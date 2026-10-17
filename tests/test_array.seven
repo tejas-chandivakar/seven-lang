@@ -1,0 +1,37 @@
+!! Test: Arrays + negative index + slice/step/reverse
+
+nums = [10, 20, 30, 40, 50]
+
+show nums[0]
+show nums[-1]
+show nums[-2]
+
+push(nums, 60)
+show nums[-1]
+
+!! Slicing
+s = slice(nums, 1, 4)
+show s[0]
+show s[1]
+show s[2]
+
+!! Step
+st = step(nums, 2)
+show st[0]
+show st[1]
+
+!! Reverse
+r = reverse(nums)
+show r[0]
+show r[1]
+
+!! Each with index
+each nums as i, n
+    show i
+    show n
+end
+
+!! Membership
+if 30 in nums
+    show "30 found"
+end

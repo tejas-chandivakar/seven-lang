@@ -1,0 +1,14 @@
+build/
+*.o
+*.obj
+*.exe
+tools/nasm/
+.vscode/
+.idea/
+
+# Generated assembly and binaries from test runs
+hello
+hello.asm
+maro_program
+maro_program.asm
+program1.asm

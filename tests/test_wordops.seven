@@ -1,0 +1,46 @@
+!! Word operators test — no symbols needed!
+
+show "--- equals / isnt ---"
+x = 10
+if x equals 10
+    show "dosh chhe"
+end
+if x isnt 5
+    show "panch nathi"
+end
+
+show "--- above / below ---"
+age = 15
+if age above 10
+    show "dosh thi upar"
+end
+if age below 20
+    show "vis thi niche"
+end
+
+show "--- atleast / atmost ---"
+score = 85
+if score atleast 80
+    show "B grade"
+end
+if score atmost 90
+    show "90 thi ochhu"
+end
+
+show "--- or if sathe ---"
+num = 7
+if num equals 1
+    show "ek"
+or if num equals 7
+    show "saat"
+else
+    show "biju"
+end
+
+show "--- is sathe (strings) ---"
+fruit = "mango"
+if fruit is "mango"
+    show "mango chhe"
+end
+
+show "done"

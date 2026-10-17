@@ -1,0 +1,302 @@
+!! ================================================
+!! SEVEN Language — Big Feature Test Program
+!! ================================================
+
+show "============================="
+show "  SEVEN Language - Big Test  "
+show "============================="
+show ""
+
+!! --- 1. Variables + Math ---
+show "--- 1. Variables + Math ---"
+x = 100
+y = 37
+sum = x + y
+diff = x - y
+prod = x * y
+show "x = {x}"
+show "y = {y}"
+show "x + y ="
+show sum
+show "x - y ="
+show diff
+show "x * y ="
+show prod
+
+!! --- 2. String Operations ---
+show ""
+show "--- 2. Strings ---"
+name = "Tejas"
+lang = "SEVEN"
+show "Welcome to {lang} language!"
+up = name.upper()
+show up
+lo = lang.lower()
+show lo
+s = "  hello world  "
+t = s.trim()
+show t
+tu = t.upper()
+show tu
+
+!! --- 3. If / Elif / Else ---
+show ""
+show "--- 3. If/Elif/Else ---"
+score = 85
+if score >= 90
+    show "Grade: A"
+elif score >= 80
+    show "Grade: B"
+elif score >= 70
+    show "Grade: C"
+else
+    show "Grade: F"
+end
+
+!! --- 4. While Loop ---
+show ""
+show "--- 4. While Loop ---"
+count = 1
+total = 0
+while count <= 5
+    total = total + count
+    count = count + 1
+end
+show "Sum 1 to 5 ="
+show total
+
+!! --- 5. Repeat Loop ---
+show ""
+show "--- 5. Repeat Loop ---"
+repeat 4
+    show "repeat!"
+end
+
+!! --- 6. Arrays ---
+show ""
+show "--- 6. Arrays ---"
+nums = [10, 20, 30, 40, 50]
+first = nums[0]
+last = nums[-1]
+show "First:"
+show first
+show "Last:"
+show last
+push(nums, 60)
+newlast = nums[-1]
+show "After push:"
+show newlast
+alen = len(nums)
+show "Length:"
+show alen
+
+!! --- 7. Each Loop ---
+show ""
+show "--- 7. Each Loop ---"
+fruits = ["apple", "banana", "mango"]
+each fruits as f
+    show f
+end
+
+!! --- 8. Each with Index ---
+show ""
+show "--- 8. Each with Index ---"
+each fruits as i, f
+    show i
+    show f
+end
+
+!! --- 9. In Operator ---
+show ""
+show "--- 9. In Operator ---"
+if "mango" in fruits
+    show "mango found!"
+end
+if "grapes" in fruits
+    show "grapes found"
+else
+    show "grapes not found"
+end
+
+!! --- 10. Slice / Reverse / Step ---
+show ""
+show "--- 10. Slice/Reverse/Step ---"
+arr = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+sl = slice(arr, 2, 6)
+show "slice(2,6):"
+show sl[0]
+show sl[1]
+show sl[2]
+show sl[3]
+rv = reverse(arr)
+show "reverse[0]:"
+show rv[0]
+st = step(arr, 3)
+show "step(3):"
+show st[0]
+show st[1]
+show st[2]
+show st[3]
+
+!! --- 11. Functions ---
+show ""
+show "--- 11. Functions ---"
+func multiply(a, b)
+    return a * b
+end
+
+func factorial(n)
+    result = 1
+    while n > 1
+        result = result * n
+        n = n - 1
+    end
+    return result
+end
+
+m56 = multiply(5, 6)
+show "5 * 6 ="
+show m56
+f5 = factorial(5)
+show "5! ="
+show f5
+f7 = factorial(7)
+show "7! ="
+show f7
+
+!! --- 12. Default Parameters ---
+show ""
+show "--- 12. Default Params ---"
+func greet(person, msg = "Namaste")
+    show msg
+    show person
+end
+
+greet("Tejas")
+greet("SEVEN", "Hello")
+
+!! --- 13. Variadic Function ---
+show ""
+show "--- 13. Variadic (many) ---"
+func sum_all(many nums)
+    total = 0
+    each nums as n
+        total = total + n
+    end
+    return total
+end
+
+func max_of(many nums)
+    m = nums[0]
+    each nums as n
+        if n > m
+            m = n
+        end
+    end
+    return m
+end
+
+sv = sum_all(1, 2, 3, 4, 5, 6)
+show "sum(1..6) ="
+show sv
+mv = max_of(3, 9, 1, 7, 4, 6, 2)
+show "max ="
+show mv
+
+!! --- 14. Try / Catch ---
+show ""
+show "--- 14. Try/Catch ---"
+try
+    show "trying..."
+    error "oops something failed"
+    show "this should not print"
+catch e
+    show "caught error:"
+    show e
+end
+show "program continues!"
+
+!! --- 15. Nested Logic ---
+show ""
+show "--- 15. Nested Logic ---"
+func is_even(n)
+    r = n - (n / 2 * 2)
+    if r == 0
+        return 1
+    end
+    return 0
+end
+
+evens = [0]
+odds = [0]
+i = 1
+while i <= 10
+    if is_even(i)
+        push(evens, i)
+    else
+        push(odds, i)
+    end
+    i = i + 1
+end
+
+show "Evens:"
+show evens[1]
+show evens[2]
+show evens[3]
+show evens[4]
+show evens[5]
+
+show "Odds:"
+show odds[1]
+show odds[2]
+show odds[3]
+
+!! --- 16. English Word Style ---
+show ""
+show "--- 16. English Word Style ---"
+age = 15
+if age atleast 18
+    show "Adult"
+or if age atleast 13
+    show "Teenager"
+else
+    show "Child"
+end
+
+day = "Monday"
+if day is "Saturday"
+    show "Weekend"
+or if day is "Monday"
+    show "Work day!"
+else
+    show "Other day"
+end
+
+if age above 10
+    show "Above ten"
+end
+if age below 20
+    show "Below twenty"
+end
+if age isnt 20
+    show "Not twenty"
+end
+
+!! --- 17. And / Or / Not ---
+show ""
+show "--- 17. And/Or/Not ---"
+x = 15
+if x above 10 and x below 20
+    show "Between 10 and 20"
+end
+if x below 5 or x above 10
+    show "Outside 5-10"
+end
+if not x equals 99
+    show "Not 99"
+end
+
+show ""
+show "============================="
+show "   ALL FEATURES WORKING!    "
+show "============================="

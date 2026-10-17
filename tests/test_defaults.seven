@@ -1,0 +1,10 @@
+!! Test default parameters
+func greet(name, count=3)
+    repeat count times as i
+        show name
+    end
+end
+
+greet("Hello", 2)
+show "---"
+greet("World")

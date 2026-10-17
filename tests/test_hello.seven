@@ -1,0 +1,2 @@
+!! Hello World — string output test
+show "Hello, World!"

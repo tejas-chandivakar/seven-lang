@@ -1,0 +1,6 @@
+!! Test push built-in
+nums = [10, 20, 30]
+push(nums, 40)
+push(nums, 50)
+show nums[3]
+show nums[4]

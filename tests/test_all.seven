@@ -1,0 +1,64 @@
+!! Test: All features integration
+
+show "=== Vars + interpolation ==="
+x = 5
+y = 10
+sum = x + y
+show "x + y = {sum}"
+
+show "=== If + in ==="
+if x in [1, 3, 5, 7]
+    show "x is in the list"
+end
+
+show "=== Each with index ==="
+words = ["one", "two", "three"]
+each words as i, w
+    show i
+    show w
+end
+
+show "=== Func + many ==="
+func maxof(many nums)
+    m = nums[0]
+    each nums as n
+        if n > m
+            m = n
+        end
+    end
+    return m
+end
+
+m = maxof(3, 7, 2, 9, 4)
+show m
+
+show "=== Negative index + slice ==="
+arr = [10, 20, 30, 40, 50]
+show arr[-1]
+s = slice(arr, 1, 4)
+show s[0]
+show s[1]
+show s[2]
+
+show "=== String methods ==="
+s = "  Hello SEVEN  "
+t = s.trim()
+u = t.upper()
+show u
+
+show "=== Try/catch ==="
+try
+    error "test error"
+catch e
+    show "caught"
+    show e
+end
+
+show "=== Push + reverse ==="
+nums = [1, 2, 3]
+push(nums, 4)
+r = reverse(nums)
+show r[0]
+show r[3]
+
+show "=== ALL TESTS PASSED ==="

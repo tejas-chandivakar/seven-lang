@@ -1,0 +1,20 @@
+!! Test built-in functions
+
+!! len()
+s = "Hello"
+show len(s)
+show len("SEVEN")
+
+!! str() - int to string (returns pointer)
+n = str(42)
+show "converted"
+
+!! int() - string to int
+x = int("123")
+show x
+
+!! Combined
+name = "SEVEN"
+show "Length of name: {name}"
+l = len(name)
+show l

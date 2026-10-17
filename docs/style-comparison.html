@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SEVEN — Style Comparison with Real Programs</title>
+<style>
+  :root {
+    --bg: #0f1419;
+    --panel: #1a2028;
+    --panel2: #232b36;
+    --border: #2f3945;
+    --text: #e6edf3;
+    --dim: #8b95a5;
+    --accent: #4fc3f7;
+    --pick: #66bb6a;
+    --skip: #ef5350;
+    --gold: #ffd54f;
+    --kw: #c792ea;
+    --str: #a5d6a7;
+    --cmt: #6a7280;
+    --num: #ffab70;
+    --fn: #82aaff;
+    --con: #ff8a80;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.55;
+  }
+  header {
+    padding: 22px 28px;
+    background: linear-gradient(90deg, #0f1419, #1a2028);
+    border-bottom: 2px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  header h1 { margin: 0 0 6px; font-size: 22px; color: var(--accent); }
+  header p { margin: 0; color: var(--dim); font-size: 13px; }
+
+  main { padding: 24px 28px; max-width: 1500px; margin: 0 auto; }
+
+  .program {
+    margin-bottom: 40px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .prog-header {
+    padding: 16px 22px;
+    background: var(--panel2);
+    border-bottom: 1px solid var(--border);
+  }
+  .prog-title {
+    font-size: 17px;
+    font-weight: bold;
+    color: var(--gold);
+    margin: 0 0 4px;
+  }
+  .prog-desc {
+    font-size: 13px;
+    color: var(--dim);
+    margin: 0;
+  }
+  .styles-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0;
+  }
+  .style-cell {
+    padding: 16px 18px;
+    border-right: 1px solid var(--border);
+    border-top: 1px solid var(--border);
+  }
+  .style-cell:nth-child(3n) { border-right: none; }
+  .style-name {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    font-weight: bold;
+    margin-bottom: 4px;
+  }
+  .style-name.hybrid { color: #4fc3f7; }
+  .style-name.natural { color: #66bb6a; }
+  .style-name.best { color: var(--gold); }
+  .style-tag {
+    display: inline-block;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-left: 6px;
+    background: var(--panel2);
+    color: var(--dim);
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  .style-desc {
+    font-size: 11px;
+    color: var(--dim);
+    margin-bottom: 10px;
+    font-style: italic;
+  }
+  pre {
+    margin: 0 0 10px;
+    padding: 12px;
+    background: #0a0e13;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: 12.5px;
+    overflow-x: auto;
+    white-space: pre;
+    line-height: 1.55;
+  }
+  .output {
+    background: #05080b;
+    border: 1px solid #1a3d1a;
+    border-left: 3px solid var(--pick);
+    border-radius: 4px;
+    padding: 10px 12px;
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: 12px;
+    color: #b8e6b8;
+    white-space: pre;
+    margin-top: 8px;
+  }
+  .output-label {
+    font-size: 10px;
+    color: var(--dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+  }
+  .stats {
+    display: flex;
+    gap: 12px;
+    margin-top: 8px;
+    font-size: 11px;
+    flex-wrap: wrap;
+  }
+  .stat-item {
+    padding: 3px 8px;
+    background: var(--panel2);
+    border-radius: 3px;
+    color: var(--dim);
+  }
+  .stat-item b { color: var(--text); }
+
+  /* syntax colors */
+  .kw { color: var(--kw); }
+  .str { color: var(--str); }
+  .cmt { color: var(--cmt); }
+  .num { color: var(--num); }
+  .fn { color: var(--fn); }
+  .con { color: var(--con); }  /* connector words: to, in, from, is, and */
+
+  .verdict {
+    padding: 12px 22px;
+    background: rgba(255, 213, 79, 0.08);
+    border-top: 1px solid var(--border);
+    font-size: 13px;
+    color: var(--gold);
+  }
+  .verdict b { color: var(--text); }
+
+  .selector-bar {
+    position: sticky;
+    top: 78px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 24px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    z-index: 50;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  }
+  .selector-bar label {
+    font-size: 13px;
+    color: var(--dim);
+  }
+  .selector-bar button {
+    padding: 8px 16px;
+    background: var(--panel2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .selector-bar button.active {
+    background: var(--gold);
+    color: #0a0e13;
+    border-color: var(--gold);
+  }
+  .selector-bar button:hover { border-color: var(--accent); }
+
+  .hidden { display: none; }
+
+  .final-vote {
+    background: var(--panel);
+    border: 2px solid var(--gold);
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin: 40px 0;
+  }
+  .final-vote h2 { margin-top: 0; color: var(--gold); }
+  .vote-btns { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+  .vote-btn {
+    padding: 12px 20px;
+    border: 2px solid var(--border);
+    background: var(--panel2);
+    color: var(--text);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .vote-btn.picked {
+    border-color: var(--pick);
+    background: rgba(102, 187, 106, 0.15);
+    color: var(--pick);
+  }
+
+  @media (max-width: 900px) {
+    .styles-grid { grid-template-columns: 1fr; }
+    .style-cell { border-right: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⚡ SEVEN — Style Comparison with Real Programs</h1>
+  <p>Same program in 3 styles side-by-side, with actual output. Click a style to focus on it.</p>
+</header>
+
+<main>
+
+<div class="selector-bar">
+  <label>Show:</label>
+  <button class="active" onclick="filter('all', this)">All 3 styles</button>
+  <button onclick="filter('hybrid', this)">🥈 Hybrid only</button>
+  <button onclick="filter('natural', this)">🥈 Natural only</button>
+  <button onclick="filter('best', this)">🥇 Best of Both only</button>
+</div>
+
+<div id="programs"></div>
+
+<div class="final-vote">
+  <h2>🗳️ Final Vote</h2>
+  <p>Badha programs joya pachhi — kaya style ma SEVEN javu joie?</p>
+  <div class="vote-btns" id="voteBtns">
+    <button class="vote-btn" data-val="hybrid" onclick="vote('hybrid', this)">🥈 Hybrid (current)</button>
+    <button class="vote-btn" data-val="natural" onclick="vote('natural', this)">🥈 Natural Command</button>
+    <button class="vote-btn" data-val="best" onclick="vote('best', this)">🥇 Best of Both (hybrid mix)</button>
+    <button class="vote-btn" data-val="custom" onclick="vote('custom', this)">✏️ Custom (I'll say in chat)</button>
+  </div>
+  <p id="voteResult" style="margin-top:14px;color:var(--pick);font-weight:bold"></p>
+</div>
+
+</main>
+
+<script>
+const PROGRAMS = [
+  {
+    title: "1️⃣ Hello World + Input",
+    desc: "Ask user's name, greet them",
+    hybrid: {
+      code: `<span class="kw">show</span> <span class="str">"Hello!"</span>
+name = <span class="kw">ask</span> <span class="str">"Your name; "</span>
+<span class="kw">show</span> <span class="str">"Hi"</span>, name</span>`,
+      output: `Hello!
+Your name; Tejas
+Hi Tejas`,
+      chars: 68
+    },
+    natural: {
+      code: `<span class="kw">show</span> <span class="str">"Hello!"</span>
+<span class="kw">ask</span> name
+<span class="kw">show</span> <span class="str">"Hi "</span> <span class="con">and</span> name</span>`,
+      output: `Hello!
+name; Tejas
+Hi Tejas`,
+      chars: 60
+    },
+    best: {
+      code: `<span class="kw">show</span> <span class="str">"Hello!"</span>
+<span class="kw">ask</span> name
+<span class="kw">show</span> <span class="str">"Hi"</span>, name</span>`,
+      output: `Hello!
+name; Tejas
+Hi Tejas`,
+      chars: 56
+    },
+    verdict: "🥇 <b>Best of Both wins</b> — shortest, `ask name` (no `=`), still uses comma for join"
+  },
+
+  {
+    title: "2️⃣ Simple Math",
+    desc: "Add two numbers and show result",
+    hybrid: {
+      code: `x = <span class="num">10</span>
+y = <span class="num">20</span>
+total = x + y
+<span class="kw">show</span> total`,
+      output: `30`,
+      chars: 40
+    },
+    natural: {
+      code: `<span class="kw">set</span> x <span class="con">to</span> <span class="num">10</span>
+<span class="kw">set</span> y <span class="con">to</span> <span class="num">20</span>
+<span class="kw">add</span> x <span class="con">and</span> y <span class="con">giving</span> total
+<span class="kw">show</span> total`,
+      output: `30`,
+      chars: 60
+    },
+    best: {
+      code: `x = <span class="num">10</span>
+y = <span class="num">20</span>
+total = x + y
+<span class="kw">show</span> total`,
+      output: `30`,
+      chars: 40
+    },
+    verdict: "🥇 <b>Hybrid/Best win</b> — math is universal, `=` and `+` fine. Natural too wordy."
+  },
+
+  {
+    title: "3️⃣ If / Else",
+    desc: "Check age, show adult or child",
+    hybrid: {
+      code: `age = <span class="num">20</span>
+
+<span class="kw">if</span> age &gt; <span class="num">18</span>;
+    <span class="kw">show</span> <span class="str">"adult"</span>
+<span class="kw">else</span>;
+    <span class="kw">show</span> <span class="str">"child"</span>
+<span class="kw">end</span>`,
+      output: `adult`,
+      chars: 74
+    },
+    natural: {
+      code: `age = <span class="num">20</span>
+
+<span class="kw">if</span> age <span class="con">is above</span> <span class="num">18</span>;
+    <span class="kw">show</span> <span class="str">"adult"</span>
+<span class="kw">otherwise</span>;
+    <span class="kw">show</span> <span class="str">"child"</span>
+<span class="kw">end</span>`,
+      output: `adult`,
+      chars: 92
+    },
+    best: {
+      code: `age = <span class="num">20</span>
+
+<span class="kw">if</span> age <span class="con">is above</span> <span class="num">18</span>;
+    <span class="kw">show</span> <span class="str">"adult"</span>
+<span class="kw">else</span>;
+    <span class="kw">show</span> <span class="str">"child"</span>
+<span class="kw">end</span>`,
+      output: `adult`,
+      chars: 86
+    },
+    verdict: "🥈 <b>Close call</b> — Natural is very readable; Hybrid is shorter. Best keeps `is above` but uses `else`."
+  },
+
+  {
+    title: "4️⃣ Loop with Counter",
+    desc: "Print 1 to 5",
+    hybrid: {
+      code: `<span class="kw">repeat</span> <span class="num">5</span> <span class="kw">as</span> i;
+    <span class="kw">show</span> i + <span class="num">1</span>
+<span class="kw">end</span>`,
+      output: `1
+2
+3
+4
+5`,
+      chars: 42
+    },
+    natural: {
+      code: `<span class="kw">repeat</span> <span class="num">5</span> <span class="kw">times</span> <span class="kw">as</span> i;
+    <span class="kw">show</span> i + <span class="num">1</span>
+<span class="kw">end</span>`,
+      output: `1
+2
+3
+4
+5`,
+      chars: 48
+    },
+    best: {
+      code: `<span class="kw">repeat</span> <span class="num">5</span> <span class="kw">times</span> <span class="kw">as</span> i;
+    <span class="kw">show</span> i + <span class="num">1</span>
+<span class="kw">end</span>`,
+      output: `1
+2
+3
+4
+5`,
+      chars: 48
+    },
+    verdict: "🥇 <b>Best/Natural</b> — `5 times` is clearer than just `5`. 6 extra chars is worth it."
+  },
+
+  {
+    title: "5️⃣ List Operations",
+    desc: "Create list, add item, print each",
+    hybrid: {
+      code: `fruits = [<span class="str">"apple"</span>, <span class="str">"banana"</span>]
+<span class="fn">push</span>(fruits, <span class="str">"mango"</span>)
+
+<span class="kw">each</span> fruits <span class="kw">as</span> f;
+    <span class="kw">show</span> f
+<span class="kw">end</span>`,
+      output: `apple
+banana
+mango`,
+      chars: 90
+    },
+    natural: {
+      code: `<span class="kw">make list</span> <span class="con">of</span> <span class="str">"apple"</span>, <span class="str">"banana"</span> <span class="con">as</span> fruits
+<span class="kw">add</span> <span class="str">"mango"</span> <span class="con">to</span> fruits
+
+<span class="kw">for each</span> f <span class="con">in</span> fruits;
+    <span class="kw">show</span> f
+<span class="kw">end</span>`,
+      output: `apple
+banana
+mango`,
+      chars: 108
+    },
+    best: {
+      code: `fruits = [<span class="str">"apple"</span>, <span class="str">"banana"</span>]
+<span class="kw">add</span> <span class="str">"mango"</span> <span class="con">to</span> fruits
+
+<span class="kw">for each</span> f <span class="con">in</span> fruits;
+    <span class="kw">show</span> f
+<span class="kw">end</span>`,
+      output: `apple
+banana
+mango`,
+      chars: 96
+    },
+    verdict: "🥇 <b>Best of Both wins</b> — Keep `[...]` for creation (short), use `add x to list` (readable), `for each ... in ...` (English)"
+  },
+
+  {
+    title: "6️⃣ Function Definition",
+    desc: "Add two numbers via function",
+    hybrid: {
+      code: `<span class="kw">func</span> <span class="fn">add</span>(a, b);
+    <span class="kw">return</span> a + b
+<span class="kw">end</span>
+
+<span class="kw">show</span> <span class="fn">add</span>(<span class="num">10</span>, <span class="num">20</span>)</span>`,
+      output: `30`,
+      chars: 54
+    },
+    natural: {
+      code: `<span class="kw">to</span> <span class="fn">add</span> <span class="con">with</span> a <span class="con">and</span> b;
+    <span class="kw">give back</span> a + b
+<span class="kw">end</span>
+
+<span class="kw">use</span> <span class="fn">add</span> <span class="con">with</span> <span class="num">10</span> <span class="con">and</span> <span class="num">20</span></span>`,
+      output: `30`,
+      chars: 72
+    },
+    best: {
+      code: `<span class="kw">func</span> <span class="fn">add</span>(a, b);
+    <span class="kw">return</span> a + b
+<span class="kw">end</span>
+
+<span class="kw">show</span> <span class="fn">add</span>(<span class="num">10</span>, <span class="num">20</span>)</span>`,
+      output: `30`,
+      chars: 54
+    },
+    verdict: "🥇 <b>Hybrid/Best win</b> — `func` and `return` are universal. Natural's `to add with a and b` reads oddly."
+  },
+
+  {
+    title: "7️⃣ Real Program: Calculator",
+    desc: "Ask for two numbers and operator, calculate",
+    hybrid: {
+      code: `<span class="kw">show</span> <span class="str">"Calculator"</span>
+a = <span class="kw">ask</span> <span class="str">"First; "</span>
+op = <span class="kw">ask</span> <span class="str">"Operator; "</span>
+b = <span class="kw">ask</span> <span class="str">"Second; "</span>
+
+<span class="kw">if</span> op == <span class="str">"+"</span>;
+    <span class="kw">show</span> a + b
+<span class="kw">elif</span> op == <span class="str">"-"</span>;
+    <span class="kw">show</span> a - b
+<span class="kw">elif</span> op == <span class="str">"*"</span>;
+    <span class="kw">show</span> a * b
+<span class="kw">elif</span> op == <span class="str">"/"</span>;
+    <span class="kw">show</span> a / b
+<span class="kw">end</span></span>`,
+      output: `Calculator
+First; 15
+Operator; +
+Second; 25
+40`,
+      chars: 190
+    },
+    natural: {
+      code: `<span class="kw">show</span> <span class="str">"Calculator"</span>
+<span class="kw">ask</span> <span class="str">"First"</span> <span class="con">as</span> a
+<span class="kw">ask</span> <span class="str">"Operator"</span> <span class="con">as</span> op
+<span class="kw">ask</span> <span class="str">"Second"</span> <span class="con">as</span> b
+
+<span class="kw">if</span> op <span class="con">is same as</span> <span class="str">"+"</span>;
+    <span class="kw">show</span> a + b
+<span class="kw">elif</span> op <span class="con">is same as</span> <span class="str">"-"</span>;
+    <span class="kw">show</span> a - b
+<span class="kw">elif</span> op <span class="con">is same as</span> <span class="str">"*"</span>;
+    <span class="kw">show</span> a * b
+<span class="kw">elif</span> op <span class="con">is same as</span> <span class="str">"/"</span>;
+    <span class="kw">show</span> a / b
+<span class="kw">end</span></span>`,
+      output: `Calculator
+First; 15
+Operator; +
+Second; 25
+40`,
+      chars: 232
+    },
+    best: {
+      code: `<span class="kw">show</span> <span class="str">"Calculator"</span>
+<span class="kw">ask</span> <span class="str">"First"</span> <span class="con">as</span> a
+<span class="kw">ask</span> <span class="str">"Operator"</span> <span class="con">as</span> op
+<span class="kw">ask</span> <span class="str">"Second"</span> <span class="con">as</span> b
+
+<span class="kw">match</span> op;
+    <span class="str">"+"</span> =&gt; <span class="kw">show</span> a + b
+    <span class="str">"-"</span> =&gt; <span class="kw">show</span> a - b
+    <span class="str">"*"</span> =&gt; <span class="kw">show</span> a * b
+    <span class="str">"/"</span> =&gt; <span class="kw">show</span> a / b
+<span class="kw">end</span></span>`,
+      output: `Calculator
+First; 15
+Operator; +
+Second; 25
+40`,
+      chars: 174
+    },
+    verdict: "🥇 <b>Best of Both wins</b> — `ask X as Y` cleaner, `match` shorter than 4 elifs, universal `+`"
+  },
+
+  {
+    title: "8️⃣ Real Program: Guessing Game",
+    desc: "User guesses number 1-100, get hints, count tries",
+    hybrid: {
+      code: `secret = <span class="fn">random</span>(<span class="num">1</span>, <span class="num">100</span>)
+tries = <span class="num">0</span>
+
+<span class="kw">while</span> <span class="kw">true</span>;
+    guess = <span class="kw">ask</span> <span class="str">"Guess; "</span>
+    tries = tries + <span class="num">1</span>
+
+    <span class="kw">if</span> guess == secret;
+        <span class="kw">show</span> <span class="str">"Correct in"</span>, tries, <span class="str">"tries"</span>
+        <span class="kw">stop</span>
+    <span class="kw">elif</span> guess &gt; secret;
+        <span class="kw">show</span> <span class="str">"Too high"</span>
+    <span class="kw">else</span>;
+        <span class="kw">show</span> <span class="str">"Too low"</span>
+    <span class="kw">end</span>
+<span class="kw">end</span></span>`,
+      output: `Guess; 50
+Too high
+Guess; 25
+Too low
+Guess; 37
+Correct in 3 tries`,
+      chars: 234
+    },
+    natural: {
+      code: `<span class="kw">set</span> secret <span class="con">to</span> <span class="fn">random</span> <span class="con">from</span> <span class="num">1</span> <span class="con">to</span> <span class="num">100</span>
+<span class="kw">set</span> tries <span class="con">to</span> <span class="num">0</span>
+
+<span class="kw">keep going</span>;
+    <span class="kw">ask</span> <span class="str">"Guess"</span> <span class="con">as</span> guess
+    <span class="kw">add</span> <span class="num">1</span> <span class="con">to</span> tries
+
+    <span class="kw">if</span> guess <span class="con">is same as</span> secret;
+        <span class="kw">show</span> <span class="str">"Correct in "</span> <span class="con">and</span> tries <span class="con">and</span> <span class="str">" tries"</span>
+        <span class="kw">stop</span>
+    <span class="kw">elif</span> guess <span class="con">is above</span> secret;
+        <span class="kw">show</span> <span class="str">"Too high"</span>
+    <span class="kw">otherwise</span>;
+        <span class="kw">show</span> <span class="str">"Too low"</span>
+    <span class="kw">end</span>
+<span class="kw">end</span></span>`,
+      output: `Guess; 50
+Too high
+Guess; 25
+Too low
+Guess; 37
+Correct in 3 tries`,
+      chars: 278
+    },
+    best: {
+      code: `secret = <span class="fn">random</span>(<span class="num">1</span>, <span class="num">100</span>)
+tries = <span class="num">0</span>
+
+<span class="kw">while</span> <span class="kw">true</span>;
+    <span class="kw">ask</span> <span class="str">"Guess"</span> <span class="con">as</span> guess
+    tries = tries + <span class="num">1</span>
+
+    <span class="kw">if</span> guess == secret;
+        <span class="kw">show</span> <span class="str">"Correct in"</span>, tries, <span class="str">"tries"</span>
+        <span class="kw">stop</span>
+    <span class="kw">elif</span> guess &gt; secret;
+        <span class="kw">show</span> <span class="str">"Too high"</span>
+    <span class="kw">else</span>;
+        <span class="kw">show</span> <span class="str">"Too low"</span>
+    <span class="kw">end</span>
+<span class="kw">end</span></span>`,
+      output: `Guess; 50
+Too high
+Guess; 25
+Too low
+Guess; 37
+Correct in 3 tries`,
+      chars: 224
+    },
+    verdict: "🥇 <b>Best of Both wins</b> — shortest AND readable. `ask X as Y` combined with universal `==`, `>`, `+`."
+  },
+
+  {
+    title: "9️⃣ Real Program: Word Counter",
+    desc: "Read file, count words containing 'error'",
+    hybrid: {
+      code: `data = <span class="kw">read</span> <span class="str">"log.txt"</span>
+lines = <span class="fn">split</span>(data, <span class="str">"\\n"</span>)
+count = <span class="num">0</span>
+
+<span class="kw">each</span> lines <span class="kw">as</span> line;
+    <span class="kw">if</span> <span class="fn">contains</span>(line, <span class="str">"error"</span>);
+        count = count + <span class="num">1</span>
+    <span class="kw">end</span>
+<span class="kw">end</span>
+
+<span class="kw">show</span> <span class="str">"Errors;"</span>, count</span>`,
+      output: `Errors; 7`,
+      chars: 150
+    },
+    natural: {
+      code: `<span class="kw">open</span> <span class="str">"log.txt"</span> <span class="con">as</span> data
+<span class="kw">set</span> lines <span class="con">to</span> <span class="fn">split</span> data <span class="con">by</span> newline
+<span class="kw">set</span> count <span class="con">to</span> <span class="num">0</span>
+
+<span class="kw">for each</span> line <span class="con">in</span> lines;
+    <span class="kw">if</span> line <span class="con">has</span> <span class="str">"error"</span>;
+        <span class="kw">add</span> <span class="num">1</span> <span class="con">to</span> count
+    <span class="kw">end</span>
+<span class="kw">end</span>
+
+<span class="kw">show</span> <span class="str">"Errors; "</span> <span class="con">and</span> count</span>`,
+      output: `Errors; 7`,
+      chars: 168
+    },
+    best: {
+      code: `<span class="kw">open</span> <span class="str">"log.txt"</span> <span class="con">as</span> data
+lines = data.<span class="fn">split</span>(<span class="str">"\\n"</span>)
+count = <span class="num">0</span>
+
+<span class="kw">for each</span> line <span class="con">in</span> lines;
+    <span class="kw">if</span> line <span class="con">has</span> <span class="str">"error"</span>;
+        count = count + <span class="num">1</span>
+    <span class="kw">end</span>
+<span class="kw">end</span>
+
+<span class="kw">show</span> <span class="str">"Errors;"</span>, count</span>`,
+      output: `Errors; 7`,
+      chars: 150
+    },
+    verdict: "🥇 <b>Best of Both wins</b> — `open X as Y` clear, method style `.split()` clean, `has` reads well"
+  },
+
+  {
+    title: "🔟 Class Example",
+    desc: "Dog class with bark method",
+    hybrid: {
+      code: `<span class="kw">class</span> <span class="fn">Dog</span>;
+    name = <span class="str">""</span>
+
+    <span class="kw">func</span> <span class="fn">bark</span>();
+        <span class="kw">show</span> <span class="kw">this</span>.name, <span class="str">"says Woof"</span>
+    <span class="kw">end</span>
+<span class="kw">end</span>
+
+d = <span class="fn">Dog</span>()
+d.name = <span class="str">"Tommy"</span>
+d.<span class="fn">bark</span>()</span>`,
+      output: `Tommy says Woof`,
+      chars: 116
+    },
+    natural: {
+      code: `<span class="kw">make class</span> <span class="fn">Dog</span>;
+    <span class="kw">has</span> name <span class="con">as</span> <span class="str">""</span>
+
+    <span class="kw">to</span> <span class="fn">bark</span>;
+        <span class="kw">show</span> <span class="kw">this</span>.name <span class="con">and</span> <span class="str">"says Woof"</span>
+    <span class="kw">end</span>
+<span class="kw">end</span>
+
+<span class="kw">set</span> d <span class="con">to</span> <span class="kw">new</span> <span class="fn">Dog</span>
+<span class="kw">change</span> d.name <span class="con">to</span> <span class="str">"Tommy"</span>
+d.<span class="fn">bark</span>()</span>`,
+      output: `Tommy says Woof`,
+      chars: 138
+    },
+    best: {
+      code: `<span class="kw">class</span> <span class="fn">Dog</span>;
+    name = <span class="str">""</span>
+
+    <span class="kw">func</span> <span class="fn">bark</span>();
+        <span class="kw">show</span> <span class="kw">this</span>.name, <span class="str">"says Woof"</span>
+    <span class="kw">end</span>
+<span class="kw">end</span>
+
+d = <span class="fn">Dog</span>()
+d.name = <span class="str">"Tommy"</span>
+d.<span class="fn">bark</span>()</span>`,
+      output: `Tommy says Woof`,
+      chars: 116
+    },
+    verdict: "🥇 <b>Hybrid/Best win</b> — Classes are technical; Natural forces `make class`, `has X as Y` awkward."
+  }
+];
+
+const STYLES = {
+  hybrid: {
+    name: "Hybrid Style",
+    tag: "Current SEVEN",
+    desc: "Word-symbol balance. Python-like."
+  },
+  natural: {
+    name: "Natural Command",
+    tag: "Style 1+4",
+    desc: "Full English sentences. Verb-first."
+  },
+  best: {
+    name: "Best of Both",
+    tag: "Recommended",
+    desc: "Hybrid math + Natural I/O + Natural lists"
+  }
+};
+
+function renderPrograms() {
+  const container = document.getElementById("programs");
+  let html = "";
+  PROGRAMS.forEach((p, idx) => {
+    html += `<div class="program" data-idx="${idx}">
+      <div class="prog-header">
+        <h3 class="prog-title">${p.title}</h3>
+        <p class="prog-desc">${p.desc}</p>
+      </div>
+      <div class="styles-grid">`;
+    ["hybrid", "natural", "best"].forEach(sk => {
+      const s = STYLES[sk];
+      const prog = p[sk];
+      html += `<div class="style-cell" data-style="${sk}">
+        <div class="style-name ${sk}">${s.name}<span class="style-tag">${s.tag}</span></div>
+        <div class="style-desc">${s.desc}</div>
+        <pre>${prog.code}</pre>
+        <div class="output-label">Output;</div>
+        <div class="output">${prog.output}</div>
+        <div class="stats">
+          <div class="stat-item">Chars: <b>${prog.chars}</b></div>
+        </div>
+      </div>`;
+    });
+    html += `</div>
+      <div class="verdict">${p.verdict}</div>
+    </div>`;
+  });
+  container.innerHTML = html;
+}
+
+function filter(mode, btn) {
+  document.querySelectorAll(".selector-bar button").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  document.querySelectorAll(".style-cell").forEach(c => {
+    if (mode === "all" || c.dataset.style === mode) c.classList.remove("hidden");
+    else c.classList.add("hidden");
+  });
+  document.querySelectorAll(".styles-grid").forEach(g => {
+    g.style.gridTemplateColumns = mode === "all" ? "repeat(3, 1fr)" : "1fr";
+  });
+}
+
+function vote(val, btn) {
+  document.querySelectorAll(".vote-btn").forEach(b => b.classList.remove("picked"));
+  btn.classList.add("picked");
+  localStorage.setItem("seven-style-vote", val);
+  const map = {
+    hybrid: "Hybrid Style — Claude ne kaho; 'Hybrid finalize kar'",
+    natural: "Natural Command — Claude ne kaho; 'Natural Command finalize kar'",
+    best: "Best of Both — Claude ne kaho; 'Best of Both finalize kar'",
+    custom: "Custom — chat ma kaho shu joie chhe"
+  };
+  document.getElementById("voteResult").textContent = "✅ Selected; " + map[val];
+}
+
+renderPrograms();
+const saved = localStorage.getItem("seven-style-vote");
+if (saved) {
+  const btn = document.querySelector(`.vote-btn[data-val="${saved}"]`);
+  if (btn) btn.click();
+}
+</script>
+</body>
+</html>

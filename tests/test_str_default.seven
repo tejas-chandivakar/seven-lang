@@ -1,0 +1,9 @@
+!! Test string default parameters
+func greet(name, greeting = "Hello")
+    show greeting
+    show name
+end
+
+greet("SEVEN")
+show "---"
+greet("SEVEN", "Namaste")

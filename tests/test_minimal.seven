@@ -1,0 +1,4 @@
+!! Minimal test — first program to compile
+x = 5
+y = 10
+show x + y

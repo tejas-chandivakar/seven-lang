@@ -1,0 +1,46 @@
+!!!
+   SEVEN - Hybrid Mode Demo
+   Shows 'mode hybrid' array syntax (default)
+!!!
+mode hybrid
+
+show "=== Hybrid Mode Demo ==="
+
+!! Variables + I/O (same as natural)
+name = ask "Your name"
+show "Hello, {name}!"
+
+!! Arrays — function-style
+fruits = ["apple", "banana"]
+
+push(fruits, "mango")
+push(fruits, "grape")
+show "Fruits: {fruits}"
+
+remove(fruits, 0)
+show "After remove: {fruits}"
+
+insert(fruits, 1, "kiwi")
+show "After insert: {fruits}"
+
+last = pop(fruits)
+show "Popped: {last}"
+show "Remaining: {fruits}"
+
+!! Loops (same as natural)
+each fruits as i, f
+    show "{i}: {f}"
+end
+
+!! Functions
+func count_items(many items)
+    return len(items)
+end
+
+show "Count: {count_items("a", "b", "c")}"
+
+!! Built-in functions
+show "Length: {len(fruits)}"
+show "Reversed: {reverse(fruits)}"
+
+show "=== Done ==="

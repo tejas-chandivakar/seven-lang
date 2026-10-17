@@ -1,0 +1,18 @@
+!!!
+   SEVEN Language - Hello World
+   Phase 1 basic example
+   Author: Tejas Chandivakar
+!!!
+
+show "Hello, SEVEN!"
+show "Fast as Assembly. Simple as Python."
+
+!! Auto-interpolation
+name = ask "Naam: "
+age = ask "Umar: "
+
+show "Namaste, {name}!"
+show "Tamari umar: {age}"
+
+!! Multi-arg show (auto space)
+show "Naam:", name, "Umar:", age

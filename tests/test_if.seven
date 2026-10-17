@@ -1,0 +1,10 @@
+!! Test: If / Elif / Else
+x = 15
+
+if x > 10
+    show "Greater than 10"
+elif x == 10
+    show "Equal to 10"
+else
+    show "Less than 10"
+end

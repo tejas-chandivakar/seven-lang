@@ -1,0 +1,46 @@
+!!!
+   SEVEN - Natural Mode Demo
+   Shows 'mode natural' array syntax
+!!!
+mode natural
+
+show "=== Natural Mode Demo ==="
+
+!! Variables + I/O (same as hybrid)
+name = ask "Your name"
+show "Hello, {name}!"
+
+!! Arrays — natural commands
+fruits = ["apple", "banana"]
+
+add "mango" to fruits
+add "grape" to fruits
+show "Fruits: {fruits}"
+
+remove 0 from fruits
+show "After remove: {fruits}"
+
+insert "kiwi" at 1 in fruits
+show "After insert: {fruits}"
+
+last = pop from fruits
+show "Popped: {last}"
+show "Remaining: {fruits}"
+
+!! Loops (same as hybrid)
+each fruits as i, f
+    show "{i}: {f}"
+end
+
+!! Functions (same as hybrid — parentheses)
+func count_items(many items)
+    return len(items)
+end
+
+show "Count: {count_items("a", "b", "c")}"
+
+!! Built-in functions still use ()
+show "Length: {len(fruits)}"
+show "Reversed: {reverse(fruits)}"
+
+show "=== Done ==="

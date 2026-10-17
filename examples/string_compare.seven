@@ -1,0 +1,163 @@
+!! ================================================
+!! SEVEN Language — String Comparison Demo
+!! English word style  : word is "value"
+!! Hybrid style        : word.equals("value")
+!! ================================================
+
+show "=============================="
+show "  String Comparison in SEVEN  "
+show "=============================="
+show ""
+
+!! ----------------------------------------
+!! 1. English Word Style — 'is' keyword
+!! ----------------------------------------
+show "--- 1. English Word Style ---"
+
+color = "red"
+
+if color is "red"
+    show "Rang: Lal (Red)"
+elif color is "blue"
+    show "Rang: Nilo (Blue)"
+elif color is "green"
+    show "Rang: Lilo (Green)"
+else
+    show "Rang: Khabhar nathi"
+end
+
+show ""
+
+!! Season check
+season = "winter"
+
+if season is "summer"
+    show "Garmi chhe!"
+elif season is "winter"
+    show "Thand chhe!"
+elif season is "monsoon"
+    show "Varsa chhe!"
+else
+    show "Season khabhar nathi"
+end
+
+show ""
+
+!! ----------------------------------------
+!! 2. Hybrid Style — .equals() method
+!! ----------------------------------------
+show "--- 2. Hybrid Style ---"
+
+lang = "SEVEN"
+
+if lang.equals("Python")
+    show "Python language"
+elif lang.equals("Java")
+    show "Java language"
+elif lang.equals("SEVEN")
+    show "SEVEN language — Our own!"
+else
+    show "Unknown language"
+end
+
+show ""
+
+!! Day check
+day = "Monday"
+
+if day.equals("Saturday")
+    show "Weekend!"
+elif day.equals("Sunday")
+    show "Weekend!"
+elif day.equals("Monday")
+    show "Kaam shuru!"
+else
+    show "Weekday chhe"
+end
+
+show ""
+
+!! ----------------------------------------
+!! 3. Banne sathe — not sathe
+!! ----------------------------------------
+show "--- 3. not sathe ---"
+
+fruit = "mango"
+
+if not fruit is "apple"
+    show "Apple nathi"
+end
+
+if not fruit.equals("banana")
+    show "Banana nathi"
+end
+
+if fruit is "mango"
+    show "Mango chhe!"
+end
+
+show ""
+
+!! ----------------------------------------
+!! 4. Array ma words check
+!! ----------------------------------------
+show "--- 4. Array + is ---"
+
+cities = ["Surat", "Ahmedabad", "Vadodara", "Rajkot"]
+
+each cities as c
+    if c is "Surat"
+        show "Surat — Diamond City!"
+    elif c is "Ahmedabad"
+        show "Ahmedabad — Manchester of India!"
+    else
+        show c
+    end
+end
+
+show ""
+
+!! ----------------------------------------
+!! 5. Function ma string check
+!! ----------------------------------------
+show "--- 5. Function sathe ---"
+
+func greet_lang(name)
+    if name is "Gujarati"
+        show "Kem cho!"
+    elif name is "Hindi"
+        show "Namaste!"
+    elif name is "English"
+        show "Hello!"
+    else
+        show "Hi!"
+    end
+end
+
+func check_grade(grade)
+    if grade.equals("A")
+        show "Excellent!"
+    elif grade.equals("B")
+        show "Good!"
+    elif grade.equals("C")
+        show "Average"
+    else
+        show "Improve karo"
+    end
+end
+
+greet_lang("Gujarati")
+greet_lang("Hindi")
+greet_lang("English")
+greet_lang("French")
+
+show ""
+
+check_grade("A")
+check_grade("B")
+check_grade("D")
+
+show ""
+show "=============================="
+show "        DEMO COMPLETE!        "
+show "=============================="

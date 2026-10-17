@@ -1,0 +1,33 @@
+!! Test: Error handling with `error` keyword
+
+try
+    x = 10 / 0
+catch
+    err "Division by zero pakadyu!"
+done
+    show "Cleanup"
+end
+
+try
+    data = read "nonexistent.txt"
+catch FileNotFound
+    err "File nathi!"
+catch
+    err "Other error"
+done
+    show "Done"
+end
+
+!! Manual throw
+func divide(a, b)
+    if b == 0
+        error "cannot divide by zero"
+    end
+    return a / b
+end
+
+try
+    show divide(10, 0)
+catch e
+    err "caught: {e}"
+end

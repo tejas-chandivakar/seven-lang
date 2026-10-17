@@ -1,0 +1,26 @@
+!! Test string methods
+s = "Hello World"
+
+!! upper/lower
+u = s.upper()
+show u
+
+lo = s.lower()
+show lo
+
+!! trim
+t = "  spaces  "
+trimmed = t.trim()
+show trimmed
+
+!! contains
+c = s.contains("World")
+show c
+
+!! replace
+r = s.replace("World", "SEVEN")
+show r
+
+!! len method
+l = s.len()
+show l

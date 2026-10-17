@@ -1,0 +1,46 @@
+!! SEVEN - Loops example
+
+!! Basic repeat
+repeat 5
+    show "Hello"
+end
+
+!! Repeat with index
+repeat 5 times as i
+    show "iteration {i}"
+end
+
+!! While loop
+x = 0
+while x < 5
+    show "x = {x}"
+    x = x + 1
+end
+
+!! For-each with index (index first, value second)
+nums = [10, 20, 30, 40, 50]
+each nums as i, n
+    show "nums[{i}] = {n}"
+end
+
+!! For-each without index (value only)
+each nums as n
+    show n
+end
+
+!! Loop control (skip / stop)
+repeat 10 times as i
+    if i == 3
+        skip
+    end
+    if i == 7
+        stop
+    end
+    show i
+end
+
+!! Membership check
+target = 20
+if target in nums
+    show "{target} found"
+end

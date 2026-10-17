@@ -1,0 +1,6 @@
+!! Test: Variables
+x = 10
+y = 20
+show x
+show y
+show x + y

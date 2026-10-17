@@ -1,0 +1,3 @@
+name = "Tejas"
+show "Hello {name}!"
+show "SEVEN language kaam kare chhe!"

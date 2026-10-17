@@ -1,0 +1,7 @@
+!! Test: Math
+show 2 + 3
+show 10 - 4
+show 6 * 7
+show 20 / 4
+show 10 % 3
+show 2 ** 8

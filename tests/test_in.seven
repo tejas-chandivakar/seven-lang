@@ -1,0 +1,12 @@
+!! Test in operator
+nums = [1, 3, 5, 7, 9]
+
+if 5 in nums
+    show "found 5"
+end
+
+if 10 in nums
+    show "found 10"
+else
+    show "10 not found"
+end

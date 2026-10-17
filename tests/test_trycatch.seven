@@ -1,0 +1,10 @@
+!! Test try/catch
+try
+    show "before error"
+    error "something went wrong"
+    show "after error"
+catch e
+    show "caught"
+    show e
+end
+show "done"

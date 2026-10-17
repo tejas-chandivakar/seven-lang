@@ -1,0 +1,10 @@
+!! No indent test
+word = "mango"
+if word is "apple"
+show "apple"
+or if word is "mango"
+show "mango chhe"
+else
+show "koi nahi"
+end
+show "done"

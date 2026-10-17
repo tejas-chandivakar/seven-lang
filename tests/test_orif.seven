@@ -1,0 +1,32 @@
+!! "or if" syntax test — child-friendly
+
+show "--- or if test ---"
+
+word = "mango"
+
+if word is "apple"
+    show "apple chhe"
+or if word is "mango"
+    show "mango chhe"
+or if word is "banana"
+    show "banana chhe"
+else
+    show "koi pan nahi"
+end
+
+show ""
+
+!! Number test with or if
+num = 7
+
+if num == 1
+    show "ek"
+or if num == 2
+    show "be"
+or if num == 7
+    show "saat"
+else
+    show "biju number"
+end
+
+show "done"

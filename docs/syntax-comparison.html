@@ -1,0 +1,1349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SEVEN vs Python — Visual Syntax Selector</title>
+<style>
+  :root {
+    --bg: #0f1419;
+    --panel: #1a2028;
+    --panel2: #232b36;
+    --border: #2f3945;
+    --text: #e6edf3;
+    --dim: #8b95a5;
+    --accent: #4fc3f7;
+    --pick: #66bb6a;
+    --skip: #ef5350;
+    --python: #ffca28;
+    --seven: #4fc3f7;
+    --kw: #c792ea;
+    --str: #a5d6a7;
+    --cmt: #6a7280;
+    --num: #ffab70;
+    --fn: #82aaff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+  }
+  header {
+    padding: 22px 28px;
+    background: linear-gradient(90deg, #0f1419, #1a2028);
+    border-bottom: 2px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  header h1 {
+    margin: 0 0 6px;
+    font-size: 22px;
+    color: var(--accent);
+  }
+  header p { margin: 0; color: var(--dim); font-size: 13px; }
+  .stats {
+    display: flex;
+    gap: 14px;
+    margin-top: 10px;
+    font-size: 12px;
+    flex-wrap: wrap;
+  }
+  .stat {
+    padding: 4px 12px;
+    background: var(--panel);
+    border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+  .stat b { color: var(--accent); }
+  main { padding: 24px 28px; max-width: 1500px; margin: 0 auto; }
+  .section {
+    margin-bottom: 30px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .section-header {
+    padding: 12px 20px;
+    background: var(--panel2);
+    border-bottom: 1px solid var(--border);
+    font-weight: bold;
+    font-size: 15px;
+    color: var(--accent);
+  }
+  .feature {
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .feature:last-child { border-bottom: none; }
+  .feature-title {
+    font-size: 15px;
+    font-weight: bold;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+  .feature-note {
+    font-size: 12px;
+    color: var(--dim);
+    margin-bottom: 14px;
+    font-style: italic;
+  }
+  .compare {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 16px;
+  }
+  .py-col {
+    background: #0a0e13;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+  }
+  .col-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+    font-weight: bold;
+  }
+  .col-label.py { color: var(--python); }
+  .col-label.sv { color: var(--seven); }
+  pre {
+    margin: 0;
+    padding: 8px 10px;
+    background: #0a0e13;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: 12.5px;
+    overflow-x: auto;
+    white-space: pre;
+    line-height: 1.5;
+  }
+  .py-col pre { border: none; padding: 4px 0; background: transparent; }
+  .sv-options {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .opt-card {
+    background: #0a0e13;
+    border: 2px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+  }
+  .opt-card:hover {
+    border-color: var(--accent);
+    background: #12181f;
+  }
+  .opt-card.selected {
+    border-color: var(--pick);
+    background: rgba(102, 187, 106, 0.08);
+    box-shadow: 0 0 0 1px var(--pick);
+  }
+  .opt-card.selected.skip {
+    border-color: var(--skip);
+    background: rgba(239, 83, 80, 0.08);
+    box-shadow: 0 0 0 1px var(--skip);
+  }
+  .opt-badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 2px 8px;
+    border-radius: 3px;
+    background: var(--panel2);
+    color: var(--dim);
+    margin-bottom: 6px;
+  }
+  .opt-card.selected .opt-badge {
+    background: var(--pick);
+    color: #0a0e13;
+  }
+  .opt-card.selected.skip .opt-badge {
+    background: var(--skip);
+    color: #0a0e13;
+  }
+  .opt-check {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    font-size: 18px;
+    color: var(--pick);
+    display: none;
+  }
+  .opt-card.selected .opt-check { display: block; }
+  .opt-card.selected.skip .opt-check { color: var(--skip); }
+  .opt-desc {
+    font-size: 11px;
+    color: var(--dim);
+    margin-top: 6px;
+    font-style: italic;
+  }
+  .opt-card pre {
+    border: none;
+    padding: 4px 0;
+    background: transparent;
+    font-size: 12.5px;
+  }
+  /* syntax colors */
+  .kw { color: var(--kw); }
+  .str { color: var(--str); }
+  .cmt { color: var(--cmt); }
+  .num { color: var(--num); }
+  .fn { color: var(--fn); }
+  /* controls */
+  .controls {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    display: flex;
+    gap: 10px;
+    z-index: 200;
+  }
+  .btn {
+    padding: 10px 18px;
+    background: var(--accent);
+    color: #0a0e13;
+    border: none;
+    border-radius: 6px;
+    font-weight: bold;
+    cursor: pointer;
+    font-size: 14px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  }
+  .btn:hover { opacity: 0.9; }
+  .btn.green { background: var(--pick); }
+  .btn.gray { background: var(--dim); }
+  .summary {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 90%;
+    max-width: 900px;
+    max-height: 85vh;
+    background: var(--panel);
+    border: 2px solid var(--accent);
+    border-radius: 12px;
+    padding: 24px;
+    overflow-y: auto;
+    z-index: 300;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+  }
+  .summary.show { display: block; }
+  .summary h2 { margin-top: 0; color: var(--accent); }
+  .overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.75);
+    z-index: 250;
+  }
+  .overlay.show { display: block; }
+  .summary-close {
+    float: right;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 4px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .summary-item {
+    margin: 10px 0;
+    padding: 10px 14px;
+    background: #0a0e13;
+    border-left: 3px solid var(--pick);
+    border-radius: 4px;
+  }
+  .summary-item.skip { border-left-color: var(--skip); }
+  .summary-item pre {
+    margin-top: 6px;
+    font-size: 12px;
+  }
+  footer {
+    padding: 20px 28px;
+    text-align: center;
+    color: var(--dim);
+    font-size: 12px;
+    border-top: 1px solid var(--border);
+    margin-top: 40px;
+    padding-bottom: 100px;
+  }
+  @media (max-width: 900px) {
+    .compare { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⚡ SEVEN Syntax Selector — Click to Pick</h1>
+  <p>Har feature ma <b>Python left ma</b> ane <b>SEVEN options right ma</b>. Je code layout game te <b>card par click</b> karo.</p>
+  <div class="stats">
+    <div class="stat">Total: <b id="total">0</b></div>
+    <div class="stat">✅ Picked: <b id="picked" style="color:var(--pick)">0</b></div>
+    <div class="stat">❌ Skipped: <b id="skipped" style="color:var(--skip)">0</b></div>
+    <div class="stat">⏸ Undecided: <b id="undecided">0</b></div>
+  </div>
+</header>
+
+<main id="main"></main>
+
+<div class="controls">
+  <button class="btn gray" onclick="resetAll()">Reset</button>
+  <button class="btn green" onclick="showSummary()">📋 Final List →</button>
+</div>
+
+<div class="overlay" id="overlay" onclick="hideSummary()"></div>
+<div class="summary" id="summary">
+  <button class="summary-close" onclick="hideSummary()">Close</button>
+  <h2>📋 Your Final SEVEN Syntax</h2>
+  <p style="color:var(--dim);font-size:13px">
+    Aa list Claude ne aap — hu docs, spec, ane lexer badhu aa mujab update karish.
+  </p>
+  <div id="summary-content"></div>
+</div>
+
+<footer>
+  SEVEN Language · Tejas Chandivakar · Vadodara<br>
+  <small>Selections auto-save thay chhe (localStorage)</small>
+</footer>
+
+<script>
+const FEATURES = [
+  {
+    section: "1. Comments",
+    items: [
+      {
+        id: "cmt",
+        title: "Comments (single + multi-line)",
+        note: "Already decided ✅ — locked in",
+        py: `<span class="cmt"># single line</span>
+<span class="cmt">"""
+multi-line
+docstring
+"""</span>`,
+        options: [
+          {
+            val: "picked",
+            badge: "FINAL",
+            code: `<span class="cmt">!! single-line comment</span>
+x = <span class="num">10</span>  <span class="cmt">!! inline comment</span>
+
+<span class="cmt">!!!
+   Multi-line comment
+   Andar !! pan chalse
+   Author: Tejas
+!!!</span>`,
+            desc: "Locked in from earlier discussion"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    section: "2. Print — Multiple Arguments",
+    items: [
+      {
+        id: "print-multi",
+        title: "Print multiple values",
+        note: "Ek show ma multiple values kaise?",
+        py: `<span class="fn">print</span>(<span class="str">"Name:"</span>, name, <span class="str">"Age:"</span>, age)
+<span class="cm">t # → Name: Tejas Age: 25</span>`,
+        options: [
+          {
+            val: "comma",
+            badge: "Option A",
+            code: `<span class="kw">show</span> <span class="str">"Name:"</span>, name, <span class="str">"Age:"</span>, age`,
+            desc: "Comma-separated, auto space between (Python-like)"
+          },
+          {
+            val: "concat",
+            badge: "Option B",
+            code: `<span class="kw">show</span> <span class="str">"Name: "</span> + name + <span class="str">" Age: "</span> + age`,
+            desc: "Force + concat only (explicit, no magic)"
+          },
+          {
+            val: "both",
+            badge: "Option C",
+            code: `<span class="kw">show</span> <span class="str">"Name:"</span>, name       <span class="cmt">!! comma OK</span>
+<span class="kw">show</span> <span class="str">"Name: "</span> + name    <span class="cmt">!! concat OK</span>`,
+            desc: "Both allowed"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    section: "3. Print — No Newline",
+    items: [
+      {
+        id: "print-nonl",
+        title: "Print without newline",
+        note: "Progress dots, prompts, etc.",
+        py: `<span class="fn">print</span>(<span class="str">"loading..."</span>, end=<span class="str">""</span>)
+<span class="fn">print</span>(<span class="str">"done!"</span>)`,
+        options: [
+          {
+            val: "put",
+            badge: "Option A",
+            code: `<span class="kw">put</span> <span class="str">"loading..."</span>   <span class="cmt">!! no newline</span>
+<span class="kw">show</span> <span class="str">"done!"</span>         <span class="cmt">!! with newline</span>`,
+            desc: "New keyword `put` (short, clean)"
+          },
+          {
+            val: "suffix",
+            badge: "Option B",
+            code: `<span class="kw">show</span> <span class="str">"loading..."</span> <span class="kw">nonl</span>
+<span class="kw">show</span> <span class="str">"done!"</span>`,
+            desc: "Suffix modifier on show"
+          },
+          {
+            val: "dotted",
+            badge: "Option C",
+            code: `<span class="kw">show</span>.raw <span class="str">"loading..."</span>
+<span class="kw">show</span> <span class="str">"done!"</span>`,
+            desc: "Dotted attribute style"
+          },
+          {
+            val: "skip",
+            badge: "Skip",
+            code: `<span class="cmt">!! No support in Phase 1</span>
+<span class="cmt">!! Always newline</span>`,
+            desc: "Not needed for Phase 1"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    section: "4. String Interpolation (f-strings)",
+    items: [
+      {
+        id: "fstring",
+        title: "Embed variables in strings",
+        note: "Currently: show \"Hi \" + name + \" age \" + age",
+        py: `<span class="fn">print</span>(<span class="str">f"Hi {name}, age {age}"</span>)`,
+        options: [
+          {
+            val: "f-prefix",
+            badge: "Option A",
+            code: `<span class="kw">show</span> <span class="str">f"Hi {name}, age {age}"</span>`,
+            desc: "Python style with f prefix"
+          },
+          {
+            val: "backtick",
+            badge: "Option B",
+            code: `<span class="kw">show</span> <span class="str">\`Hi \${name}, age \${age}\`</span>`,
+            desc: "JavaScript style with backticks"
+          },
+          {
+            val: "auto",
+            badge: "Option C",
+            code: `<span class="kw">show</span> <span class="str">"Hi {name}, age {age}"</span>`,
+            desc: "Every \"...\" auto-interpolates (no prefix)"
+          },
+          {
+            val: "format-fn",
+            badge: "Option D",
+            code: `<span class="kw">show</span> <span class="fn">format</span>(<span class="str">"Hi {}, age {}"</span>, name, age)`,
+            desc: "format() function call"
+          },
+          {
+            val: "skip",
+            badge: "Skip",
+            code: `<span class="cmt">!! Only + concat</span>
+<span class="kw">show</span> <span class="str">"Hi "</span> + name + <span class="str">" age "</span> + age`,
+            desc: "No interpolation, use + always"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    section: "5. Input — Return Type",
+    items: [
+      {
+        id: "ask-type",
+        title: "How does `ask` return values?",
+        note: "String or auto-convert?",
+        py: `age = <span class="fn">int</span>(<span class="fn">input</span>(<span class="str">"Age: "</span>))
+name = <span class="fn">input</span>(<span class="str">"Name: "</span>)`,
+        options: [
+          {
+            val: "string",
+            badge: "Option A",
+            code: `name = <span class="kw">ask</span> <span class="str">"Name: "</span>          <span class="cmt">!! string</span>
+age = <span class="fn">num</span>(<span class="kw">ask</span> <span class="str">"Age: "</span>)     <span class="cmt">!! convert</span>`,
+            desc: "Always returns string, user converts (explicit)"
+          },
+          {
+            val: "typed",
+            badge: "Option B",
+            code: `name = <span class="kw">ask</span> <span class="str">"Name: "</span>
+age = <span class="kw">ask</span>.int <span class="str">"Age: "</span>
+price = <span class="kw">ask</span>.float <span class="str">"Price: "</span>`,
+            desc: "Typed variants: ask.int, ask.float"
+          },
+          {
+            val: "auto",
+            badge: "Option C",
+            code: `age = <span class="kw">ask</span> <span class="str">"Age: "</span>       <span class="cmt">!! auto-int if numeric</span>
+name = <span class="kw">ask</span> <span class="str">"Name: "</span>     <span class="cmt">!! string</span>`,
+            desc: "Auto-detect based on input content"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    section: "6. Error Print (stderr)",
+    items: [
+      {
+        id: "print-stderr",
+        title: "Print to error stream",
+        note: "Log errors separately from normal output",
+        py: `<span class="fn">print</span>(<span class="str">"error!"</span>, file=sys.stderr)`,
+        options: [
+          {
+            val: "err",
+            badge: "Option A",
+            code: `<span class="kw">err</span> <span class="str">"Something broke!"</span>
+<span class="kw">err</span> <span class="str">"Line " + lineno</span>`,
+            desc: "Dedicated `err` keyword (parallel to show)"
+          },
+          {
+            val: "dotted",
+            badge: "Option B",
+            code: `<span class="kw">show</span>.err <span class="str">"Something broke!"</span>`,
+            desc: "show.err attribute"
+          },
+          {
+            val: "skip",
+            badge: "Skip",
+            code: `<span class="cmt">!! No stderr in Phase 1</span>
+<span class="cmt">!! stdlib later</span>`,
+            desc: "Add later via stdlib"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    section: "7. Hidden Input (Password)",
+    items: [
+      {
+        id: "hidden",
+        title: "Masked input",
+        note: "Password prompts",
+        py: `<span class="kw">from</span> getpass <span class="kw">import</span> getpass
+pwd = <span class="fn">getpass</span>(<span class="str">"Password: "</span>)`,
+        options: [
+          {
+            val: "ask-hidden",
+            badge: "Option A",
+            code: `pwd = <span class="kw">ask</span>.hidden <span class="str">"Password: "</span>`,
+            desc: "ask.hidden attribute"
+          },
+          {
+            val: "secret",
+            badge: "Option B",
+            code: `pwd = <span class="kw">secret</span> <span class="str">"Password: "</span>`,
+            desc: "Dedicated `secret` keyword"
+          },
+          {
+            val: "skip",
+            badge: "Skip",
+            code: `<span class="cmt">!! Not in Phase 1</span>
+<span class="cmt">!! io.hidden(...) later</span>`,
+            desc: "Add via stdlib in Phase 3"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    section: "8. Compound Assignment (+=, -=)",
+    items: [
+      {
+        id: "compound",
+        title: "Shorthand assignment",
+        note: "Currently banned in spec — reverse?",
+        py: `x <span class="kw">+=</span> <span class="num">1</span>
+x <span class="kw">*=</span> <span class="num">2</span>
+count <span class="kw">-=</span> <span class="num">1</span>`,
+        options: [
+          {
+            val: "add",
+            badge: "Option A",
+            code: `x += <span class="num">1</span>
+x *= <span class="num">2</span>
+count -= <span class="num">1</span>`,
+            desc: "Add +=, -=, *=, /=, %=, **="
+          },
+          {
+            val: "ban",
+            badge: "Skip",
+            code: `x = x + <span class="num">1</span>
+x = x * <span class="num">2</span>
+count = count - <span class="num">1</span>`,
+            desc: "Keep as-is (explicit, one way to do it)"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    section: "9. Integer Division",
+    items: [
+      {
+        id: "int-div",
+        title: "Truncated integer division",
+        note: "10 / 3 gives float 3.33, need int 3",
+        py: `x = <span class="num">10</span> <span class="kw">//</span> <span class="num">3</span>     <span class="cmt"># = 3</span>
+y = <span class="num">10</span> / <span class="num">3</span>      <span class="cmt"># = 3.33</span>`,
+        options: [
+          {
+            val: "double-slash",
+            badge: "Option A",
+            code: `x = <span class="num">10</span> // <span class="num">3</span>       <span class="cmt">!! = 3 (int)</span>
+y = <span class="num">10</span> / <span class="num">3</span>        <span class="cmt">!! = 3.33 (float)</span>`,
+            desc: "// operator (Python style)"
+          },
+          {
+            val: "func",
+            badge: "Option B",
+            code: `x = <span class="fn">idiv</span>(<span class="num">10</span>, <span class="num">3</span>)   <span class="cmt">!! = 3</span>
+y = <span class="num">10</span> / <span class="num">3</span>         <span class="cmt">!! = 3.33</span>`,
+            desc: "idiv() function"
+          },
+          {
+            val: "skip",
+            badge: "Skip",
+            code: `x = <span class="fn">int</span>(<span class="num">10</span> / <span class="num">3</span>)  <span class="cmt">!! manual convert</span>`,
+            desc: "User converts manually"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    section: "10. `in` Operator",
+    items: [
+      {
+        id: "in-op",
+        title: "Membership test",
+        note: "Check if element exists in list/string",
+        py: `<span class="kw">if</span> x <span class="kw">in</span> [<span class="num">1</span>,<span class="num">2</span>,<span class="num">3</span>]:
+    <span class="fn">print</span>(<span class="str">"found"</span>)
+<span class="kw">if</span> <span class="str">"a"</span> <span class="kw">not in</span> word:
+    <span class="fn">print</span>(<span class="str">"no a"</span>)`,
+        options: [
+          {
+            val: "add",
+            badge: "Option A",
+            code: `<span class="kw">if</span> x <span class="kw">in</span> [<span class="num">1</span>,<span class="num">2</span>,<span class="num">3</span>]:
+    <span class="kw">show</span> <span class="str">"found"</span>
+<span class="kw">end</span>
+
+<span class="kw">if</span> <span class="str">"a"</span> <span class="kw">not in</span> word:
+    <span class="kw">show</span> <span class="str">"no a"</span>
+<span class="kw">end</span>`,
+            desc: "Add `in` / `not in` keywords"
+          },
+          {
+            val: "contains",
+            badge: "Option B",
+            code: `<span class="kw">if</span> <span class="fn">contains</span>([<span class="num">1</span>,<span class="num">2</span>,<span class="num">3</span>], x):
+    <span class="kw">show</span> <span class="str">"found"</span>
+<span class="kw">end</span>
+
+<span class="kw">if</span> <span class="kw">not</span> <span class="fn">contains</span>(word, <span class="str">"a"</span>):
+    <span class="kw">show</span> <span class="str">"no a"</span>
+<span class="kw">end</span>`,
+            desc: "contains() function only"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    section: "11. Ternary Expression",
+    items: [
+      {
+        id: "ternary",
+        title: "One-line conditional",
+        note: "x = big if cond else small",
+        py: `x = a <span class="kw">if</span> cond <span class="kw">else</span> b`,
+        options: [
+          {
+            val: "python",
+            badge: "Option A",
+            code: `x = a <span class="kw">if</span> cond <span class="kw">else</span> b
+max = a <span class="kw">if</span> a &gt; b <span class="kw">else</span> b`,
+            desc: "Python style (readable, English-like)"
+          },
+          {
+            val: "c-style",
+            badge: "Option B",
+            code: `x = cond ? a : b
+max = (a &gt; b) ? a : b`,
+            desc: "C/JS style (compact)"
+          },
+          {
+            val: "then",
+            badge: "Option C",
+            code: `x = <span class="kw">if</span> cond <span class="kw">then</span> a <span class="kw">else</span> b
+max = <span class="kw">if</span> a &gt; b <span class="kw">then</span> a <span class="kw">else</span> b`,
+            desc: "Explicit `then` (like Rust/Kotlin expression)"
+          },
+          {
+            val: "skip",
+            badge: "Skip",
+            code: `<span class="kw">if</span> cond:
+    x = a
+<span class="kw">else</span>:
+    x = b
+<span class="kw">end</span>`,
+            desc: "Full if/end only, no ternary"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    section: "12. Loop Index (enumerate)",
+    items: [
+      {
+        id: "each-idx",
+        title: "Index in each loop",
+        note: "Currently `each` gives value only",
+        py: `<span class="kw">for</span> i, x <span class="kw">in</span> <span class="fn">enumerate</span>(nums):
+    <span class="fn">print</span>(i, x)`,
+        options: [
+          {
+            val: "value-idx",
+            badge: "Option A",
+            code: `<span class="kw">each</span> nums <span class="kw">as</span> x, i:
+    <span class="kw">show</span> i, x
+<span class="kw">end</span>`,
+            desc: "value first, index second"
+          },
+          {
+            val: "idx-value",
+            badge: "Option B",
+            code: `<span class="kw">each</span> nums <span class="kw">as</span> i, x:
+    <span class="kw">show</span> i, x
+<span class="kw">end</span>`,
+            desc: "index first, value second"
+          },
+          {
+            val: "at",
+            badge: "Option C",
+            code: `<span class="kw">each</span> nums <span class="kw">as</span> x <span class="kw">at</span> i:
+    <span class="kw">show</span> i, x
+<span class="kw">end</span>`,
+            desc: "Explicit `at` keyword for index"
+          },
+          {
+            val: "skip",
+            badge: "Skip",
+            code: `i = <span class="num">0</span>
+<span class="kw">each</span> nums <span class="kw">as</span> x:
+    <span class="kw">show</span> i, x
+    i = i + <span class="num">1</span>
+<span class="kw">end</span>`,
+            desc: "Manual index tracking"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    section: "13. Function — Named Arguments",
+    items: [
+      {
+        id: "named-args",
+        title: "Call functions by parameter name",
+        note: "Clarity for functions with many params",
+        py: `<span class="fn">connect</span>(host=<span class="str">"localhost"</span>, port=<span class="num">8080</span>)`,
+        options: [
+          {
+            val: "colon",
+            badge: "Option A",
+            code: `<span class="fn">connect</span>(host: <span class="str">"localhost"</span>, port: <span class="num">8080</span>)`,
+            desc: "Colon (matches dict/map syntax)"
+          },
+          {
+            val: "equals",
+            badge: "Option B",
+            code: `<span class="fn">connect</span>(host = <span class="str">"localhost"</span>, port = <span class="num">8080</span>)`,
+            desc: "Equals (Python style)"
+          },
+          {
+            val: "skip",
+            badge: "Skip",
+            code: `<span class="fn">connect</span>(<span class="str">"localhost"</span>, <span class="num">8080</span>)   <span class="cmt">!! positional only</span>`,
+            desc: "Positional args only"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    section: "14. Function — Variable Arguments",
+    items: [
+      {
+        id: "varargs",
+        title: "Accept any number of args",
+        note: "sum(1, 2, 3, 4, 5) etc.",
+        py: `<span class="kw">def</span> <span class="fn">sum_all</span>(*nums):
+    <span class="kw">return</span> <span class="fn">sum</span>(nums)`,
+        options: [
+          {
+            val: "dots",
+            badge: "Option A",
+            code: `<span class="kw">func</span> <span class="fn">sum_all</span>(...nums):
+    <span class="kw">return</span> <span class="fn">sum</span>(nums)
+<span class="kw">end</span>
+
+<span class="fn">sum_all</span>(<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>, <span class="num">4</span>)`,
+            desc: "Spread dots ...nums (JS/Kotlin style)"
+          },
+          {
+            val: "star",
+            badge: "Option B",
+            code: `<span class="kw">func</span> <span class="fn">sum_all</span>(*nums):
+    <span class="kw">return</span> <span class="fn">sum</span>(nums)
+<span class="kw">end</span>`,
+            desc: "Star *nums (Python style)"
+          },
+          {
+            val: "many",
+            badge: "Option C",
+            code: `<span class="kw">func</span> <span class="fn">sum_all</span>(<span class="kw">many</span> nums):
+    <span class="kw">return</span> <span class="fn">sum</span>(nums)
+<span class="kw">end</span>`,
+            desc: "`many` keyword (unique to SEVEN)"
+          },
+          {
+            val: "skip",
+            badge: "Skip",
+            code: `<span class="kw">func</span> <span class="fn">sum_all</span>(nums):    <span class="cmt">!! pass array</span>
+    <span class="kw">return</span> <span class="fn">sum</span>(nums)
+<span class="kw">end</span>
+
+<span class="fn">sum_all</span>([<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>, <span class="num">4</span>])</span>`,
+            desc: "Pass array manually"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    section: "15. Function — Type Annotations",
+    items: [
+      {
+        id: "type-hints",
+        title: "Optional type declarations",
+        note: "For clarity + optimization",
+        py: `<span class="kw">def</span> <span class="fn">add</span>(a: <span class="kw">int</span>, b: <span class="kw">int</span>) -&gt; <span class="kw">int</span>:
+    <span class="kw">return</span> a + b`,
+        options: [
+          {
+            val: "c-style",
+            badge: "Option A",
+            code: `<span class="kw">func</span> <span class="fn">add</span>(<span class="kw">int</span> a, <span class="kw">int</span> b) -&gt; <span class="kw">int</span>:
+    <span class="kw">return</span> a + b
+<span class="kw">end</span>`,
+            desc: "C style: type first"
+          },
+          {
+            val: "colon",
+            badge: "Option B",
+            code: `<span class="kw">func</span> <span class="fn">add</span>(a: <span class="kw">int</span>, b: <span class="kw">int</span>) -&gt; <span class="kw">int</span>:
+    <span class="kw">return</span> a + b
+<span class="kw">end</span>`,
+            desc: "Colon style (Python/TS/Rust)"
+          },
+          {
+            val: "skip",
+            badge: "Skip",
+            code: `<span class="kw">func</span> <span class="fn">add</span>(a, b):
+    <span class="kw">return</span> a + b
+<span class="kw">end</span>`,
+            desc: "Dynamic only, no types"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    section: "16. Negative Indexing",
+    items: [
+      {
+        id: "neg-idx",
+        title: "Access from end of array",
+        note: "Get last / second-last item easily",
+        py: `nums[-<span class="num">1</span>]   <span class="cmt"># last</span>
+nums[-<span class="num">2</span>]   <span class="cmt"># second last</span>`,
+        options: [
+          {
+            val: "add",
+            badge: "Option A",
+            code: `nums[-<span class="num">1</span>]     <span class="cmt">!! last element</span>
+nums[-<span class="num">2</span>]     <span class="cmt">!! second last</span>`,
+            desc: "Add negative indexing"
+          },
+          {
+            val: "func",
+            badge: "Option B",
+            code: `<span class="fn">last</span>(nums)         <span class="cmt">!! last</span>
+nums[<span class="fn">len</span>(nums) - <span class="num">2</span>]  <span class="cmt">!! second last</span>`,
+            desc: "Use last()/first() functions"
+          },
+          {
+            val: "skip",
+            badge: "Skip",
+            code: `nums[<span class="fn">len</span>(nums) - <span class="num">1</span>]  <span class="cmt">!! last</span>`,
+            desc: "Positive index only"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    section: "17. Slicing",
+    items: [
+      {
+        id: "slice",
+        title: "Extract subarray",
+        note: "Get portion of list/string",
+        py: `nums[<span class="num">1</span>:<span class="num">5</span>]     <span class="cmt"># idx 1..4</span>
+nums[::<span class="num">2</span>]    <span class="cmt"># every 2nd</span>
+nums[::-<span class="num">1</span>]   <span class="cmt"># reversed</span>`,
+        options: [
+          {
+            val: "range",
+            badge: "Option A",
+            code: `nums[<span class="num">1</span>..<span class="num">5</span>]      <span class="cmt">!! idx 1..4</span>
+nums[<span class="num">1</span>..<span class="num">10</span>:<span class="num">2</span>]   <span class="cmt">!! every 2nd</span>
+nums[<span class="fn">reverse</span>]     <span class="cmt">!! reversed</span>`,
+            desc: "Range syntax `..` (matches SEVEN's range type)"
+          },
+          {
+            val: "python",
+            badge: "Option B",
+            code: `nums[<span class="num">1</span>:<span class="num">5</span>]
+nums[::<span class="num">2</span>]
+nums[::-<span class="num">1</span>]`,
+            desc: "Python style (colon)"
+          },
+          {
+            val: "func",
+            badge: "Option C",
+            code: `<span class="fn">slice</span>(nums, <span class="num">1</span>, <span class="num">5</span>)
+<span class="fn">step</span>(nums, <span class="num">2</span>)
+<span class="fn">reverse</span>(nums)`,
+            desc: "Function calls"
+          },
+          {
+            val: "skip",
+            badge: "Skip",
+            code: `<span class="cmt">!! Manual loop</span>
+result = []
+<span class="kw">repeat</span> <span class="num">4</span> <span class="kw">as</span> i:
+    <span class="fn">push</span>(result, nums[<span class="num">1</span> + i])
+<span class="kw">end</span>`,
+            desc: "No slice syntax"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    section: "18. Error — Raise / Throw",
+    items: [
+      {
+        id: "raise",
+        title: "Throw an error",
+        note: "Currently UNDEFINED — must decide!",
+        py: `<span class="kw">raise</span> <span class="fn">ValueError</span>(<span class="str">"bad input"</span>)`,
+        options: [
+          {
+            val: "throw",
+            badge: "Option A",
+            code: `<span class="kw">throw</span> <span class="str">"bad input"</span>
+<span class="kw">throw</span> <span class="fn">Error</span>(<span class="str">"details"</span>)`,
+            desc: "`throw` keyword (Java/JS style)"
+          },
+          {
+            val: "raise",
+            badge: "Option B",
+            code: `<span class="kw">raise</span> <span class="str">"bad input"</span>
+<span class="kw">raise</span> <span class="fn">Error</span>(<span class="str">"details"</span>)`,
+            desc: "`raise` keyword (Python style)"
+          },
+          {
+            val: "fail",
+            badge: "Option C",
+            code: `<span class="kw">fail</span> <span class="str">"bad input"</span>
+<span class="kw">fail</span> <span class="fn">Error</span>(<span class="str">"details"</span>)`,
+            desc: "`fail` keyword (unique to SEVEN, short)"
+          },
+          {
+            val: "err-kw",
+            badge: "Option D",
+            code: `<span class="kw">error</span> <span class="str">"bad input"</span>
+<span class="kw">error</span> <span class="fn">Error</span>(<span class="str">"details"</span>)`,
+            desc: "`error` keyword (very readable)"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    section: "19. Assert",
+    items: [
+      {
+        id: "assert",
+        title: "Debug-time invariant check",
+        note: "Fails loudly if condition wrong",
+        py: `<span class="kw">assert</span> x &gt; <span class="num">0</span>, <span class="str">"must be positive"</span>`,
+        options: [
+          {
+            val: "add",
+            badge: "Option A",
+            code: `<span class="kw">assert</span> x &gt; <span class="num">0</span>, <span class="str">"must be positive"</span>
+<span class="kw">assert</span> nums != <span class="kw">null</span>`,
+            desc: "Add `assert` statement"
+          },
+          {
+            val: "skip",
+            badge: "Skip",
+            code: `<span class="kw">if</span> x &lt;= <span class="num">0</span>:
+    <span class="kw">throw</span> <span class="str">"must be positive"</span>
+<span class="kw">end</span>`,
+            desc: "Use if + throw manually"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    section: "20. String Quotes",
+    items: [
+      {
+        id: "quotes",
+        title: "String quote styles",
+        note: "Single, double, or both?",
+        py: `s1 = <span class="str">'hello'</span>
+s2 = <span class="str">"hello"</span>
+s3 = <span class="str">"""multi
+line"""</span>`,
+        options: [
+          {
+            val: "double-only",
+            badge: "Option A",
+            code: `s = <span class="str">"hello"</span>       <span class="cmt">!! only double</span>
+c = <span class="str">'A'</span>            <span class="cmt">!! single = char</span>
+m = <span class="str">"""multi
+line"""</span>       <span class="cmt">!! triple = multi-line</span>`,
+            desc: "Double = string, Single = char (current spec)"
+          },
+          {
+            val: "both-strings",
+            badge: "Option B",
+            code: `s1 = <span class="str">'hello'</span>       <span class="cmt">!! both strings</span>
+s2 = <span class="str">"hello"</span>
+m = <span class="str">"""multi
+line"""</span>`,
+            desc: "Both '' and \"\" work for strings (Python)"
+          },
+          {
+            val: "backtick-multi",
+            badge: "Option C",
+            code: `s = <span class="str">"hello"</span>
+m = <span class="str">\`multi
+line\`</span>              <span class="cmt">!! backtick multi</span>`,
+            desc: "\"\" single-line, backtick for multi"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    section: "21. String Methods Style",
+    items: [
+      {
+        id: "str-methods",
+        title: "How to call string operations",
+        note: "Function calls or method chaining?",
+        py: `s.<span class="fn">upper</span>()
+s.<span class="fn">split</span>(<span class="str">" "</span>).<span class="fn">join</span>(<span class="str">"-"</span>)`,
+        options: [
+          {
+            val: "func",
+            badge: "Option A",
+            code: `<span class="fn">upper</span>(s)
+<span class="fn">join</span>(<span class="fn">split</span>(s, <span class="str">" "</span>), <span class="str">"-"</span>)</span>`,
+            desc: "Function style (current)"
+          },
+          {
+            val: "method",
+            badge: "Option B",
+            code: `s.<span class="fn">upper</span>()
+s.<span class="fn">split</span>(<span class="str">" "</span>).<span class="fn">join</span>(<span class="str">"-"</span>)`,
+            desc: "Method style (Python/JS/Java)"
+          },
+          {
+            val: "pipe",
+            badge: "Option C",
+            code: `s |&gt; <span class="fn">upper</span>
+s |&gt; <span class="fn">split</span> <span class="str">" "</span> |&gt; <span class="fn">join</span> <span class="str">"-"</span>`,
+            desc: "Pipe style (functional, matches SEVEN pipe)"
+          },
+          {
+            val: "both",
+            badge: "Option D",
+            code: `<span class="fn">upper</span>(s)       <span class="cmt">!! both work</span>
+s.<span class="fn">upper</span>()      <span class="cmt">!! both work</span>`,
+            desc: "Both function and method styles allowed"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    section: "22. Class — self / this",
+    items: [
+      {
+        id: "self",
+        title: "Reference current instance",
+        note: "Access class fields inside methods",
+        py: `<span class="kw">class</span> <span class="fn">Dog</span>:
+    <span class="kw">def</span> <span class="fn">bark</span>(self):
+        <span class="fn">print</span>(self.name)`,
+        options: [
+          {
+            val: "implicit",
+            badge: "Option A",
+            code: `<span class="kw">class</span> <span class="fn">Dog</span>:
+    name = <span class="str">""</span>
+    <span class="kw">func</span> <span class="fn">bark</span>():
+        <span class="kw">show</span> name       <span class="cmt">!! implicit self</span>
+    <span class="kw">end</span>
+<span class="kw">end</span>`,
+            desc: "Implicit self (no keyword)"
+          },
+          {
+            val: "self",
+            badge: "Option B",
+            code: `<span class="kw">class</span> <span class="fn">Dog</span>:
+    name = <span class="str">""</span>
+    <span class="kw">func</span> <span class="fn">bark</span>():
+        <span class="kw">show</span> <span class="kw">self</span>.name
+    <span class="kw">end</span>
+<span class="kw">end</span>`,
+            desc: "Explicit `self` (Python style)"
+          },
+          {
+            val: "this",
+            badge: "Option C",
+            code: `<span class="kw">class</span> <span class="fn">Dog</span>:
+    name = <span class="str">""</span>
+    <span class="kw">func</span> <span class="fn">bark</span>():
+        <span class="kw">show</span> <span class="kw">this</span>.name
+    <span class="kw">end</span>
+<span class="kw">end</span>`,
+            desc: "`this` keyword (Java/JS style)"
+          },
+          {
+            val: "at",
+            badge: "Option D",
+            code: `<span class="kw">class</span> <span class="fn">Dog</span>:
+    name = <span class="str">""</span>
+    <span class="kw">func</span> <span class="fn">bark</span>():
+        <span class="kw">show</span> @name         <span class="cmt">!! @ prefix</span>
+    <span class="kw">end</span>
+<span class="kw">end</span>`,
+            desc: "@ prefix (Ruby style, short)"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    section: "23. Class — Static Methods",
+    items: [
+      {
+        id: "static",
+        title: "Class-level methods (no instance)",
+        note: "Utility functions grouped with class",
+        py: `<span class="kw">class</span> <span class="fn">Math</span>:
+    <span class="kw">@staticmethod</span>
+    <span class="kw">def</span> <span class="fn">pi</span>(): <span class="kw">return</span> <span class="num">3.14</span>`,
+        options: [
+          {
+            val: "static",
+            badge: "Option A",
+            code: `<span class="kw">class</span> <span class="fn">Math</span>:
+    <span class="kw">static</span> <span class="kw">func</span> <span class="fn">pi</span>():
+        <span class="kw">return</span> <span class="num">3.14</span>
+    <span class="kw">end</span>
+<span class="kw">end</span>
+
+<span class="fn">Math</span>.<span class="fn">pi</span>()`,
+            desc: "`static` modifier before func"
+          },
+          {
+            val: "decorator",
+            badge: "Option B",
+            code: `<span class="kw">class</span> <span class="fn">Math</span>:
+    @static
+    <span class="kw">func</span> <span class="fn">pi</span>():
+        <span class="kw">return</span> <span class="num">3.14</span>
+    <span class="kw">end</span>
+<span class="kw">end</span>`,
+            desc: "@static decorator"
+          },
+          {
+            val: "shared",
+            badge: "Option C",
+            code: `<span class="kw">class</span> <span class="fn">Math</span>:
+    <span class="kw">shared</span> <span class="kw">func</span> <span class="fn">pi</span>():
+        <span class="kw">return</span> <span class="num">3.14</span>
+    <span class="kw">end</span>
+<span class="kw">end</span>`,
+            desc: "`shared` keyword (unique, clearer meaning)"
+          }
+        ]
+      }
+    ]
+  }
+];
+
+// State
+let state = JSON.parse(localStorage.getItem("seven-syntax-v2") || "{}");
+
+function saveState() {
+  localStorage.setItem("seven-syntax-v2", JSON.stringify(state));
+  updateStats();
+}
+
+function render() {
+  const main = document.getElementById("main");
+  let html = "";
+  FEATURES.forEach(sec => {
+    html += `<div class="section"><div class="section-header">${sec.section}</div>`;
+    sec.items.forEach(item => {
+      html += `<div class="feature">
+        <div class="feature-title">${item.title}</div>
+        <div class="feature-note">${item.note}</div>
+        <div class="compare">
+          <div>
+            <div class="col-label py">🐍 Python</div>
+            <div class="py-col"><pre>${item.py}</pre></div>
+          </div>
+          <div>
+            <div class="col-label sv">⚡ SEVEN — click to pick</div>
+            <div class="sv-options">`;
+      item.options.forEach(opt => {
+        const isSkip = opt.val === "skip" || opt.val === "ban";
+        const sel = state[item.id] === opt.val ? `selected ${isSkip ? "skip" : ""}` : "";
+        html += `<div class="opt-card ${sel}" onclick="pick('${item.id}', '${opt.val}')">
+          <div class="opt-check">✓</div>
+          <div class="opt-badge">${opt.badge}</div>
+          <pre>${opt.code}</pre>
+          <div class="opt-desc">${opt.desc}</div>
+        </div>`;
+      });
+      html += `</div></div></div></div>`;
+    });
+    html += `</div>`;
+  });
+  main.innerHTML = html;
+  updateStats();
+}
+
+function pick(id, val) {
+  if (state[id] === val) {
+    delete state[id];  // click again to deselect
+  } else {
+    state[id] = val;
+  }
+  saveState();
+  render();
+}
+
+function updateStats() {
+  let total = 0, picked = 0, skipped = 0;
+  FEATURES.forEach(sec => sec.items.forEach(item => {
+    total++;
+    const v = state[item.id];
+    if (v) {
+      if (v === "skip" || v === "ban") skipped++;
+      else picked++;
+    }
+  }));
+  document.getElementById("total").textContent = total;
+  document.getElementById("picked").textContent = picked;
+  document.getElementById("skipped").textContent = skipped;
+  document.getElementById("undecided").textContent = total - picked - skipped;
+}
+
+function resetAll() {
+  if (!confirm("Badhi selections reset karvi chhe?")) return;
+  state = {};
+  saveState();
+  render();
+}
+
+function stripHtml(s) {
+  const div = document.createElement("div");
+  div.innerHTML = s;
+  return div.textContent || div.innerText || "";
+}
+
+function showSummary() {
+  let out = "";
+  FEATURES.forEach(sec => {
+    sec.items.forEach(item => {
+      const v = state[item.id];
+      if (!v) return;
+      const opt = item.options.find(o => o.val === v);
+      if (!opt) return;
+      const isSkip = v === "skip" || v === "ban";
+      out += `<div class="summary-item ${isSkip ? "skip" : ""}">
+        <b>${sec.section} — ${item.title}</b>
+        <div style="font-size:12px;color:var(--dim);margin-top:2px">${opt.badge}: ${opt.desc}</div>
+        <pre>${opt.code}</pre>
+      </div>`;
+    });
+  });
+  if (!out) out = "<p style='color:var(--dim)'>Koi selection nathi kari abhi.</p>";
+  document.getElementById("summary-content").innerHTML = out;
+  document.getElementById("summary").classList.add("show");
+  document.getElementById("overlay").classList.add("show");
+}
+
+function hideSummary() {
+  document.getElementById("summary").classList.remove("show");
+  document.getElementById("overlay").classList.remove("show");
+}
+
+render();
+</script>
+</body>
+</html>

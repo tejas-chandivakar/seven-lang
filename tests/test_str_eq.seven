@@ -1,0 +1,41 @@
+!! String comparison — 2 styles test
+
+show "--- English word style (is) ---"
+word = "apple"
+
+if word is "apple"
+    show "apple chhe"
+elif word is "mango"
+    show "mango chhe"
+else
+    show "koi pan nahi"
+end
+
+fruit = "mango"
+if fruit is "mango"
+    show "mango malyu!"
+end
+
+show "--- Hybrid style (.equals) ---"
+lang = "SEVEN"
+
+if lang.equals("Python")
+    show "Python"
+elif lang.equals("SEVEN")
+    show "SEVEN chhe!"
+else
+    show "Biju"
+end
+
+show "--- not is ---"
+city = "Surat"
+if not city is "Mumbai"
+    show "Mumbai nathi"
+end
+
+show "--- variable vs variable ---"
+a = "hello"
+b = "hello"
+if a is b
+    show "same chhe"
+end

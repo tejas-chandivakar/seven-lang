@@ -1,0 +1,25 @@
+!! Test: Strings + interpolation + method style
+
+!! Quote styles
+s1 = 'single quote'
+s2 = "double quote"
+s3 = """
+Multi-line
+string
+"""
+
+show s1
+show s2
+show s3
+
+!! Simple interpolation
+name = "Tejas"
+show "Hello {name}!"
+
+!! Method style
+s = "Hello SEVEN"
+show s.upper()
+show s.lower()
+show s.contains("SEVEN")
+show s.replace("SEVEN", "World")
+show s.trim()

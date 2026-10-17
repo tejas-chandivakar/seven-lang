@@ -1,0 +1,22 @@
+!! SEVEN Language - Math operations
+
+a = 10
+b = 3
+
+show a + b       !! 13
+show a - b       !! 7
+show a * b       !! 30
+show a / b       !! 3
+show a % b       !! 1
+show a ** 2      !! 100
+
+!! Bit operations
+x = 0b1010
+y = 0b1100
+
+show x & y       !! AND
+show x | y       !! OR
+show x ^ y       !! XOR
+show ~x          !! NOT
+show x << 2      !! Left shift
+show x >> 1      !! Right shift

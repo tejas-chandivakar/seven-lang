@@ -1,0 +1,19 @@
+!! Test array slice, reverse, step
+nums = [10, 20, 30, 40, 50]
+
+!! Slice
+s = slice(nums, 1, 4)
+show s[0]
+show s[1]
+show s[2]
+
+!! Reverse
+r = reverse(nums)
+show r[0]
+show r[4]
+
+!! Step
+st = step(nums, 2)
+show st[0]
+show st[1]
+show st[2]

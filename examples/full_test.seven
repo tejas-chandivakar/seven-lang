@@ -1,0 +1,115 @@
+!!!
+   SEVEN - Full feature test
+   Uses finalized syntax: no ':', keep 'end', mode hybrid
+!!!
+
+!! Variables + interpolation
+x = 10
+name = "SEVEN"
+pi = 3.14
+
+show "=== Variables ==="
+show "x = {x}, name = {name}, pi = {pi}"
+
+!! Math + integer division
+show "=== Math ==="
+show "x + 5 = {x + 5}"
+show "10 / 3 = {10 / 3}"
+show "10 // 3 = {10 // 3}"
+show "2 ** 8 = {2 ** 8}"
+
+!! Comparisons with `in`
+show "=== Membership ==="
+if x in [5, 10, 15]
+    show "x found in list"
+end
+
+if "SEV" not in "abcdef"
+    show "SEV not in abcdef"
+end
+
+!! Conditions
+show "=== Conditions ==="
+if x > 5
+    show "Motu"
+elif x == 5
+    show "Barabar"
+else
+    show "Nanu"
+end
+
+!! Loops with index
+show "=== Loops ==="
+nums = [10, 20, 30]
+each nums as i, n
+    show "nums[{i}] = {n}"
+end
+
+!! Negative indexing
+show "=== Negative index ==="
+show "last: {nums[-1]}"
+show "second-last: {nums[-2]}"
+
+!! Slicing via functions
+show "=== Slicing ==="
+part = slice(nums, 0, 2)
+show "slice(0,2) = {part}"
+
+!! Functions with `many`
+show "=== Variadic ==="
+func sum_all(many xs)
+    total = 0
+    each xs as x
+        total = total + x
+    end
+    return total
+end
+
+show "sum(1,2,3,4,5) = {sum_all(1, 2, 3, 4, 5)}"
+
+!! Classes with `this` and `shared`
+show "=== Classes ==="
+class Dog
+    name = ""
+
+    func bark()
+        show "{this.name} says Woof!"
+    end
+end
+
+class Math
+    shared func pi()
+        return 3.14159
+    end
+end
+
+d = Dog()
+d.name = "Tommy"
+d.bark()
+show "pi = {Math.pi()}"
+
+!! String methods
+show "=== Strings ==="
+s = "hello world"
+show s.upper()
+show s.split(" ").join("-")
+
+!! Error handling
+show "=== Errors ==="
+try
+    x = 10 / 0
+catch
+    err "Division by zero pakadyu!"
+done
+    show "Cleanup complete"
+end
+
+!! Manual raise
+func check_age(age)
+    if age < 0
+        error "Age can not be negative"
+    end
+    return age
+end
+
+show "=== Test complete ==="

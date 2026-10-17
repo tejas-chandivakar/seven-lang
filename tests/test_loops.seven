@@ -1,0 +1,14 @@
+!! Test: Loops
+repeat 3
+    show "hi"
+end
+
+repeat 3 times as i
+    show i
+end
+
+x = 0
+while x < 3
+    show x
+    x = x + 1
+end

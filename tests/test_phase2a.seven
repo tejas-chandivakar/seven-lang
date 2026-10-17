@@ -1,0 +1,24 @@
+!! Phase 2a: Division by zero + multi-line strings + single quotes
+
+!! Division by zero guard
+show 10 / 2
+
+!! Single quote strings
+s1 = 'hello single'
+show "test single quotes"
+
+!! Multi-line string
+s2 = """
+line one
+line two
+"""
+show "test multiline"
+
+!! Basic math still works
+show 7 + 3
+show 5 * 4
+
+!! Comparison still works
+if 10 > 5
+    show "yes"
+end

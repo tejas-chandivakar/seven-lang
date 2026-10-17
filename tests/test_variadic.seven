@@ -1,0 +1,11 @@
+!! Test variadic functions
+func sum_all(many nums)
+    total = 0
+    each nums as n
+        total = total + n
+    end
+    return total
+end
+
+result = sum_all(1, 2, 3, 4, 5)
+show result

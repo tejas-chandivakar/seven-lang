@@ -1,0 +1,8 @@
+!! Test string interpolation
+name = 42
+show "Value is {name}!"
+show "Two plus three = {x}"
+x = 5
+show "x is {x}"
+show "Hello world"
+show "Start {x} middle {name} end"

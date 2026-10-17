@@ -1,0 +1,36 @@
+!! Test: Functions (variadic + defaults)
+
+func add(a, b)
+    return a + b
+end
+
+func square(x)
+    return x * x
+end
+
+!! Variadic with many
+func sum_all(many nums)
+    total = 0
+    each nums as n
+        total = total + n
+    end
+    return total
+end
+
+!! Default param (string)
+func greet(name, greeting = "Namaste")
+    show greeting
+    show name
+end
+
+result = add(3, 4)
+show result
+
+sq = square(5)
+show sq
+
+s = sum_all(1, 2, 3, 4, 5)
+show s
+
+greet("Tejas")
+greet("SEVEN", "Hello")

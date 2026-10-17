@@ -1,0 +1,44 @@
+!! Phase 1 comprehensive test
+
+!! Variables and math
+x = 10
+y = 3
+show x + y
+show x - y
+show x * y
+show x / y
+
+!! String output
+show "Hello from SEVEN!"
+
+!! If/else
+if x > 5
+    show "x is big"
+else
+    show "x is small"
+end
+
+!! While loop
+count = 0
+while count < 5
+    count = count + 1
+end
+show count
+
+!! Repeat
+repeat 3 times
+    show "hi"
+end
+
+!! Functions
+func sum(a, b)
+    return a + b
+end
+
+func greet()
+    show "Hello from func!"
+end
+
+result = sum(10, 20)
+show result
+greet()

@@ -1,0 +1,13 @@
+!! Basic array test
+arr = [10, 20, 30]
+show arr[0]
+show arr[1]
+show arr[2]
+
+!! Each loop
+each arr as item
+    show item
+end
+
+!! Len
+show len(arr)

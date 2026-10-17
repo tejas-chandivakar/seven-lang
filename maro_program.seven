@@ -1,0 +1,5 @@
+name = "Tejas"
+show "Hello {name}!"
+x = 10
+y = 20
+show x + y

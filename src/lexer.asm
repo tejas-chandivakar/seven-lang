@@ -25,6 +25,7 @@ section .data
     global kw_equals, kw_isnt, kw_above, kw_below, kw_atleast, kw_atmost
     global kw_try, kw_catch, kw_error
     global kw_many, kw_mode, kw_push
+    global kw_match, kw_case
 
     kw_table:
     kw_show     db "show", 0
@@ -67,6 +68,8 @@ section .data
     kw_many     db "many", 0
     kw_mode     db "mode", 0
     kw_push     db "push", 0
+    kw_match    db "match", 0
+    kw_case     db "case", 0
     kw_end_marker db 0      ; sentinel
 
     ; ---- Keyword pointer table for fast lookup ----
@@ -112,6 +115,8 @@ section .data
     dq kw_many, 4
     dq kw_mode, 4
     dq kw_push, 4
+    dq kw_match, 5
+    dq kw_case, 4
     dq 0, 0                 ; sentinel
 
     ; ---- Token type constants ----

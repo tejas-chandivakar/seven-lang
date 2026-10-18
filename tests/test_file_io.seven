@@ -1,0 +1,11 @@
+!! Phase 3: File I/O test
+
+show "--- file write ---"
+write "testout.txt", "hello from SEVEN"
+show "wrote file"
+
+show "--- file read ---"
+data = read "testout.txt"
+show data
+
+show "done"

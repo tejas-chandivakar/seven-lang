@@ -1,0 +1,9 @@
+!! Phase 3: type() builtin test
+
+show "--- type ---"
+show type(42)
+show type("hello")
+nums = [1, 2, 3]
+show type(nums)
+
+show "done"

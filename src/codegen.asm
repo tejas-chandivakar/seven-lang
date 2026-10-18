@@ -84,7 +84,14 @@ section .data
                     db "extern rt_arr_get, rt_arr_set, rt_arr_len", 10
                     db "extern rt_arr_contains", 10
                     db "extern rt_arr_slice, rt_arr_reverse, rt_arr_step", 10
-                    db "extern rt_len", 10, 10, 0
+                    db "extern rt_arr_sort, rt_arr_join", 10
+                    db "extern rt_len", 10
+                    db "extern rt_abs, rt_min, rt_max, rt_sqrt, rt_random", 10
+                    db "extern rt_type", 10
+                    db "extern rt_str_startswith, rt_str_endswith", 10
+                    db "extern rt_str_index, rt_str_split, rt_str_repeat", 10
+                    db "extern rt_range", 10
+                    db "extern rt_file_write_str, rt_file_read_str", 10, 10, 0
     frag_sect_data  db "section .data", 10, 0
     frag_sect_bss   db 10, "section .bss", 10, 0
     frag_sect_text  db 10, "section .text", 10
@@ -285,6 +292,35 @@ section .data
     frag_exit1      db "    mov rax, 60", 10
                     db "    mov rdi, 1", 10
                     db "    syscall", 10, 0
+
+    ; Phase 3 call fragments
+    frag_call_abs       db "    call rt_abs", 10, 0
+    frag_call_min       db "    call rt_min", 10, 0
+    frag_call_max       db "    call rt_max", 10, 0
+    frag_call_sqrt      db "    call rt_sqrt", 10, 0
+    frag_call_random    db "    call rt_random", 10, 0
+    frag_call_type      db "    call rt_type", 10, 0
+    frag_call_startswith db "    call rt_str_startswith", 10, 0
+    frag_call_endswith  db "    call rt_str_endswith", 10, 0
+    frag_call_str_index db "    call rt_str_index", 10, 0
+    frag_call_split     db "    call rt_str_split", 10, 0
+    frag_call_str_repeat db "    call rt_str_repeat", 10, 0
+    frag_call_arr_sort  db "    call rt_arr_sort", 10, 0
+    frag_call_arr_join  db "    call rt_arr_join", 10, 0
+    frag_call_range     db "    call rt_range", 10, 0
+    frag_push_rbx       db "    push rbx", 10, 0
+    frag_mov_rdi_from_rax db "    mov rdi, rax", 10, 0
+    frag_mov_rsi_from_rbx db "    mov rsi, rbx", 10, 0
+    frag_cmp_rax_1      db "    cmp rax, 1", 10, 0
+    frag_call_file_write db "    call rt_file_write_str", 10, 0
+    frag_call_file_read db "    call rt_file_read_str", 10, 0
+    ; range(n) fix: use cmov to swap args when 1-arg call
+    ; r10=1 means single-arg: need rdi=0, rsi=original rdi
+    ; r10=2 means two-arg: rdi=start, rsi=end (correct)
+    frag_range_fix  db "    cmp r10, 2", 10
+                    db "    cmovl rsi, rdi", 10
+                    db "    mov rax, 0", 10
+                    db "    cmovl rdi, rax", 10, 0
 
     ; Function argument register names (SysV AMD64 ABI order)
     frag_reg_rdi    db "rdi", 0
@@ -1122,6 +1158,20 @@ codegen_stmt:
     call cg_is_kw
     cmp rax, 1
     je .do_push_stmt
+
+    extern kw_match
+    lea rdi, [kw_match]
+    mov rsi, 5
+    call cg_is_kw
+    cmp rax, 1
+    je .do_match
+
+    extern kw_write
+    lea rdi, [kw_write]
+    mov rsi, 5
+    call cg_is_kw
+    cmp rax, 1
+    je .do_write_file
 
     ; Unknown keyword — skip
     call cg_advance
@@ -2304,6 +2354,255 @@ codegen_stmt:
     pop rbp
     ret
 
+; ---- match / case / else / end ----
+.do_match:
+    call cg_advance          ; consume 'match'
+    call cg_skip_nl
+
+    ; Evaluate the match expression → on stack
+    call codegen_expr
+
+    ; r12 = end label
+    call new_label
+    mov r12, rax
+
+    call cg_skip_nl
+
+.match_case_loop:
+    call cg_skip_nl
+    call cg_tok_type
+    cmp al, TOK_EOF
+    je .match_done
+    cmp al, TOK_KEYWORD
+    jne .match_done
+
+    ; Check for 'case'
+    push r12
+    extern kw_case
+    lea rdi, [kw_case]
+    mov rsi, 4
+    call cg_is_kw
+    pop r12
+    cmp rax, 1
+    je .match_case
+
+    ; Check for 'else'
+    push r12
+    extern kw_else
+    lea rdi, [kw_else]
+    mov rsi, 4
+    call cg_is_kw
+    pop r12
+    cmp rax, 1
+    je .match_else
+
+    ; Check for 'end'
+    push r12
+    extern kw_end
+    lea rdi, [kw_end]
+    mov rsi, 3
+    call cg_is_kw
+    pop r12
+    cmp rax, 1
+    je .match_end
+
+    jmp .match_done
+
+.match_case:
+    call cg_advance          ; consume 'case'
+    call cg_skip_nl
+
+    ; Get labels for this case
+    call new_label
+    push rax                 ; body_label
+    call new_label
+    push rax                 ; next_label
+
+    ; Duplicate match value: mov rax, [rsp+16] (skip 2 pushed labels)
+    ; Actually the match value is on the asm runtime stack, not here.
+    ; emit: mov rax, [rsp] / push rax  — copies top of runtime stack
+    mov rdi, frag_mov_rax_rsp
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+
+    ; Evaluate case value expression
+    call codegen_expr
+
+    ; pop rbx (case val), pop rax (match val copy)
+    mov rdi, frag_pop_rbx
+    call out_str
+    mov rdi, frag_pop_rax
+    call out_str
+
+    ; Integer compare: cmp rax, rbx / je body
+    mov rdi, frag_cmp_rax_rbx2
+    call out_str
+    mov rdi, frag_je
+    call out_str
+    mov rdi, [rsp + 8]      ; body_label
+    call out_label_ref
+    call out_str_newline
+
+    ; String compare fallback: save regs, call rt_str_eq, check
+    mov rdi, frag_push_rax
+    call out_str
+    mov rdi, frag_push_rbx
+    call out_str
+    mov rdi, frag_mov_rdi_from_rax
+    call out_str
+    mov rdi, frag_mov_rsi_from_rbx
+    call out_str
+    mov rdi, frag_call_str_eq
+    call out_str
+    mov rdi, frag_cmp_rax_1
+    call out_str
+    mov rdi, frag_pop_rbx
+    call out_str
+    mov rdi, frag_pop_rax
+    call out_str
+    mov rdi, frag_je
+    call out_str
+    mov rdi, [rsp + 8]      ; body_label
+    call out_label_ref
+    call out_str_newline
+
+    ; jmp next_label
+    mov rdi, frag_jmp
+    call out_str
+    mov rdi, [rsp]           ; next_label
+    call out_label_ref
+    call out_str_newline
+
+    ; body_label:
+    mov rdi, [rsp + 8]
+    call out_label_def
+
+    ; Execute body statements until next case/else/end
+    call cg_skip_nl
+.match_body_loop:
+    call cg_tok_type
+    cmp al, TOK_EOF
+    je .match_case_body_end
+    cmp al, TOK_KEYWORD
+    jne .match_body_stmt
+
+    push r12
+    extern kw_case
+    lea rdi, [kw_case]
+    mov rsi, 4
+    call cg_is_kw
+    pop r12
+    cmp rax, 1
+    je .match_case_body_end
+
+    push r12
+    extern kw_else
+    lea rdi, [kw_else]
+    mov rsi, 4
+    call cg_is_kw
+    pop r12
+    cmp rax, 1
+    je .match_case_body_end
+
+    push r12
+    extern kw_end
+    lea rdi, [kw_end]
+    mov rsi, 3
+    call cg_is_kw
+    pop r12
+    cmp rax, 1
+    je .match_case_body_end
+
+.match_body_stmt:
+    push r12
+    call codegen_stmt
+    pop r12
+    call cg_skip_nl
+    jmp .match_body_loop
+
+.match_case_body_end:
+    ; Jump to match end
+    mov rdi, frag_jmp
+    call out_str
+    mov rdi, r12             ; end label
+    call out_label_ref
+    call out_str_newline
+
+    ; next_label:
+    pop rdi                  ; next_label
+    call out_label_def
+    pop rax                  ; body_label (discard)
+
+    jmp .match_case_loop
+
+.match_else:
+    call cg_advance          ; consume 'else'
+    call cg_skip_nl
+.match_else_loop:
+    call cg_tok_type
+    cmp al, TOK_EOF
+    je .match_done
+    cmp al, TOK_KEYWORD
+    jne .match_else_stmt
+
+    push r12
+    extern kw_end
+    lea rdi, [kw_end]
+    mov rsi, 3
+    call cg_is_kw
+    pop r12
+    cmp rax, 1
+    je .match_end
+
+.match_else_stmt:
+    push r12
+    call codegen_stmt
+    pop r12
+    call cg_skip_nl
+    jmp .match_else_loop
+
+.match_end:
+    call cg_advance          ; consume 'end'
+.match_done:
+    ; Pop match value from stack
+    mov rdi, frag_pop_rax
+    call out_str
+    ; End label
+    mov rdi, r12
+    call out_label_def
+    pop rbp
+    ret
+
+; ---- write "filename", data ----
+.do_write_file:
+    call cg_advance          ; consume 'write'
+    call cg_skip_nl
+    ; Evaluate filename expression
+    call codegen_expr
+    ; Skip comma
+    call cg_tok_type
+    cmp al, TOK_PUNCT
+    jne .write_no_comma
+    call cg_tok_sub
+    cmp al, PUNCT_COMMA
+    jne .write_no_comma
+    call cg_advance          ; consume ','
+.write_no_comma:
+    call cg_skip_nl
+    ; Evaluate data expression
+    call codegen_expr
+    ; Stack: [filename_ptr, data_ptr]
+    ; pop rsi (data), pop rdi (filename)
+    mov rdi, frag_pop_rsi
+    call out_str
+    mov rdi, frag_pop_rdi
+    call out_str
+    mov rdi, frag_call_file_write
+    call out_str
+    pop rbp
+    ret
+
 .do_assign_ask:
     call cg_advance          ; consume 'ask'/'secret'
 
@@ -2370,10 +2669,34 @@ codegen_stmt:
 
 .do_assign_read:
     call cg_advance          ; consume 'read'
-    ; TODO: file read
+
+    ; Register variable
     mov rsi, r12
     movzx rcx, r13d
     call register_var
+
+    ; Evaluate filename expression
+    push r12
+    push r13
+    call codegen_expr
+    pop r13
+    pop r12
+
+    ; pop rdi (filename) / call rt_file_read_str
+    mov rdi, frag_pop_rdi
+    call out_str
+    mov rdi, frag_call_file_read
+    call out_str
+
+    ; Store result: mov [_v_name], rax
+    mov rdi, frag_mov_bracket
+    call out_str
+    mov rsi, r12
+    movzx rcx, r13d
+    call out_var_name
+    mov rdi, frag_close_rax
+    call out_str
+
     pop rbp
     ret
 
@@ -3183,7 +3506,7 @@ cg_expr_primary:
     call out_str_newline
     mov rdi, frag_push_rax
     call out_str
-    ret
+    jmp .check_method
 
 .ident:
     call cg_peek
@@ -3300,6 +3623,108 @@ cg_expr_primary:
     jmp .builtin_step
 .not_builtin_step:
 
+    ; Check "abs"
+    cmp ecx, 3
+    jne .not_builtin_abs
+    cmp byte [rsi], 'a'
+    jne .not_builtin_abs
+    cmp byte [rsi+1], 'b'
+    jne .not_builtin_abs
+    cmp byte [rsi+2], 's'
+    jne .not_builtin_abs
+    jmp .builtin_abs
+.not_builtin_abs:
+
+    ; Check "min"
+    cmp ecx, 3
+    jne .not_builtin_min
+    cmp byte [rsi], 'm'
+    jne .not_builtin_min
+    cmp byte [rsi+1], 'i'
+    jne .not_builtin_min
+    cmp byte [rsi+2], 'n'
+    jne .not_builtin_min
+    jmp .builtin_min
+.not_builtin_min:
+
+    ; Check "max"
+    cmp ecx, 3
+    jne .not_builtin_max
+    cmp byte [rsi], 'm'
+    jne .not_builtin_max
+    cmp byte [rsi+1], 'a'
+    jne .not_builtin_max
+    cmp byte [rsi+2], 'x'
+    jne .not_builtin_max
+    jmp .builtin_max
+.not_builtin_max:
+
+    ; Check "sqrt"
+    cmp ecx, 4
+    jne .not_builtin_sqrt
+    cmp byte [rsi], 's'
+    jne .not_builtin_sqrt
+    cmp byte [rsi+1], 'q'
+    jne .not_builtin_sqrt
+    jmp .builtin_sqrt
+.not_builtin_sqrt:
+
+    ; Check "random"
+    cmp ecx, 6
+    jne .not_builtin_random
+    cmp byte [rsi], 'r'
+    jne .not_builtin_random
+    cmp byte [rsi+1], 'a'
+    jne .not_builtin_random
+    cmp byte [rsi+2], 'n'
+    jne .not_builtin_random
+    jmp .builtin_random
+.not_builtin_random:
+
+    ; Check "sort"
+    cmp ecx, 4
+    jne .not_builtin_sort
+    cmp byte [rsi], 's'
+    jne .not_builtin_sort
+    cmp byte [rsi+1], 'o'
+    jne .not_builtin_sort
+    cmp byte [rsi+2], 'r'
+    jne .not_builtin_sort
+    cmp byte [rsi+3], 't'
+    jne .not_builtin_sort
+    jmp .builtin_sort
+.not_builtin_sort:
+
+    ; Check "join"
+    cmp ecx, 4
+    jne .not_builtin_join
+    cmp byte [rsi], 'j'
+    jne .not_builtin_join
+    cmp byte [rsi+1], 'o'
+    jne .not_builtin_join
+    cmp byte [rsi+2], 'i'
+    jne .not_builtin_join
+    cmp byte [rsi+3], 'n'
+    jne .not_builtin_join
+    jmp .builtin_join
+.not_builtin_join:
+
+    ; Check "range"
+    cmp ecx, 5
+    jne .not_builtin_range
+    cmp byte [rsi], 'r'
+    jne .not_builtin_range
+    cmp byte [rsi+1], 'a'
+    jne .not_builtin_range
+    cmp byte [rsi+2], 'n'
+    jne .not_builtin_range
+    cmp byte [rsi+3], 'g'
+    jne .not_builtin_range
+    cmp byte [rsi+4], 'e'
+    jne .not_builtin_range
+    jmp .builtin_range
+.not_builtin_range:
+
     ; Generic user function call
     xor r14, r14
     call codegen_call_args   ; eval args, pop into regs
@@ -3335,10 +3760,9 @@ cg_expr_primary:
 
 ; ---- Built-in: type(x) — returns type string ----
 .builtin_type:
-    ; For now, just push 0 (placeholder)
     xor r14, r14
     call codegen_call_args
-    mov rdi, frag_xor_rax
+    mov rdi, frag_call_type
     call out_str
     mov rdi, frag_push_rax
     call out_str
@@ -3402,6 +3826,107 @@ cg_expr_primary:
     xor r14, r14
     call codegen_call_args
     mov rdi, frag_call_arr_step
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    pop rsi
+    pop rcx
+    ret
+
+; ---- Built-in: abs(x) ----
+.builtin_abs:
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_abs
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    pop rsi
+    pop rcx
+    ret
+
+; ---- Built-in: min(a, b) ----
+.builtin_min:
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_min
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    pop rsi
+    pop rcx
+    ret
+
+; ---- Built-in: max(a, b) ----
+.builtin_max:
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_max
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    pop rsi
+    pop rcx
+    ret
+
+; ---- Built-in: sqrt(x) ----
+.builtin_sqrt:
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_sqrt
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    pop rsi
+    pop rcx
+    ret
+
+; ---- Built-in: random(min, max) ----
+.builtin_random:
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_random
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    pop rsi
+    pop rcx
+    ret
+
+; ---- Built-in: sort(arr) ----
+.builtin_sort:
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_arr_sort
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    pop rsi
+    pop rcx
+    ret
+
+; ---- Built-in: join(arr, sep) ----
+.builtin_join:
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_arr_join
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    pop rsi
+    pop rcx
+    ret
+
+; ---- Built-in: range(start, end) or range(end) ----
+.builtin_range:
+    xor r14, r14
+    call codegen_call_args
+    ; 1 arg: range(n) → rdi=n, rsi=0. Need rdi=0, rsi=n
+    ; 2 args: range(a,b) → rdi=a, rsi=b. Correct as-is.
+    ; Emit: cmp r10, 1 / jne .ok / mov rsi, rdi / xor rdi, rdi / .ok:
+    mov rdi, frag_range_fix
+    call out_str
+    mov rdi, frag_call_range
     call out_str
     mov rdi, frag_push_rax
     call out_str
@@ -3588,8 +4113,102 @@ cg_expr_primary:
     call out_str
     mov rdi, frag_push_rax
     call out_str
-    jmp .check_method        ; support chaining
+    jmp .check_method
 .not_method_len:
+
+    ; "startswith" (10 chars) — s.startswith("prefix")
+    cmp ecx, 10
+    jne .not_method_startswith
+    cmp byte [rsi], 's'
+    jne .not_method_startswith
+    cmp byte [rsi+6], 'w'
+    jne .not_method_startswith
+    call codegen_expr
+    call cg_advance          ; consume ')'
+    mov rdi, frag_pop_rsi
+    call out_str
+    mov rdi, frag_call_startswith
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    jmp .check_method
+.not_method_startswith:
+
+    ; "endswith" (8 chars) — s.endswith("suffix")
+    cmp ecx, 8
+    jne .not_method_endswith
+    cmp byte [rsi], 'e'
+    jne .not_method_endswith
+    cmp byte [rsi+4], 'w'
+    jne .not_method_endswith
+    call codegen_expr
+    call cg_advance          ; consume ')'
+    mov rdi, frag_pop_rsi
+    call out_str
+    mov rdi, frag_call_endswith
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    jmp .check_method
+.not_method_endswith:
+
+    ; "index" (5 chars) — s.index("sub")
+    cmp ecx, 5
+    jne .not_method_index
+    cmp byte [rsi], 'i'
+    jne .not_method_index
+    cmp byte [rsi+1], 'n'
+    jne .not_method_index
+    cmp byte [rsi+2], 'd'
+    jne .not_method_index
+    call codegen_expr
+    call cg_advance          ; consume ')'
+    mov rdi, frag_pop_rsi
+    call out_str
+    mov rdi, frag_call_str_index
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    jmp .check_method
+.not_method_index:
+
+    ; "split" (5 chars) — s.split(",")
+    cmp ecx, 5
+    jne .not_method_split
+    cmp byte [rsi], 's'
+    jne .not_method_split
+    cmp byte [rsi+1], 'p'
+    jne .not_method_split
+    call codegen_expr
+    call cg_advance          ; consume ')'
+    mov rdi, frag_pop_rsi
+    call out_str
+    mov rdi, frag_call_split
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    jmp .check_method
+.not_method_split:
+
+    ; "repeat" (6 chars) — s.repeat(3)
+    cmp ecx, 6
+    jne .not_method_repeat
+    cmp byte [rsi], 'r'
+    jne .not_method_repeat
+    cmp byte [rsi+1], 'e'
+    jne .not_method_repeat
+    cmp byte [rsi+2], 'p'
+    jne .not_method_repeat
+    call codegen_expr
+    call cg_advance          ; consume ')'
+    mov rdi, frag_pop_rsi
+    call out_str
+    mov rdi, frag_call_str_repeat
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    jmp .check_method
+.not_method_repeat:
 
     ; Unknown method — push 0
     call cg_advance          ; consume ')'

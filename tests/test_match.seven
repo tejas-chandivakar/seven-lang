@@ -1,0 +1,38 @@
+!! Phase 3: match/case/else/end test
+
+show "--- match numbers ---"
+x = 3
+match x
+    case 1
+        show "one"
+    case 2
+        show "two"
+    case 3
+        show "three"
+    else
+        show "other"
+end
+
+show "--- match strings ---"
+color = "green"
+match color
+    case "red"
+        show "laal"
+    case "green"
+        show "lilu"
+    case "blue"
+        show "nilu"
+    else
+        show "biju"
+end
+
+show "--- match else ---"
+y = 99
+match y
+    case 1
+        show "one"
+    else
+        show "default"
+end
+
+show "done"

@@ -17,6 +17,9 @@ section .data
     null_str_len equ 4
     divzero_msg  db "Error: division by zero", 10
     divzero_len  equ $ - divzero_msg
+    type_int_str db "int", 0
+    type_str_str db "string", 0
+    type_arr_str db "array", 0
 
 section .bss
     int_buf      resb 21        ; buffer for int->string (max 20 digits + sign)
@@ -360,6 +363,15 @@ rt_str_copy:
 ; ============================================================
 global rt_str_eq
 rt_str_eq:
+    ; Guard: if either arg looks like an integer (not a pointer), return 0
+    cmp rdi, 0
+    jl .not_eq
+    cmp rdi, 0x400000
+    jbe .not_eq
+    cmp rsi, 0
+    jl .not_eq
+    cmp rsi, 0x400000
+    jbe .not_eq
     xor rax, rax
 .loop:
     mov cl, [rdi]
@@ -566,6 +578,74 @@ rt_file_write:
     mov rbp, rsp
     mov rax, 1              ; sys_write
     syscall
+    pop rbp
+    ret
+
+; ============================================================
+; rt_file_write_str — Write string to named file
+; rdi = filename (null-terminated), rsi = string to write
+; ============================================================
+global rt_file_write_str
+rt_file_write_str:
+    push rbp
+    mov rbp, rsp
+    push r12
+    push r13
+    mov r12, rsi             ; save string
+
+    ; Open file for writing
+    call rt_file_open_write  ; rdi already has filename
+    cmp rax, 0
+    jl .fws_error
+    mov r13, rax             ; fd
+
+    ; Get string length
+    mov rdi, r12
+    call rt_str_len
+    mov rdx, rax             ; length
+
+    ; Write
+    mov rax, 1               ; sys_write
+    mov rdi, r13             ; fd
+    mov rsi, r12             ; string
+    syscall
+
+    ; Close
+    mov rax, 3
+    mov rdi, r13
+    syscall
+
+    mov rax, 0               ; success
+.fws_error:
+    pop r13
+    pop r12
+    pop rbp
+    ret
+
+; ============================================================
+; rt_file_read_str — Read file into heap string
+; rdi = filename (null-terminated), returns rax = string ptr
+; ============================================================
+global rt_file_read_str
+rt_file_read_str:
+    push rbp
+    mov rbp, rsp
+    push r12
+
+    call rt_file_open_read
+    cmp rax, 0
+    jl .frs_error
+    mov rdi, rax
+    call rt_file_read        ; rax = string ptr
+    pop r12
+    pop rbp
+    ret
+.frs_error:
+    ; Return empty string on error
+    mov rdi, 1
+    call rt_alloc
+    mov byte [rax], 0
+    pop r12
     pop rbp
     ret
 
@@ -1049,6 +1129,9 @@ rt_arr_contains:
     mov r12, [rdi]           ; count
     lea r13, [rdi + 16]      ; start of elements
     mov r14, rsi             ; value to find
+    ; Negative values are always integers
+    cmp r14, 0
+    jl .ac_int_loop
     ; Detect if value is a string pointer (> 0x400000)
     mov rax, 0x400000
     cmp r14, rax
@@ -1254,6 +1337,9 @@ global rt_print_val
 rt_print_val:
     push rbp
     mov rbp, rsp
+    ; Negative values are always integers (signed check)
+    cmp rdi, 0
+    jl .print_as_int
     ; Check if value looks like a pointer (in heap range or > 0x400000)
     cmp rdi, 0x400000
     jb .print_as_int
@@ -1296,6 +1382,729 @@ rt_div_check:
     mov rdi, 1
     syscall
 .ok:
+    ret
+
+; ============================================================
+; rt_abs — Absolute value: rdi = input, rax = |input|
+; ============================================================
+global rt_abs
+rt_abs:
+    mov rax, rdi
+    cmp rax, 0
+    jge .done
+    neg rax
+.done:
+    ret
+
+; ============================================================
+; rt_min — Minimum of rdi, rsi → rax
+; ============================================================
+global rt_min
+rt_min:
+    mov rax, rdi
+    cmp rsi, rax
+    jge .done
+    mov rax, rsi
+.done:
+    ret
+
+; ============================================================
+; rt_max — Maximum of rdi, rsi → rax
+; ============================================================
+global rt_max
+rt_max:
+    mov rax, rdi
+    cmp rsi, rax
+    jle .done
+    mov rax, rsi
+.done:
+    ret
+
+; ============================================================
+; rt_sqrt — Integer square root (floor): rdi = input, rax = floor(sqrt(input))
+; ============================================================
+global rt_sqrt
+rt_sqrt:
+    push rbx
+    cmp rdi, 0
+    jle .zero
+    cmp rdi, 1
+    je .one
+    mov rax, rdi
+    shr rax, 1              ; initial guess = n/2
+.loop:
+    mov rbx, rax             ; save old guess
+    ; new = (old + n/old) / 2
+    push rdx
+    xor rdx, rdx
+    push rax
+    mov rax, rdi
+    div rbx                  ; rax = n / old
+    pop rcx                  ; rcx = old
+    add rax, rcx             ; rax = old + n/old
+    shr rax, 1               ; rax = (old + n/old) / 2
+    pop rdx
+    cmp rax, rbx
+    jl .loop                 ; if new < old, keep going
+    mov rax, rbx             ; return old (converged)
+    pop rbx
+    ret
+.zero:
+    xor rax, rax
+    pop rbx
+    ret
+.one:
+    mov rax, 1
+    pop rbx
+    ret
+
+; ============================================================
+; rt_random — Random number in range [rdi, rsi] → rax
+; Uses Linux getrandom syscall (318)
+; ============================================================
+global rt_random
+rt_random:
+    push rbp
+    mov rbp, rsp
+    push r12
+    push r13
+    sub rsp, 8               ; space for random bytes
+    mov r12, rdi             ; min
+    mov r13, rsi             ; max
+
+    ; getrandom(&buf, 8, 0)
+    mov rax, 318             ; sys_getrandom
+    lea rdi, [rsp]
+    mov rsi, 8
+    xor rdx, rdx
+    syscall
+
+    mov rax, [rsp]           ; get random 8 bytes
+    ; Make positive
+    cmp rax, 0
+    jge .positive
+    neg rax
+.positive:
+    ; range = max - min + 1
+    mov rcx, r13
+    sub rcx, r12
+    inc rcx
+    ; rax = rax % range + min
+    xor rdx, rdx
+    div rcx
+    mov rax, rdx
+    add rax, r12
+
+    add rsp, 8
+    pop r13
+    pop r12
+    pop rbp
+    ret
+
+; ============================================================
+; rt_type — Return type string pointer: rdi = value → rax = ptr to type string
+; Uses magnitude threshold: > 0x400000 = string/array, check array header
+; ============================================================
+global rt_type
+rt_type:
+    push rbx
+    ; Negative values are always integers
+    cmp rdi, 0
+    jl .is_int_ret
+    mov rax, 0x400000
+    cmp rdi, rax
+    jbe .is_int
+    ; Could be string or array — check if it looks like an array
+    ; Arrays have count at [rdi], and count < 10000000 typically
+    ; and elements start at [rdi+16]
+    ; Heuristic: if [rdi] (first qword) is a small number and [rdi+8] >= heap area, it's an array
+    mov rax, [rdi]           ; potential count
+    cmp rax, 0
+    jl .is_str               ; negative = not array count
+    cmp rax, 100000000
+    jg .is_str               ; too large for array count
+    ; Check second qword (capacity) — should also be reasonable
+    mov rbx, [rdi + 8]
+    cmp rbx, rax
+    jl .is_str               ; capacity < count = not array
+    mov rax, type_arr_str
+    pop rbx
+    ret
+.is_str:
+    mov rax, type_str_str
+    pop rbx
+    ret
+.is_int:
+    ; Check for bool (0 or 1)
+    cmp rdi, 0
+    je .is_int_ret
+    cmp rdi, 1
+    je .is_int_ret
+    ; Regular int
+.is_int_ret:
+    mov rax, type_int_str
+    pop rbx
+    ret
+
+; ============================================================
+; rt_str_startswith — Check if string rdi starts with rsi
+; rdi = string ptr, rsi = prefix ptr → rax = 1/0
+; ============================================================
+global rt_str_startswith
+rt_str_startswith:
+    push rbx
+    push r12
+    push r13
+    mov r12, rdi             ; string
+    mov r13, rsi             ; prefix
+.sw_loop:
+    mov al, [r13]
+    cmp al, 0
+    je .sw_yes               ; prefix ended = match
+    mov bl, [r12]
+    cmp bl, 0
+    je .sw_no                ; string ended before prefix
+    cmp al, bl
+    jne .sw_no
+    inc r12
+    inc r13
+    jmp .sw_loop
+.sw_yes:
+    mov rax, 1
+    pop r13
+    pop r12
+    pop rbx
+    ret
+.sw_no:
+    xor rax, rax
+    pop r13
+    pop r12
+    pop rbx
+    ret
+
+; ============================================================
+; rt_str_endswith — Check if string rdi ends with rsi
+; rdi = string ptr, rsi = suffix ptr → rax = 1/0
+; ============================================================
+global rt_str_endswith
+rt_str_endswith:
+    push rbx
+    push r12
+    push r13
+    push r14
+    mov r12, rdi             ; string
+    mov r13, rsi             ; suffix
+    ; Get string length
+    mov rdi, r12
+    call rt_str_len
+    mov r14, rax             ; str_len
+    ; Get suffix length
+    mov rdi, r13
+    call rt_str_len
+    mov rbx, rax             ; suf_len
+    ; If suffix longer than string, no
+    cmp rbx, r14
+    jg .ew_no
+    ; Compare from str + (str_len - suf_len)
+    mov rdi, r12
+    add rdi, r14
+    sub rdi, rbx             ; rdi = start position
+    mov rsi, r13
+.ew_loop:
+    mov al, [rsi]
+    cmp al, 0
+    je .ew_yes
+    cmp al, [rdi]
+    jne .ew_no
+    inc rdi
+    inc rsi
+    jmp .ew_loop
+.ew_yes:
+    mov rax, 1
+    pop r14
+    pop r13
+    pop r12
+    pop rbx
+    ret
+.ew_no:
+    xor rax, rax
+    pop r14
+    pop r13
+    pop r12
+    pop rbx
+    ret
+
+; ============================================================
+; rt_str_index — Find substring rsi in string rdi
+; rdi = haystack, rsi = needle → rax = index (or -1)
+; ============================================================
+global rt_str_index
+rt_str_index:
+    push rbx
+    push r12
+    push r13
+    push r14
+    push r15
+    mov r12, rdi             ; haystack
+    mov r13, rsi             ; needle
+    ; Get needle length
+    mov rdi, r13
+    call rt_str_len
+    mov r14, rax             ; needle_len
+    cmp r14, 0
+    je .idx_found_zero       ; empty needle = 0
+    ; Get haystack length
+    mov rdi, r12
+    call rt_str_len
+    mov r15, rax             ; hay_len
+    xor rbx, rbx            ; position counter
+.idx_outer:
+    mov rax, r15
+    sub rax, rbx
+    cmp rax, r14
+    jl .idx_not_found        ; not enough chars left
+    ; Compare needle at position rbx
+    xor rcx, rcx
+.idx_inner:
+    cmp rcx, r14
+    je .idx_found
+    mov al, [r12 + rbx]
+    add al, 0               ; load byte
+    mov al, [r12 + rbx + 0]
+    push rbx
+    add rbx, rcx
+    mov al, [r12 + rbx]
+    pop rbx
+    cmp al, [r13 + rcx]
+    jne .idx_next
+    inc rcx
+    jmp .idx_inner
+.idx_next:
+    inc rbx
+    jmp .idx_outer
+.idx_found:
+    mov rax, rbx
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop rbx
+    ret
+.idx_found_zero:
+    xor rax, rax
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop rbx
+    ret
+.idx_not_found:
+    mov rax, -1
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop rbx
+    ret
+
+; ============================================================
+; rt_str_split — Split string rdi by separator rsi → rax = new array
+; ============================================================
+global rt_str_split
+rt_str_split:
+    push rbp
+    mov rbp, rsp
+    push r12
+    push r13
+    push r14
+    push r15
+    push rbx
+    mov r12, rdi             ; string
+    mov r13, rsi             ; separator
+
+    ; Get separator length
+    mov rdi, r13
+    call rt_str_len
+    mov r14, rax             ; sep_len
+
+    ; Create result array
+    xor rdi, rdi
+    call rt_arr_new
+    mov r15, rax             ; result array
+
+    ; If sep_len == 0, split each char
+    cmp r14, 0
+    je .split_chars
+
+    mov rbx, r12             ; current position
+.split_loop:
+    mov al, [rbx]
+    cmp al, 0
+    je .split_last           ; end of string, push remaining
+
+    ; Check if separator matches at current position
+    xor rcx, rcx
+.split_cmp:
+    cmp rcx, r14
+    je .split_found          ; full separator matched
+    mov al, [rbx + rcx]
+    cmp al, 0
+    je .split_last           ; end of string
+    cmp al, [r13 + rcx]
+    jne .split_advance
+    inc rcx
+    jmp .split_cmp
+
+.split_advance:
+    inc rbx
+    jmp .split_loop
+
+.split_found:
+    ; Copy substring from r12 to rbx into new string
+    mov rdi, rbx
+    sub rdi, r12             ; length of substring
+    push rdi
+    inc rdi                  ; +1 for null
+    call rt_alloc
+    mov rdi, rax             ; dest
+    pop rcx                  ; length
+    push rcx
+    mov rsi, r12             ; src
+    ; Copy rcx bytes
+    push rdi
+.copy1:
+    cmp rcx, 0
+    je .copy1_done
+    mov al, [rsi]
+    mov [rdi], al
+    inc rsi
+    inc rdi
+    dec rcx
+    jmp .copy1
+.copy1_done:
+    mov byte [rdi], 0        ; null terminate
+    pop rdi                  ; restore dest start
+    pop rcx                  ; length (unused)
+
+    ; Push substring to array
+    mov rsi, rdi
+    mov rdi, r15
+    call rt_arr_push
+    mov r15, rax
+
+    ; Advance past separator
+    add rbx, r14
+    mov r12, rbx             ; new start
+    jmp .split_loop
+
+.split_last:
+    ; Push remaining string (from r12 to end)
+    mov rdi, r12
+    call rt_str_len
+    mov rcx, rax
+    inc rcx                  ; +1 for null
+    push rcx
+    mov rdi, rcx
+    call rt_alloc
+    mov rdi, rax
+    pop rcx
+    dec rcx
+    mov rsi, r12
+    push rdi
+.copy2:
+    cmp rcx, 0
+    je .copy2_done
+    mov al, [rsi]
+    mov [rdi], al
+    inc rsi
+    inc rdi
+    dec rcx
+    jmp .copy2
+.copy2_done:
+    mov byte [rdi], 0
+    pop rdi
+    mov rsi, rdi
+    mov rdi, r15
+    call rt_arr_push
+    mov r15, rax
+
+    mov rax, r15
+    pop rbx
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop rbp
+    ret
+
+.split_chars:
+    ; Split each character into its own string
+    mov rbx, r12
+.sc_loop:
+    mov al, [rbx]
+    cmp al, 0
+    je .sc_done
+    ; Allocate 2-byte string
+    mov rdi, 2
+    call rt_alloc
+    mov cl, [rbx]
+    mov [rax], cl
+    mov byte [rax + 1], 0
+    mov rsi, rax
+    mov rdi, r15
+    call rt_arr_push
+    mov r15, rax
+    inc rbx
+    jmp .sc_loop
+.sc_done:
+    mov rax, r15
+    pop rbx
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop rbp
+    ret
+
+; ============================================================
+; rt_str_repeat — Repeat string rdi, rsi times → rax = new string
+; ============================================================
+global rt_str_repeat
+rt_str_repeat:
+    push rbp
+    mov rbp, rsp
+    push r12
+    push r13
+    push r14
+    mov r12, rdi             ; string
+    mov r13, rsi             ; count
+    ; Get string length
+    mov rdi, r12
+    call rt_str_len
+    mov r14, rax             ; str_len
+    ; Allocate str_len * count + 1
+    mov rdi, r14
+    imul rdi, r13
+    inc rdi
+    call rt_alloc
+    mov rdi, rax             ; dest
+    push rdi                 ; save start
+    ; Copy string count times
+    xor rcx, rcx
+.rep_outer:
+    cmp rcx, r13
+    je .rep_done
+    mov rsi, r12
+    push rcx
+    mov rcx, r14
+.rep_inner:
+    cmp rcx, 0
+    je .rep_inner_done
+    mov al, [rsi]
+    mov [rdi], al
+    inc rsi
+    inc rdi
+    dec rcx
+    jmp .rep_inner
+.rep_inner_done:
+    pop rcx
+    inc rcx
+    jmp .rep_outer
+.rep_done:
+    mov byte [rdi], 0        ; null terminate
+    pop rax                  ; return start
+    pop r14
+    pop r13
+    pop r12
+    pop rbp
+    ret
+
+; ============================================================
+; rt_arr_sort — Sort integer array in-place (bubble sort): rdi = array ptr
+; Returns: rax = array ptr
+; ============================================================
+global rt_arr_sort
+rt_arr_sort:
+    push rbp
+    mov rbp, rsp
+    push r12
+    push r13
+    push r14
+    push rbx
+    mov r12, rdi             ; array
+    mov r13, [r12]           ; count
+    cmp r13, 1
+    jle .sort_done
+    lea r14, [r12 + 16]      ; elements start
+.sort_outer:
+    xor rbx, rbx            ; swapped flag
+    xor rcx, rcx            ; i = 0
+.sort_inner:
+    lea rax, [rcx + 1]
+    cmp rax, r13
+    jge .sort_check
+    mov rax, [r14 + rcx * 8]
+    mov rdx, [r14 + rcx * 8 + 8]
+    cmp rax, rdx
+    jle .sort_no_swap
+    ; Swap
+    mov [r14 + rcx * 8], rdx
+    mov [r14 + rcx * 8 + 8], rax
+    mov rbx, 1
+.sort_no_swap:
+    inc rcx
+    jmp .sort_inner
+.sort_check:
+    cmp rbx, 0
+    jne .sort_outer
+.sort_done:
+    mov rax, r12
+    pop rbx
+    pop r14
+    pop r13
+    pop r12
+    pop rbp
+    ret
+
+; ============================================================
+; rt_arr_join — Join array of strings with separator
+; rdi = array, rsi = separator → rax = new string
+; ============================================================
+global rt_arr_join
+rt_arr_join:
+    push rbp
+    mov rbp, rsp
+    push r12
+    push r13
+    push r14
+    push r15
+    push rbx
+    mov r12, rdi             ; array
+    mov r13, rsi             ; separator
+    mov r14, [r12]           ; count
+    lea r15, [r12 + 16]      ; elements
+
+    ; Get separator length
+    mov rdi, r13
+    call rt_str_len
+    mov rbx, rax             ; sep_len
+
+    ; First pass: calculate total length
+    xor rcx, rcx             ; total
+    xor r8, r8               ; i
+.join_len:
+    cmp r8, r14
+    jge .join_alloc
+    push rcx
+    push r8
+    mov rdi, [r15 + r8 * 8]
+    call rt_str_len
+    pop r8
+    pop rcx
+    add rcx, rax
+    ; Add separator length (except after last)
+    lea rax, [r8 + 1]
+    cmp rax, r14
+    jge .join_len_next
+    add rcx, rbx
+.join_len_next:
+    inc r8
+    jmp .join_len
+
+.join_alloc:
+    inc rcx                  ; +1 for null
+    push rcx
+    mov rdi, rcx
+    call rt_alloc
+    pop rcx
+    mov rdi, rax             ; dest pointer
+    push rdi                 ; save start
+
+    ; Second pass: copy strings with separators
+    xor r8, r8
+.join_copy:
+    cmp r8, r14
+    jge .join_finish
+    ; Copy element string
+    push r8
+    mov rsi, [r15 + r8 * 8]
+.jc_loop:
+    mov al, [rsi]
+    cmp al, 0
+    je .jc_elem_done
+    mov [rdi], al
+    inc rsi
+    inc rdi
+    jmp .jc_loop
+.jc_elem_done:
+    pop r8
+    ; Add separator if not last
+    lea rax, [r8 + 1]
+    cmp rax, r14
+    jge .jc_next
+    mov rsi, r13
+    mov rcx, rbx
+.jc_sep:
+    cmp rcx, 0
+    je .jc_next
+    mov al, [rsi]
+    mov [rdi], al
+    inc rsi
+    inc rdi
+    dec rcx
+    jmp .jc_sep
+.jc_next:
+    inc r8
+    jmp .join_copy
+
+.join_finish:
+    mov byte [rdi], 0        ; null terminate
+    pop rax                  ; return start
+    pop rbx
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop rbp
+    ret
+
+; ============================================================
+; rt_range — Create array of integers from rdi to rsi-1
+; rdi = start, rsi = end → rax = new array
+; ============================================================
+global rt_range
+rt_range:
+    push rbp
+    mov rbp, rsp
+    push r12
+    push r13
+    push r14
+    push rbx
+    mov r12, rdi             ; start
+    mov r13, rsi             ; end
+
+    ; Create array
+    xor rdi, rdi
+    call rt_arr_new
+    mov r14, rax             ; array
+
+    mov rbx, r12
+.range_loop:
+    cmp rbx, r13
+    jge .range_done
+    mov rdi, r14
+    mov rsi, rbx
+    call rt_arr_push
+    mov r14, rax
+    inc rbx
+    jmp .range_loop
+.range_done:
+    mov rax, r14
+    pop rbx
+    pop r14
+    pop r13
+    pop r12
+    pop rbp
     ret
 
 ; ============================================================

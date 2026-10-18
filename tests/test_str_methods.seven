@@ -1,0 +1,42 @@
+!! Phase 3: New string methods test
+
+show "--- startswith ---"
+s = "hello world"
+if s.startswith("hello")
+    show "starts with hello"
+end
+if s.startswith("world")
+    show "WRONG"
+else
+    show "not starts with world"
+end
+
+show "--- endswith ---"
+if s.endswith("world")
+    show "ends with world"
+end
+if s.endswith("hello")
+    show "WRONG"
+else
+    show "not ends with hello"
+end
+
+show "--- index ---"
+i = s.index("world")
+show i
+i2 = s.index("xyz")
+show i2
+
+show "--- split ---"
+csv = "a,b,c,d"
+parts = csv.split(",")
+show parts[0]
+show parts[1]
+show parts[2]
+show parts[3]
+
+show "--- repeat ---"
+r = "ha".repeat(3)
+show r
+
+show "done"

@@ -1,0 +1,7 @@
+!! Test: just split (5 chars)
+s = "a,b,c"
+parts = s.split(",")
+show parts[0]
+show parts[1]
+show parts[2]
+show "split done"

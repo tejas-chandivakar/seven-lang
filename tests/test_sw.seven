@@ -1,0 +1,5 @@
+!! minimal startswith test
+s = "hello world"
+r = s.startswith("hello")
+show r
+show "done"

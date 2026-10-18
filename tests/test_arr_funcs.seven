@@ -1,0 +1,35 @@
+!! Phase 3: Array functions test
+
+show "--- sort ---"
+nums = [5, 2, 8, 1, 9, 3]
+sorted = sort(nums)
+show sorted[0]
+show sorted[1]
+show sorted[2]
+show sorted[3]
+show sorted[4]
+show sorted[5]
+
+show "--- join ---"
+words = ["hello", "beautiful", "world"]
+result = join(words, " ")
+show result
+
+csv = join(words, ",")
+show csv
+
+show "--- range ---"
+r = range(5)
+show r[0]
+show r[1]
+show r[2]
+show r[3]
+show r[4]
+
+r2 = range(3, 7)
+show r2[0]
+show r2[1]
+show r2[2]
+show r2[3]
+
+show "done"

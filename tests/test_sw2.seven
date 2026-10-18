@@ -1,0 +1,6 @@
+!! Test: method with simple name
+s = "hello"
+r = s.len()
+show r
+r2 = s.upper()
+show r2

@@ -1,0 +1,28 @@
+!! Phase 3: Math builtins test
+
+show "--- abs ---"
+show abs(-10)
+show abs(5)
+show abs(0)
+
+show "--- min/max ---"
+show min(3, 7)
+show max(3, 7)
+show min(-5, 5)
+show max(-5, 5)
+
+show "--- sqrt ---"
+show sqrt(25)
+show sqrt(100)
+show sqrt(2)
+show sqrt(0)
+
+show "--- random ---"
+r = random(1, 10)
+if r atleast 1
+    if r atmost 10
+        show "random in range"
+    end
+end
+
+show "done"

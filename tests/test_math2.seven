@@ -1,0 +1,15 @@
+!! Minimal math test
+show abs(-10)
+show abs(5)
+show min(3, 7)
+show max(3, 7)
+show min(-5, 5)
+show max(-5, 5)
+show "math done"
+show sqrt(25)
+show sqrt(100)
+show sqrt(0)
+show "sqrt done"
+r = random(1, 10)
+show r
+show "all done"

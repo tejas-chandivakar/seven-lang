@@ -1,0 +1,9 @@
+!! Test string indexing: str[i]
+s = "Hello"
+show s[0]
+show s[1]
+show s[4]
+
+!! Negative indexing
+show s[-1]
+show s[-2]

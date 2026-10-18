@@ -7,8 +7,11 @@ tools/nasm/
 .idea/
 
 # Generated assembly and binaries from test runs
+*.asm
+!src/*.asm
 hello
-hello.asm
 maro_program
-maro_program.asm
 program1.asm
+testout.txt
+self/output*
+compiler.asm

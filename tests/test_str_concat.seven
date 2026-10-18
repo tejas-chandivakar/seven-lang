@@ -1,0 +1,9 @@
+!! Test string concatenation with + operator
+a = "Hello"
+b = " "
+c = "World"
+d = a + b + c
+show d
+show "foo" + "bar"
+x = "num:" + str(42)
+show x

@@ -57,6 +57,12 @@ section .data
     OP_LTE      equ 12
     OP_GTE      equ 13
     OP_ASSIGN   equ 14
+    OP_AMP      equ 15
+    OP_PIPE     equ 16
+    OP_CARET    equ 17
+    OP_TILDE    equ 18
+    OP_LSHIFT   equ 19
+    OP_RSHIFT   equ 20
 
     ; Punct subtypes
     PUNCT_LPAREN   equ 1
@@ -91,7 +97,10 @@ section .data
                     db "extern rt_str_startswith, rt_str_endswith", 10
                     db "extern rt_str_index, rt_str_split, rt_str_repeat", 10
                     db "extern rt_range", 10
-                    db "extern rt_file_write_str, rt_file_read_str", 10, 10, 0
+                    db "extern rt_file_write_str, rt_file_read_str", 10
+                    db "extern rt_subscript, rt_str_char_at", 10
+                    db "extern rt_ord, rt_chr, rt_substr", 10
+                    db "extern rt_exit", 10, 10, 0
     frag_sect_data  db "section .data", 10, 0
     frag_sect_bss   db 10, "section .bss", 10, 0
     frag_sect_text  db 10, "section .text", 10
@@ -321,6 +330,33 @@ section .data
                     db "    cmovl rsi, rdi", 10
                     db "    mov rax, 0", 10
                     db "    cmovl rdi, rax", 10, 0
+
+    ; Phase 5 (self-hosted) call fragments
+    frag_call_subscript db "    pop rsi", 10
+                    db "    pop rdi", 10
+                    db "    call rt_subscript", 10
+                    db "    push rax", 10, 0
+    frag_call_ord       db "    call rt_ord", 10, 0
+    frag_call_chr       db "    call rt_chr", 10, 0
+    frag_call_substr    db "    call rt_substr", 10, 0
+    frag_call_exit      db "    pop rdi", 10
+                    db "    mov rax, 60", 10
+                    db "    syscall", 10, 0
+    ; Bitwise operation fragments
+    frag_bit_and    db "    and rax, rbx", 10, 0
+    frag_bit_or     db "    or rax, rbx", 10, 0
+    frag_bit_xor    db "    xor rax, rbx", 10, 0
+    frag_bit_not    db "    not rax", 10, 0
+    frag_bit_shl    db "    mov rcx, rbx", 10
+                    db "    shl rax, cl", 10, 0
+    frag_bit_shr    db "    mov rcx, rbx", 10
+                    db "    shr rax, cl", 10, 0
+
+    ; String-aware + operator fragments
+    frag_jb         db "    jb ", 0
+    frag_cmp_rax_thr db "    cmp rax, 0x400000", 10, 0
+    frag_cmp_rbx_thr db "    cmp rbx, 0x400000", 10, 0
+    frag_call_str_concat db "    call rt_str_concat", 10, 0
 
     ; Function argument register names (SysV AMD64 ABI order)
     frag_reg_rdi    db "rdi", 0
@@ -2828,10 +2864,18 @@ codegen_show_expr:
     push rbp
     mov rbp, rsp
 
-    ; Check if it's a string literal directly
+    ; Check if it's a string literal directly (but not if followed by an operator like +)
     call cg_tok_type
     cmp al, TOK_STRING
-    je .show_string
+    jne .show_expr
+    ; Peek at next token to see if it's an operator
+    inc qword [cg_pos]
+    call cg_tok_type
+    dec qword [cg_pos]
+    cmp al, TOK_OP
+    je .show_expr              ; string + something: use full expression path
+    jmp .show_string
+.show_expr:
 
     ; Otherwise generate expression and print as val (auto-detect type)
     call codegen_expr
@@ -3400,16 +3444,66 @@ cg_expr_add:
     je .add
     cmp al, OP_MINUS
     je .sub_
+    cmp al, OP_AMP
+    je .bit_and
+    cmp al, OP_PIPE
+    je .bit_or
+    cmp al, OP_CARET
+    je .bit_xor
     jmp .done
 .add:
     call cg_advance
     call cg_expr_mul
+    ; pop rbx (right), pop rax (left)
     mov rdi, frag_pop_rbx
     call out_str
     mov rdi, frag_pop_rax
     call out_str
+    ; Runtime type check: if both operands look like pointers, concat strings
+    call new_label
+    mov r15, rax           ; r15 = int_add label
+    call new_label
+    push rax               ; stack: done label
+    ; emit: cmp rax, 0x400000 / jb .Lint_add
+    mov rdi, frag_cmp_rax_thr
+    call out_str
+    mov rdi, frag_jb
+    call out_str
+    mov rdi, r15
+    call out_label_ref
+    call out_str_newline
+    ; emit: cmp rbx, 0x400000 / jb .Lint_add
+    mov rdi, frag_cmp_rbx_thr
+    call out_str
+    mov rdi, frag_jb
+    call out_str
+    mov rdi, r15
+    call out_label_ref
+    call out_str_newline
+    ; emit: mov rdi, rax / mov rsi, rbx / call rt_str_concat / jmp .Ldone
+    mov rdi, frag_mov_rdi_from_rax
+    call out_str
+    mov rdi, frag_mov_rsi_from_rbx
+    call out_str
+    mov rdi, frag_call_str_concat
+    call out_str
+    mov rdi, frag_jmp
+    call out_str
+    pop rax
+    push rax               ; keep done label on stack
+    mov rdi, rax
+    call out_label_ref
+    call out_str_newline
+    ; emit: .Lint_add: / add rax, rbx
+    mov rdi, r15
+    call out_label_def
     mov rdi, frag_add
     call out_str
+    ; emit: .Ldone:
+    pop rax
+    mov rdi, rax
+    call out_label_def
+    ; push result
     mov rdi, frag_push_rax
     call out_str
     jmp .loop
@@ -3422,6 +3516,42 @@ cg_expr_add:
     mov rdi, frag_pop_rax
     call out_str
     mov rdi, frag_sub
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    jmp .loop
+.bit_and:
+    call cg_advance
+    call cg_expr_mul
+    mov rdi, frag_pop_rbx
+    call out_str
+    mov rdi, frag_pop_rax
+    call out_str
+    mov rdi, frag_bit_and
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    jmp .loop
+.bit_or:
+    call cg_advance
+    call cg_expr_mul
+    mov rdi, frag_pop_rbx
+    call out_str
+    mov rdi, frag_pop_rax
+    call out_str
+    mov rdi, frag_bit_or
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    jmp .loop
+.bit_xor:
+    call cg_advance
+    call cg_expr_mul
+    mov rdi, frag_pop_rbx
+    call out_str
+    mov rdi, frag_pop_rax
+    call out_str
+    mov rdi, frag_bit_xor
     call out_str
     mov rdi, frag_push_rax
     call out_str
@@ -3447,6 +3577,10 @@ cg_expr_mul:
     je .mod
     cmp al, OP_DSTAR
     je .pow
+    cmp al, OP_LSHIFT
+    je .shl
+    cmp al, OP_RSHIFT
+    je .shr
     jmp .done
 .mul:
     call cg_advance
@@ -3502,6 +3636,30 @@ cg_expr_mul:
     mov rdi, frag_push_rax
     call out_str
     jmp .loop
+.shl:
+    call cg_advance
+    call cg_expr_unary
+    mov rdi, frag_pop_rbx
+    call out_str
+    mov rdi, frag_pop_rax
+    call out_str
+    mov rdi, frag_bit_shl
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    jmp .loop
+.shr:
+    call cg_advance
+    call cg_expr_unary
+    mov rdi, frag_pop_rbx
+    call out_str
+    mov rdi, frag_pop_rax
+    call out_str
+    mov rdi, frag_bit_shr
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    jmp .loop
 .done:
     ret
 
@@ -3536,12 +3694,26 @@ cg_expr_unary:
     jne .no_neg
     call cg_tok_sub
     cmp al, OP_MINUS
-    jne .no_neg
+    je .do_neg
+    cmp al, OP_TILDE
+    je .do_bitnot
+    jmp .no_neg
+.do_neg:
     call cg_advance
     call cg_expr_primary
     mov rdi, frag_pop_rax
     call out_str
     mov rdi, frag_neg
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    ret
+.do_bitnot:
+    call cg_advance
+    call cg_expr_primary
+    mov rdi, frag_pop_rax
+    call out_str
+    mov rdi, frag_bit_not
     call out_str
     mov rdi, frag_push_rax
     call out_str
@@ -3819,6 +3991,62 @@ cg_expr_primary:
     jmp .builtin_range
 .not_builtin_range:
 
+    ; Check "ord"
+    cmp ecx, 3
+    jne .not_builtin_ord
+    cmp byte [rsi], 'o'
+    jne .not_builtin_ord
+    cmp byte [rsi+1], 'r'
+    jne .not_builtin_ord
+    cmp byte [rsi+2], 'd'
+    jne .not_builtin_ord
+    jmp .builtin_ord
+.not_builtin_ord:
+
+    ; Check "chr"
+    cmp ecx, 3
+    jne .not_builtin_chr
+    cmp byte [rsi], 'c'
+    jne .not_builtin_chr
+    cmp byte [rsi+1], 'h'
+    jne .not_builtin_chr
+    cmp byte [rsi+2], 'r'
+    jne .not_builtin_chr
+    jmp .builtin_chr
+.not_builtin_chr:
+
+    ; Check "substr"
+    cmp ecx, 6
+    jne .not_builtin_substr
+    cmp byte [rsi], 's'
+    jne .not_builtin_substr
+    cmp byte [rsi+1], 'u'
+    jne .not_builtin_substr
+    cmp byte [rsi+2], 'b'
+    jne .not_builtin_substr
+    cmp byte [rsi+3], 's'
+    jne .not_builtin_substr
+    cmp byte [rsi+4], 't'
+    jne .not_builtin_substr
+    cmp byte [rsi+5], 'r'
+    jne .not_builtin_substr
+    jmp .builtin_substr
+.not_builtin_substr:
+
+    ; Check "exit"
+    cmp ecx, 4
+    jne .not_builtin_exit
+    cmp byte [rsi], 'e'
+    jne .not_builtin_exit
+    cmp byte [rsi+1], 'x'
+    jne .not_builtin_exit
+    cmp byte [rsi+2], 'i'
+    jne .not_builtin_exit
+    cmp byte [rsi+3], 't'
+    jne .not_builtin_exit
+    jmp .builtin_exit
+.not_builtin_exit:
+
     ; Generic user function call
     xor r14, r14
     call codegen_call_args   ; eval args, pop into regs
@@ -4028,6 +4256,52 @@ cg_expr_primary:
     pop rcx
     ret
 
+; ---- Built-in: ord(str) — ASCII code of first char ----
+.builtin_ord:
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_ord
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    pop rsi
+    pop rcx
+    ret
+
+; ---- Built-in: chr(int) — integer to 1-char string ----
+.builtin_chr:
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_chr
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    pop rsi
+    pop rcx
+    ret
+
+; ---- Built-in: substr(str, start, end) — substring extraction ----
+.builtin_substr:
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_substr
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    pop rsi
+    pop rcx
+    ret
+
+; ---- Built-in: exit(code) — exit with status code ----
+.builtin_exit:
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_exit
+    call out_str
+    pop rsi
+    pop rcx
+    ret
+
 .load_var_reg:
     ; Register variable first (deferred from .ident)
     mov rsi, [rsp]           ; name ptr
@@ -4049,21 +4323,21 @@ cg_expr_primary:
     pop rsi
     pop rcx
 
-    ; Check for array indexing: var[expr]
+    ; Check for subscript: var[expr] (works for arrays and strings)
     call cg_tok_type
     cmp al, TOK_PUNCT
     jne .check_method
     call cg_tok_sub
     cmp al, PUNCT_LBRACKET
     jne .check_method
-    ; Array indexing
+    ; Subscript (auto-detects string vs array at runtime)
     call cg_advance          ; consume '['
     call codegen_expr         ; index expression → push index
     call cg_advance          ; consume ']'
-    ; Stack: [array_ptr, index]
-    mov rdi, frag_arr_get
+    ; Stack: [value_ptr, index]
+    mov rdi, frag_call_subscript
     call out_str
-    ret
+    jmp .check_method        ; allow chaining: str[i].upper()
 
 .check_method:
     ; Check for method call: .method()
@@ -4411,7 +4685,8 @@ codegen_call_args:
     mov rbp, rsp
     push r12
     push r13
-    ; r14 already holds 0 from caller
+    push r14
+    xor r14, r14
 
     ; Check for immediate ')' — no args
     call cg_tok_type
@@ -4492,6 +4767,7 @@ codegen_call_args:
     call out_int
     call out_str_newline
 
+    pop r14
     pop r13
     pop r12
     pop rbp

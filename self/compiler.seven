@@ -1,0 +1,1529 @@
+!! ============================================================
+!! SEVEN Self-Hosted Compiler v0.1
+!! Written in SEVEN, compiles a subset of SEVEN to x86-64 NASM
+!! ============================================================
+
+!! ---- Token types ----
+TK_EOF = 0
+TK_IDENT = 1
+TK_INT = 2
+TK_STR = 4
+TK_KW = 5
+TK_OP = 6
+TK_PUNCT = 7
+TK_NL = 8
+
+!! ---- Operator subtypes ----
+OP_PLUS = 1
+OP_MINUS = 2
+OP_STAR = 3
+OP_SLASH = 4
+OP_PERCENT = 5
+OP_EQ = 8
+OP_NEQ = 9
+OP_LT = 10
+OP_GT = 11
+OP_LTE = 12
+OP_GTE = 13
+OP_ASSIGN = 14
+OP_AMP = 15
+OP_PIPE = 16
+OP_CARET = 17
+OP_LSHIFT = 19
+OP_RSHIFT = 20
+
+!! ---- Punct subtypes ----
+PN_LPAREN = 1
+PN_RPAREN = 2
+PN_LBRACKET = 3
+PN_RBRACKET = 4
+PN_COMMA = 5
+PN_DOT = 6
+
+!! ============================================================
+!! LEXER
+!! ============================================================
+
+!! Global lexer state
+lex_src = ""
+lex_pos = 0
+lex_line = 1
+lex_len = 0
+lex_tokens = []
+
+func is_alpha(c)
+    if c >= 65 and c <= 90
+        return 1
+    end
+    if c >= 97 and c <= 122
+        return 1
+    end
+    if c == 95
+        return 1
+    end
+    return 0
+end
+
+func is_digit(c)
+    if c >= 48 and c <= 57
+        return 1
+    end
+    return 0
+end
+
+func is_alnum(c)
+    if is_alpha(c) == 1
+        return 1
+    end
+    if is_digit(c) == 1
+        return 1
+    end
+    return 0
+end
+
+func lex_peek()
+    if lex_pos >= lex_len
+        return 0
+    end
+    return ord(lex_src[lex_pos])
+end
+
+func lex_peek_at(offset)
+    idx = lex_pos + offset
+    if idx >= lex_len
+        return 0
+    end
+    return ord(lex_src[idx])
+end
+
+func lex_add(typ, sub, text)
+    tok = []
+    push(tok, typ)
+    push(tok, sub)
+    push(tok, lex_line)
+    push(tok, text)
+    push(lex_tokens, tok)
+end
+
+func is_keyword(word)
+    if word is "show"
+        return 1
+    end
+    if word is "if"
+        return 1
+    end
+    if word is "elif"
+        return 1
+    end
+    if word is "else"
+        return 1
+    end
+    if word is "end"
+        return 1
+    end
+    if word is "while"
+        return 1
+    end
+    if word is "repeat"
+        return 1
+    end
+    if word is "func"
+        return 1
+    end
+    if word is "return"
+        return 1
+    end
+    if word is "true"
+        return 1
+    end
+    if word is "false"
+        return 1
+    end
+    if word is "null"
+        return 1
+    end
+    if word is "and"
+        return 1
+    end
+    if word is "or"
+        return 1
+    end
+    if word is "not"
+        return 1
+    end
+    if word is "err"
+        return 1
+    end
+    if word is "ask"
+        return 1
+    end
+    if word is "each"
+        return 1
+    end
+    if word is "as"
+        return 1
+    end
+    if word is "in"
+        return 1
+    end
+    if word is "is"
+        return 1
+    end
+    if word is "skip"
+        return 1
+    end
+    if word is "stop"
+        return 1
+    end
+    if word is "try"
+        return 1
+    end
+    if word is "catch"
+        return 1
+    end
+    if word is "error"
+        return 1
+    end
+    if word is "push"
+        return 1
+    end
+    if word is "match"
+        return 1
+    end
+    if word is "case"
+        return 1
+    end
+    if word is "write"
+        return 1
+    end
+    if word is "read"
+        return 1
+    end
+    if word is "times"
+        return 1
+    end
+    if word is "many"
+        return 1
+    end
+    return 0
+end
+
+func lex_all()
+    lex_tokens = []
+    lex_pos = 0
+    lex_line = 1
+    lex_len = len(lex_src)
+
+    while lex_pos < lex_len
+        ch = lex_peek()
+
+        !! Whitespace (space, tab, carriage return)
+        if ch == 32 or ch == 9 or ch == 13
+            lex_pos = lex_pos + 1
+            skip
+        end
+
+        !! Newline
+        if ch == 10
+            lex_add(TK_NL, 0, "NL")
+            lex_line = lex_line + 1
+            lex_pos = lex_pos + 1
+            skip
+        end
+
+        !! Comment: !! to end of line
+        if ch == 33 and lex_peek_at(1) == 33
+            while lex_pos < lex_len
+                if lex_peek() == 10
+                    stop
+                end
+                lex_pos = lex_pos + 1
+            end
+            skip
+        end
+
+        !! String literal
+        if ch == 34 or ch == 39
+            quote = ch
+            lex_pos = lex_pos + 1
+            start = lex_pos
+            while lex_pos < lex_len
+                c = lex_peek()
+                if c == quote
+                    stop
+                end
+                if c == 92
+                    lex_pos = lex_pos + 2
+                    skip
+                end
+                if c == 10
+                    lex_line = lex_line + 1
+                end
+                lex_pos = lex_pos + 1
+            end
+            text = substr(lex_src, start, lex_pos)
+            lex_pos = lex_pos + 1
+            lex_add(TK_STR, 0, text)
+            skip
+        end
+
+        !! Number
+        if is_digit(ch) == 1
+            start = lex_pos
+            while lex_pos < lex_len and is_digit(lex_peek()) == 1
+                lex_pos = lex_pos + 1
+            end
+            text = substr(lex_src, start, lex_pos)
+            lex_add(TK_INT, 0, text)
+            skip
+        end
+
+        !! Identifier / keyword
+        if is_alpha(ch) == 1
+            start = lex_pos
+            while lex_pos < lex_len and is_alnum(lex_peek()) == 1
+                lex_pos = lex_pos + 1
+            end
+            word = substr(lex_src, start, lex_pos)
+            if is_keyword(word) == 1
+                lex_add(TK_KW, 0, word)
+            else
+                lex_add(TK_IDENT, 0, word)
+            end
+            skip
+        end
+
+        !! Two-character operators
+        ch2 = lex_peek_at(1)
+
+        if ch == 61 and ch2 == 61
+            lex_add(TK_OP, OP_EQ, "==")
+            lex_pos = lex_pos + 2
+            skip
+        end
+        if ch == 33 and ch2 == 61
+            lex_add(TK_OP, OP_NEQ, "!=")
+            lex_pos = lex_pos + 2
+            skip
+        end
+        if ch == 60 and ch2 == 61
+            lex_add(TK_OP, OP_LTE, "<=")
+            lex_pos = lex_pos + 2
+            skip
+        end
+        if ch == 62 and ch2 == 61
+            lex_add(TK_OP, OP_GTE, ">=")
+            lex_pos = lex_pos + 2
+            skip
+        end
+        if ch == 60 and ch2 == 60
+            lex_add(TK_OP, OP_LSHIFT, "<<")
+            lex_pos = lex_pos + 2
+            skip
+        end
+        if ch == 62 and ch2 == 62
+            lex_add(TK_OP, OP_RSHIFT, ">>")
+            lex_pos = lex_pos + 2
+            skip
+        end
+
+        !! Single-character operators
+        if ch == 43
+            lex_add(TK_OP, OP_PLUS, "+")
+            lex_pos = lex_pos + 1
+            skip
+        end
+        if ch == 45
+            lex_add(TK_OP, OP_MINUS, "-")
+            lex_pos = lex_pos + 1
+            skip
+        end
+        if ch == 42
+            lex_add(TK_OP, OP_STAR, "*")
+            lex_pos = lex_pos + 1
+            skip
+        end
+        if ch == 47
+            lex_add(TK_OP, OP_SLASH, "/")
+            lex_pos = lex_pos + 1
+            skip
+        end
+        if ch == 37
+            lex_add(TK_OP, OP_PERCENT, "%")
+            lex_pos = lex_pos + 1
+            skip
+        end
+        if ch == 61
+            lex_add(TK_OP, OP_ASSIGN, "=")
+            lex_pos = lex_pos + 1
+            skip
+        end
+        if ch == 60
+            lex_add(TK_OP, OP_LT, "<")
+            lex_pos = lex_pos + 1
+            skip
+        end
+        if ch == 62
+            lex_add(TK_OP, OP_GT, ">")
+            lex_pos = lex_pos + 1
+            skip
+        end
+        if ch == 38
+            lex_add(TK_OP, OP_AMP, "&")
+            lex_pos = lex_pos + 1
+            skip
+        end
+        if ch == 124
+            lex_add(TK_OP, OP_PIPE, "|")
+            lex_pos = lex_pos + 1
+            skip
+        end
+        if ch == 94
+            lex_add(TK_OP, OP_CARET, "^")
+            lex_pos = lex_pos + 1
+            skip
+        end
+
+        !! Punctuation
+        if ch == 40
+            lex_add(TK_PUNCT, PN_LPAREN, "(")
+            lex_pos = lex_pos + 1
+            skip
+        end
+        if ch == 41
+            lex_add(TK_PUNCT, PN_RPAREN, ")")
+            lex_pos = lex_pos + 1
+            skip
+        end
+        if ch == 91
+            lex_add(TK_PUNCT, PN_LBRACKET, "[")
+            lex_pos = lex_pos + 1
+            skip
+        end
+        if ch == 93
+            lex_add(TK_PUNCT, PN_RBRACKET, "]")
+            lex_pos = lex_pos + 1
+            skip
+        end
+        if ch == 44
+            lex_add(TK_PUNCT, PN_COMMA, ",")
+            lex_pos = lex_pos + 1
+            skip
+        end
+        if ch == 46
+            lex_add(TK_PUNCT, PN_DOT, ".")
+            lex_pos = lex_pos + 1
+            skip
+        end
+
+        !! Unknown character — skip
+        lex_pos = lex_pos + 1
+    end
+
+    !! EOF token
+    lex_add(TK_EOF, 0, "")
+end
+
+!! ============================================================
+!! CODE GENERATOR
+!! ============================================================
+
+!! Global codegen state
+cg_toks = []
+cg_pos = 0
+cg_out = ""
+cg_data = ""
+cg_bss = ""
+cg_scount = 0
+cg_lcount = 0
+cg_vars = []
+
+func cg_cur()
+    return cg_toks[cg_pos]
+end
+
+func cg_type()
+    tok = cg_cur()
+    return tok[0]
+end
+
+func cg_sub()
+    tok = cg_cur()
+    return tok[1]
+end
+
+func cg_text()
+    tok = cg_cur()
+    return tok[3]
+end
+
+func cg_advance()
+    cg_pos = cg_pos + 1
+end
+
+func cg_skip_nl()
+    while cg_type() == TK_NL
+        cg_advance()
+    end
+end
+
+func emit(s)
+    cg_out = cg_out + s
+end
+
+func emit_data(s)
+    cg_data = cg_data + s
+end
+
+func emit_bss(s)
+    cg_bss = cg_bss + s
+end
+
+func new_label()
+    cg_lcount = cg_lcount + 1
+    return "_L" + str(cg_lcount)
+end
+
+func reg_str(text)
+    id = cg_scount
+    cg_scount = cg_scount + 1
+    label = "_s" + str(id)
+    emit_data("    " + label + " db " + chr(34) + text + chr(34) + ", 0" + chr(10))
+    emit_data("    " + label + "_len equ " + str(len(text)) + chr(10))
+    return label
+end
+
+func nasm_escape(text)
+    !! Handle special chars in string for NASM db directive
+    result = ""
+    in_quotes = 0
+    i = 0
+    slen = len(text)
+    while i < slen
+        c = ord(text[i])
+        if c == 10
+            if in_quotes == 1
+                result = result + chr(34)
+                in_quotes = 0
+            end
+            if len(result) > 0
+                result = result + ", "
+            end
+            result = result + "10"
+        elif c == 9
+            if in_quotes == 1
+                result = result + chr(34)
+                in_quotes = 0
+            end
+            if len(result) > 0
+                result = result + ", "
+            end
+            result = result + "9"
+        elif c == 13
+            if in_quotes == 1
+                result = result + chr(34)
+                in_quotes = 0
+            end
+            if len(result) > 0
+                result = result + ", "
+            end
+            result = result + "13"
+        elif c == 92
+            !! Backslash escape sequences
+            if i + 1 < slen
+                nc = ord(text[i + 1])
+                if nc == 110
+                    !! \n
+                    if in_quotes == 1
+                        result = result + chr(34)
+                        in_quotes = 0
+                    end
+                    if len(result) > 0
+                        result = result + ", "
+                    end
+                    result = result + "10"
+                    i = i + 2
+                    skip
+                elif nc == 116
+                    !! \t
+                    if in_quotes == 1
+                        result = result + chr(34)
+                        in_quotes = 0
+                    end
+                    if len(result) > 0
+                        result = result + ", "
+                    end
+                    result = result + "9"
+                    i = i + 2
+                    skip
+                elif nc == 92
+                    !! \\
+                    if in_quotes == 0
+                        if len(result) > 0
+                            result = result + ", "
+                        end
+                        result = result + chr(34)
+                        in_quotes = 1
+                    end
+                    result = result + chr(92)
+                    i = i + 2
+                    skip
+                elif nc == 34
+                    !! \"
+                    if in_quotes == 0
+                        if len(result) > 0
+                            result = result + ", "
+                        end
+                        result = result + chr(34)
+                        in_quotes = 1
+                    end
+                    result = result + chr(34)
+                    i = i + 2
+                    skip
+                else
+                    if in_quotes == 0
+                        if len(result) > 0
+                            result = result + ", "
+                        end
+                        result = result + chr(34)
+                        in_quotes = 1
+                    end
+                    result = result + chr(92)
+                    i = i + 1
+                    skip
+                end
+            end
+        else
+            if in_quotes == 0
+                if len(result) > 0
+                    result = result + ", "
+                end
+                result = result + chr(34)
+                in_quotes = 1
+            end
+            result = result + chr(c)
+        end
+        i = i + 1
+    end
+    if in_quotes == 1
+        result = result + chr(34)
+    end
+    return result
+end
+
+func reg_str_escaped(text)
+    id = cg_scount
+    cg_scount = cg_scount + 1
+    label = "_s" + str(id)
+
+    !! Calculate actual length (after escape processing)
+    actual_len = 0
+    i = 0
+    slen = len(text)
+    while i < slen
+        c = ord(text[i])
+        if c == 92 and i + 1 < slen
+            actual_len = actual_len + 1
+            i = i + 2
+        else
+            actual_len = actual_len + 1
+            i = i + 1
+        end
+    end
+
+    escaped = nasm_escape(text)
+    emit_data("    " + label + " db " + escaped + ", 0" + chr(10))
+    emit_data("    " + label + "_len equ " + str(actual_len) + chr(10))
+    return label
+end
+
+func reg_var(vname)
+    rv_i = 0
+    rv_len = len(cg_vars)
+    while rv_i < rv_len
+        if cg_vars[rv_i] is vname
+            return
+        end
+        rv_i = rv_i + 1
+    end
+    push(cg_vars, vname)
+    emit_bss("    _v_" + vname + " resq 1" + chr(10))
+end
+
+!! ---- Helper: check if at 'end' keyword ----
+func cg_at_end()
+    if cg_type() == TK_KW and cg_text() is "end"
+        return 1
+    end
+    return 0
+end
+
+!! ---- Helper: check if at 'end', 'elif', or 'else' keyword ----
+func cg_if_body_end()
+    if cg_type() != TK_KW
+        return 0
+    end
+    w = cg_text()
+    if w is "end"
+        return 1
+    end
+    if w is "elif"
+        return 1
+    end
+    if w is "else"
+        return 1
+    end
+    return 0
+end
+
+!! ---- Expression codegen ----
+
+func cg_expr()
+    cg_expr_or()
+end
+
+func cg_expr_or()
+    cg_expr_and()
+    while cg_type() == TK_KW and cg_text() is "or"
+        cg_advance()
+        or_lbl_end = new_label()
+        or_lbl_false = new_label()
+        emit("    pop rax" + chr(10))
+        emit("    cmp rax, 0" + chr(10))
+        emit("    jne " + or_lbl_end + chr(10))
+        cg_expr_and()
+        emit(or_lbl_end + ":" + chr(10))
+    end
+end
+
+func cg_expr_and()
+    cg_expr_compare()
+    while cg_type() == TK_KW and cg_text() is "and"
+        cg_advance()
+        cg_expr_compare()
+        emit("    pop rbx" + chr(10))
+        emit("    pop rax" + chr(10))
+        emit("    and rax, rbx" + chr(10))
+        emit("    push rax" + chr(10))
+    end
+end
+
+func cg_expr_compare()
+    cg_expr_add()
+
+    if cg_type() == TK_OP
+        cmp_sub = cg_sub()
+        if cmp_sub == OP_EQ
+            cg_advance()
+            cg_expr_add()
+            emit("    pop rbx" + chr(10))
+            emit("    pop rax" + chr(10))
+            emit("    cmp rax, rbx" + chr(10))
+            emit("    sete al" + chr(10))
+            emit("    movzx eax, al" + chr(10))
+            emit("    push rax" + chr(10))
+        elif cmp_sub == OP_NEQ
+            cg_advance()
+            cg_expr_add()
+            emit("    pop rbx" + chr(10))
+            emit("    pop rax" + chr(10))
+            emit("    cmp rax, rbx" + chr(10))
+            emit("    setne al" + chr(10))
+            emit("    movzx eax, al" + chr(10))
+            emit("    push rax" + chr(10))
+        elif cmp_sub == OP_LT
+            cg_advance()
+            cg_expr_add()
+            emit("    pop rbx" + chr(10))
+            emit("    pop rax" + chr(10))
+            emit("    cmp rax, rbx" + chr(10))
+            emit("    setl al" + chr(10))
+            emit("    movzx eax, al" + chr(10))
+            emit("    push rax" + chr(10))
+        elif cmp_sub == OP_GT
+            cg_advance()
+            cg_expr_add()
+            emit("    pop rbx" + chr(10))
+            emit("    pop rax" + chr(10))
+            emit("    cmp rax, rbx" + chr(10))
+            emit("    setg al" + chr(10))
+            emit("    movzx eax, al" + chr(10))
+            emit("    push rax" + chr(10))
+        elif cmp_sub == OP_LTE
+            cg_advance()
+            cg_expr_add()
+            emit("    pop rbx" + chr(10))
+            emit("    pop rax" + chr(10))
+            emit("    cmp rax, rbx" + chr(10))
+            emit("    setle al" + chr(10))
+            emit("    movzx eax, al" + chr(10))
+            emit("    push rax" + chr(10))
+        elif cmp_sub == OP_GTE
+            cg_advance()
+            cg_expr_add()
+            emit("    pop rbx" + chr(10))
+            emit("    pop rax" + chr(10))
+            emit("    cmp rax, rbx" + chr(10))
+            emit("    setge al" + chr(10))
+            emit("    movzx eax, al" + chr(10))
+            emit("    push rax" + chr(10))
+        end
+    end
+
+    !! String equality: "is" keyword
+    if cg_type() == TK_KW and cg_text() is "is"
+        cg_advance()
+        cg_expr_add()
+        emit("    pop rsi" + chr(10))
+        emit("    pop rdi" + chr(10))
+        emit("    call rt_str_eq" + chr(10))
+        emit("    push rax" + chr(10))
+    end
+end
+
+func cg_expr_add()
+    cg_expr_mul()
+
+    cont_add = 1
+    while cont_add == 1
+        if cg_type() == TK_OP and cg_sub() == OP_PLUS
+            cg_advance()
+            cg_expr_mul()
+            !! Runtime type check: string concat or int add
+            add_int_lbl = new_label()
+            add_done_lbl = new_label()
+            emit("    pop rbx" + chr(10))
+            emit("    pop rax" + chr(10))
+            emit("    cmp rax, 0x400000" + chr(10))
+            emit("    jb " + add_int_lbl + chr(10))
+            emit("    cmp rbx, 0x400000" + chr(10))
+            emit("    jb " + add_int_lbl + chr(10))
+            emit("    mov rdi, rax" + chr(10))
+            emit("    mov rsi, rbx" + chr(10))
+            emit("    call rt_str_concat" + chr(10))
+            emit("    jmp " + add_done_lbl + chr(10))
+            emit(add_int_lbl + ":" + chr(10))
+            emit("    add rax, rbx" + chr(10))
+            emit(add_done_lbl + ":" + chr(10))
+            emit("    push rax" + chr(10))
+        elif cg_type() == TK_OP and cg_sub() == OP_MINUS
+            cg_advance()
+            cg_expr_mul()
+            emit("    pop rbx" + chr(10))
+            emit("    pop rax" + chr(10))
+            emit("    sub rax, rbx" + chr(10))
+            emit("    push rax" + chr(10))
+        elif cg_type() == TK_OP and cg_sub() == OP_AMP
+            cg_advance()
+            cg_expr_mul()
+            emit("    pop rbx" + chr(10))
+            emit("    pop rax" + chr(10))
+            emit("    and rax, rbx" + chr(10))
+            emit("    push rax" + chr(10))
+        elif cg_type() == TK_OP and cg_sub() == OP_PIPE
+            cg_advance()
+            cg_expr_mul()
+            emit("    pop rbx" + chr(10))
+            emit("    pop rax" + chr(10))
+            emit("    or rax, rbx" + chr(10))
+            emit("    push rax" + chr(10))
+        elif cg_type() == TK_OP and cg_sub() == OP_CARET
+            cg_advance()
+            cg_expr_mul()
+            emit("    pop rbx" + chr(10))
+            emit("    pop rax" + chr(10))
+            emit("    xor rax, rbx" + chr(10))
+            emit("    push rax" + chr(10))
+        else
+            cont_add = 0
+        end
+    end
+end
+
+func cg_expr_mul()
+    cg_expr_unary()
+
+    cont_mul = 1
+    while cont_mul == 1
+        if cg_type() == TK_OP and cg_sub() == OP_STAR
+            cg_advance()
+            cg_expr_unary()
+            emit("    pop rbx" + chr(10))
+            emit("    pop rax" + chr(10))
+            emit("    imul rax, rbx" + chr(10))
+            emit("    push rax" + chr(10))
+        elif cg_type() == TK_OP and cg_sub() == OP_SLASH
+            cg_advance()
+            cg_expr_unary()
+            emit("    pop rbx" + chr(10))
+            emit("    pop rax" + chr(10))
+            emit("    cqo" + chr(10))
+            emit("    idiv rbx" + chr(10))
+            emit("    push rax" + chr(10))
+        elif cg_type() == TK_OP and cg_sub() == OP_PERCENT
+            cg_advance()
+            cg_expr_unary()
+            emit("    pop rbx" + chr(10))
+            emit("    pop rax" + chr(10))
+            emit("    cqo" + chr(10))
+            emit("    idiv rbx" + chr(10))
+            emit("    mov rax, rdx" + chr(10))
+            emit("    push rax" + chr(10))
+        elif cg_type() == TK_OP and cg_sub() == OP_LSHIFT
+            cg_advance()
+            cg_expr_unary()
+            emit("    pop rbx" + chr(10))
+            emit("    pop rax" + chr(10))
+            emit("    mov rcx, rbx" + chr(10))
+            emit("    shl rax, cl" + chr(10))
+            emit("    push rax" + chr(10))
+        elif cg_type() == TK_OP and cg_sub() == OP_RSHIFT
+            cg_advance()
+            cg_expr_unary()
+            emit("    pop rbx" + chr(10))
+            emit("    pop rax" + chr(10))
+            emit("    mov rcx, rbx" + chr(10))
+            emit("    shr rax, cl" + chr(10))
+            emit("    push rax" + chr(10))
+        else
+            cont_mul = 0
+        end
+    end
+end
+
+func cg_expr_unary()
+    !! Unary minus
+    if cg_type() == TK_OP and cg_sub() == OP_MINUS
+        cg_advance()
+        cg_expr_primary()
+        emit("    pop rax" + chr(10))
+        emit("    neg rax" + chr(10))
+        emit("    push rax" + chr(10))
+        return
+    end
+    !! Logical not
+    if cg_type() == TK_KW and cg_text() is "not"
+        cg_advance()
+        cg_expr_compare()
+        emit("    pop rax" + chr(10))
+        emit("    cmp rax, 0" + chr(10))
+        emit("    sete al" + chr(10))
+        emit("    movzx eax, al" + chr(10))
+        emit("    push rax" + chr(10))
+        return
+    end
+    cg_expr_primary()
+end
+
+func cg_expr_primary()
+    !! Integer literal
+    if cg_type() == TK_INT
+        val = cg_text()
+        cg_advance()
+        emit("    mov rax, " + val + chr(10))
+        emit("    push rax" + chr(10))
+        return
+    end
+
+    !! String literal
+    if cg_type() == TK_STR
+        text = cg_text()
+        cg_advance()
+        label = reg_str_escaped(text)
+        emit("    mov rax, " + label + chr(10))
+        emit("    push rax" + chr(10))
+        return
+    end
+
+    !! Parenthesized expression
+    if cg_type() == TK_PUNCT and cg_sub() == PN_LPAREN
+        cg_advance()
+        cg_expr()
+        cg_advance()
+        return
+    end
+
+    !! Boolean / null keywords
+    if cg_type() == TK_KW
+        w = cg_text()
+        if w is "true"
+            cg_advance()
+            emit("    mov rax, 1" + chr(10))
+            emit("    push rax" + chr(10))
+            return
+        end
+        if w is "false" or w is "null"
+            cg_advance()
+            emit("    xor rax, rax" + chr(10))
+            emit("    push rax" + chr(10))
+            return
+        end
+    end
+
+    !! Identifier (variable or function call)
+    if cg_type() == TK_IDENT
+        prim_name = cg_text()
+        cg_advance()
+
+        !! Function call
+        if cg_type() == TK_PUNCT and cg_sub() == PN_LPAREN
+            cg_func_call(prim_name)
+            return
+        end
+
+        !! Variable load
+        reg_var(prim_name)
+        emit("    mov rax, [_v_" + prim_name + "]" + chr(10))
+        emit("    push rax" + chr(10))
+
+        !! Array/string subscript
+        if cg_type() == TK_PUNCT and cg_sub() == PN_LBRACKET
+            cg_advance()
+            cg_expr()
+            cg_advance()
+            emit("    pop rsi" + chr(10))
+            emit("    pop rdi" + chr(10))
+            emit("    call rt_subscript" + chr(10))
+            emit("    push rax" + chr(10))
+        end
+        return
+    end
+end
+
+func cg_func_call(fn_name)
+    cg_advance()
+
+    !! Built-in functions
+    if fn_name is "len"
+        cg_expr()
+        cg_advance()
+        emit("    pop rdi" + chr(10))
+        emit("    call rt_len" + chr(10))
+        emit("    push rax" + chr(10))
+        return
+    end
+    if fn_name is "str"
+        cg_expr()
+        cg_advance()
+        emit("    pop rdi" + chr(10))
+        emit("    call rt_int_to_str" + chr(10))
+        emit("    push rax" + chr(10))
+        return
+    end
+    if fn_name is "int"
+        cg_expr()
+        cg_advance()
+        emit("    pop rsi" + chr(10))
+        emit("    call rt_str_to_int" + chr(10))
+        emit("    push rax" + chr(10))
+        return
+    end
+    if fn_name is "ord"
+        cg_expr()
+        cg_advance()
+        emit("    pop rdi" + chr(10))
+        emit("    call rt_ord" + chr(10))
+        emit("    push rax" + chr(10))
+        return
+    end
+    if fn_name is "chr"
+        cg_expr()
+        cg_advance()
+        emit("    pop rdi" + chr(10))
+        emit("    call rt_chr" + chr(10))
+        emit("    push rax" + chr(10))
+        return
+    end
+    if fn_name is "substr"
+        cg_expr()
+        cg_advance()
+        cg_expr()
+        cg_advance()
+        cg_expr()
+        cg_advance()
+        emit("    pop rdx" + chr(10))
+        emit("    pop rsi" + chr(10))
+        emit("    pop rdi" + chr(10))
+        emit("    call rt_substr" + chr(10))
+        emit("    push rax" + chr(10))
+        return
+    end
+    if fn_name is "type"
+        cg_expr()
+        cg_advance()
+        emit("    pop rdi" + chr(10))
+        emit("    call rt_type" + chr(10))
+        emit("    push rax" + chr(10))
+        return
+    end
+
+    !! Generic user function call
+    saved_arg_count = arg_count
+    arg_count = 0
+    if cg_type() != TK_PUNCT or cg_sub() != PN_RPAREN
+        cg_expr()
+        arg_count = arg_count + 1
+        while cg_type() == TK_PUNCT and cg_sub() == PN_COMMA
+            cg_advance()
+            cg_expr()
+            arg_count = arg_count + 1
+        end
+    end
+    cg_advance()
+
+    !! Pop args into registers (reverse order)
+    if arg_count >= 6
+        emit("    pop r9" + chr(10))
+    end
+    if arg_count >= 5
+        emit("    pop r8" + chr(10))
+    end
+    if arg_count >= 4
+        emit("    pop rcx" + chr(10))
+    end
+    if arg_count >= 3
+        emit("    pop rdx" + chr(10))
+    end
+    if arg_count >= 2
+        emit("    pop rsi" + chr(10))
+    end
+    if arg_count >= 1
+        emit("    pop rdi" + chr(10))
+    end
+
+    emit("    call _f_" + fn_name + chr(10))
+    emit("    push rax" + chr(10))
+    arg_count = saved_arg_count
+end
+
+!! ---- Statement codegen ----
+
+func cg_stmt()
+    cg_skip_nl()
+
+    if cg_type() == TK_EOF
+        return
+    end
+
+    !! show statement
+    if cg_type() == TK_KW and cg_text() is "show"
+        cg_show()
+        return
+    end
+
+    !! if statement
+    if cg_type() == TK_KW and cg_text() is "if"
+        cg_if()
+        return
+    end
+
+    !! while statement
+    if cg_type() == TK_KW and cg_text() is "while"
+        cg_while()
+        return
+    end
+
+    !! repeat statement
+    if cg_type() == TK_KW and cg_text() is "repeat"
+        cg_repeat()
+        return
+    end
+
+    !! func definition
+    if cg_type() == TK_KW and cg_text() is "func"
+        cg_func_def()
+        return
+    end
+
+    !! return statement
+    if cg_type() == TK_KW and cg_text() is "return"
+        cg_advance()
+        if cg_type() != TK_NL and cg_type() != TK_EOF
+            cg_expr()
+            emit("    pop rax" + chr(10))
+        end
+        emit("    pop rbp" + chr(10))
+        emit("    ret" + chr(10))
+        return
+    end
+
+    !! end keyword (consumed by parent)
+    if cg_type() == TK_KW and cg_text() is "end"
+        return
+    end
+
+    !! elif / else (consumed by cg_if)
+    if cg_type() == TK_KW and cg_text() is "elif"
+        return
+    end
+    if cg_type() == TK_KW and cg_text() is "else"
+        return
+    end
+
+    !! err statement
+    if cg_type() == TK_KW and cg_text() is "err"
+        cg_advance()
+        cg_expr()
+        emit("    pop rdi" + chr(10))
+        emit("    call rt_print_str_err" + chr(10))
+        emit("    mov rax, 60" + chr(10))
+        emit("    mov rdi, 1" + chr(10))
+        emit("    syscall" + chr(10))
+        return
+    end
+
+    !! Identifier: assignment or expression statement
+    if cg_type() == TK_IDENT
+        stmt_name = cg_text()
+        cg_advance()
+
+        !! Assignment
+        if cg_type() == TK_OP and cg_sub() == OP_ASSIGN
+            cg_advance()
+            reg_var(stmt_name)
+            cg_expr()
+            emit("    pop rax" + chr(10))
+            emit("    mov [_v_" + stmt_name + "], rax" + chr(10))
+            return
+        end
+
+        !! Function call as statement
+        if cg_type() == TK_PUNCT and cg_sub() == PN_LPAREN
+            cg_func_call(stmt_name)
+            emit("    pop rax" + chr(10))
+            return
+        end
+    end
+
+    !! Skip unknown
+    cg_advance()
+end
+
+func show_is_plain_str()
+    !! Check if current token is a string NOT followed by an operator
+    if cg_type() != TK_STR
+        return 0
+    end
+    cg_pos = cg_pos + 1
+    next_type = cg_type()
+    cg_pos = cg_pos - 1
+    if next_type == TK_OP
+        return 0
+    end
+    return 1
+end
+
+func cg_show()
+    cg_advance()
+
+    !! First expression
+    if show_is_plain_str() == 1
+        cg_show_str()
+    else
+        cg_expr()
+        emit("    pop rdi" + chr(10))
+        emit("    call rt_print_val" + chr(10))
+    end
+
+    !! Comma-separated additional expressions
+    while cg_type() == TK_PUNCT and cg_sub() == PN_COMMA
+        cg_advance()
+        emit("    call rt_print_space" + chr(10))
+        if show_is_plain_str() == 1
+            cg_show_str()
+        else
+            cg_expr()
+            emit("    pop rdi" + chr(10))
+            emit("    call rt_print_val" + chr(10))
+        end
+    end
+
+    emit("    call rt_print_newline" + chr(10))
+end
+
+func cg_show_str()
+    text = cg_text()
+    cg_advance()
+    label = reg_str_escaped(text)
+    emit("    mov rsi, " + label + chr(10))
+    emit("    mov rdx, " + label + "_len" + chr(10))
+    emit("    call rt_print_str" + chr(10))
+end
+
+func cg_if()
+    cg_advance()
+    saved_lbl_end = lbl_end
+    saved_lbl_else = lbl_else
+    lbl_end = new_label()
+    lbl_else = new_label()
+
+    !! Condition
+    cg_expr()
+    emit("    pop rax" + chr(10))
+    emit("    cmp rax, 0" + chr(10))
+    emit("    je " + lbl_else + chr(10))
+
+    !! Then body
+    cg_skip_nl()
+    while cg_if_body_end() == 0
+        if cg_type() == TK_EOF
+            stop
+        end
+        cg_stmt()
+        cg_skip_nl()
+    end
+
+    !! Check for elif / else
+    if cg_type() == TK_KW and cg_text() is "elif"
+        emit("    jmp " + lbl_end + chr(10))
+        emit(lbl_else + ":" + chr(10))
+        !! Treat elif as nested if
+        cg_advance()
+        lbl_else2 = new_label()
+        cg_expr()
+        emit("    pop rax" + chr(10))
+        emit("    cmp rax, 0" + chr(10))
+        emit("    je " + lbl_else2 + chr(10))
+
+        cg_skip_nl()
+        while cg_if_body_end() == 0
+            if cg_type() == TK_EOF
+                stop
+            end
+            cg_stmt()
+            cg_skip_nl()
+        end
+
+        if cg_type() == TK_KW and cg_text() is "else"
+            emit("    jmp " + lbl_end + chr(10))
+            emit(lbl_else2 + ":" + chr(10))
+            cg_advance()
+            cg_skip_nl()
+            while cg_at_end() == 0
+                if cg_type() == TK_EOF
+                    stop
+                end
+                cg_stmt()
+                cg_skip_nl()
+            end
+        else
+            emit(lbl_else2 + ":" + chr(10))
+        end
+    elif cg_type() == TK_KW and cg_text() is "else"
+        emit("    jmp " + lbl_end + chr(10))
+        emit(lbl_else + ":" + chr(10))
+        cg_advance()
+        cg_skip_nl()
+        while cg_at_end() == 0
+            if cg_type() == TK_EOF
+                stop
+            end
+            cg_stmt()
+            cg_skip_nl()
+        end
+    else
+        emit(lbl_else + ":" + chr(10))
+    end
+
+    !! Consume "end"
+    if cg_type() == TK_KW and cg_text() is "end"
+        cg_advance()
+    end
+    emit(lbl_end + ":" + chr(10))
+    lbl_end = saved_lbl_end
+    lbl_else = saved_lbl_else
+end
+
+func cg_while()
+    cg_advance()
+    saved_wh_start = lbl_start
+    saved_wh_end = lbl_end
+    lbl_start = new_label()
+    lbl_end = new_label()
+
+    emit(lbl_start + ":" + chr(10))
+    cg_expr()
+    emit("    pop rax" + chr(10))
+    emit("    cmp rax, 0" + chr(10))
+    emit("    je " + lbl_end + chr(10))
+
+    cg_skip_nl()
+    while cg_at_end() == 0
+        if cg_type() == TK_EOF
+            stop
+        end
+        cg_stmt()
+        cg_skip_nl()
+    end
+
+    emit("    jmp " + lbl_start + chr(10))
+    emit(lbl_end + ":" + chr(10))
+
+    if cg_type() == TK_KW and cg_text() is "end"
+        cg_advance()
+    end
+    lbl_start = saved_wh_start
+    lbl_end = saved_wh_end
+end
+
+func cg_repeat()
+    cg_advance()
+    saved_rp_start = lbl_start
+    saved_rp_end = lbl_end
+    lbl_start = new_label()
+    lbl_end = new_label()
+
+    !! Get count
+    cg_expr()
+    emit("    pop rcx" + chr(10))
+    emit("    push rcx" + chr(10))
+    emit(lbl_start + ":" + chr(10))
+    emit("    pop rcx" + chr(10))
+    emit("    cmp rcx, 0" + chr(10))
+    emit("    jle " + lbl_end + chr(10))
+    emit("    dec rcx" + chr(10))
+    emit("    push rcx" + chr(10))
+
+    cg_skip_nl()
+
+    !! Skip optional "times" keyword
+    if cg_type() == TK_KW and cg_text() is "times"
+        cg_advance()
+    end
+
+    cg_skip_nl()
+    while cg_at_end() == 0
+        if cg_type() == TK_EOF
+            stop
+        end
+        cg_stmt()
+        cg_skip_nl()
+    end
+
+    emit("    jmp " + lbl_start + chr(10))
+    emit(lbl_end + ":" + chr(10))
+    emit("    pop rcx" + chr(10))
+
+    if cg_type() == TK_KW and cg_text() is "end"
+        cg_advance()
+    end
+    lbl_start = saved_rp_start
+    lbl_end = saved_rp_end
+end
+
+func cg_func_def()
+    cg_advance()
+    fname = cg_text()
+    cg_advance()
+    cg_advance()
+
+    lbl_skip = new_label()
+    emit("    jmp " + lbl_skip + chr(10))
+    emit("_f_" + fname + ":" + chr(10))
+    emit("    push rbp" + chr(10))
+    emit("    mov rbp, rsp" + chr(10))
+
+    !! Parse parameters
+    param_idx = 0
+    regs = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"]
+    while cg_type() != TK_PUNCT or cg_sub() != PN_RPAREN
+        if cg_type() == TK_PUNCT and cg_sub() == PN_COMMA
+            cg_advance()
+        end
+        if cg_type() == TK_IDENT
+            pname = cg_text()
+            cg_advance()
+            reg_var(pname)
+            emit("    mov [_v_" + pname + "], " + regs[param_idx] + chr(10))
+            param_idx = param_idx + 1
+        end
+    end
+    cg_advance()
+
+    !! Function body
+    cg_skip_nl()
+    while cg_at_end() == 0
+        if cg_type() == TK_EOF
+            stop
+        end
+        cg_stmt()
+        cg_skip_nl()
+    end
+
+    !! Consume "end"
+    if cg_type() == TK_KW and cg_text() is "end"
+        cg_advance()
+    end
+
+    emit("    xor rax, rax" + chr(10))
+    emit("    pop rbp" + chr(10))
+    emit("    ret" + chr(10))
+    emit(lbl_skip + ":" + chr(10))
+end
+
+!! ============================================================
+!! MAIN DRIVER
+!! ============================================================
+
+!! Read input file
+source = read "input.seven"
+lex_src = source
+
+!! Lex
+lex_all()
+tok_count = len(lex_tokens)
+show tok_count
+
+!! Set up codegen
+cg_toks = lex_tokens
+cg_pos = 0
+cg_out = ""
+cg_data = ""
+cg_bss = ""
+cg_scount = 0
+cg_lcount = 0
+cg_vars = []
+
+!! Generate code
+while cg_type() != TK_EOF
+    cg_stmt()
+    cg_skip_nl()
+end
+
+!! Assemble full output
+nl = chr(10)
+header = "; Generated by SEVEN Self-Hosted Compiler v0.1" + nl
+header = header + "; x86-64 NASM (Linux ELF64)" + nl + nl
+
+externs = "extern rt_init, rt_alloc, rt_exit" + nl
+externs = externs + "extern rt_print_str, rt_print_int, rt_print_newline" + nl
+externs = externs + "extern rt_print_space, rt_print_val" + nl
+externs = externs + "extern rt_str_to_int, rt_str_len, rt_str_concat" + nl
+externs = externs + "extern rt_int_to_str, rt_str_eq, rt_str_copy" + nl
+externs = externs + "extern rt_print_str_err" + nl
+externs = externs + "extern rt_arr_new, rt_arr_push, rt_arr_pop" + nl
+externs = externs + "extern rt_arr_get, rt_arr_set, rt_arr_len" + nl
+externs = externs + "extern rt_len, rt_type" + nl
+externs = externs + "extern rt_subscript, rt_str_char_at" + nl
+externs = externs + "extern rt_ord, rt_chr, rt_substr" + nl + nl
+
+full = header + externs
+full = full + "section .text" + nl
+full = full + "    global _start" + nl + nl
+full = full + "_start:" + nl
+full = full + "    call rt_init" + nl
+full = full + cg_out
+full = full + nl + "    ; exit(0)" + nl
+full = full + "    mov rax, 60" + nl
+full = full + "    xor rdi, rdi" + nl
+full = full + "    syscall" + nl + nl
+full = full + "section .data" + nl
+full = full + "    _nl db 10" + nl
+full = full + cg_data + nl
+full = full + "section .bss" + nl
+full = full + "    __err resq 1" + nl
+full = full + cg_bss
+
+!! Write output
+write "output.asm", full
+show "Compilation complete: output.asm"

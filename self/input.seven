@@ -1,0 +1,7 @@
+!! Hello from self-hosted compiler!
+show "Hello from SEVEN self-hosted compiler!"
+x = 10
+y = 20
+z = x + y
+show z
+show "Done!"

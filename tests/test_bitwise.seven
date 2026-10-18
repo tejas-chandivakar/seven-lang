@@ -1,0 +1,11 @@
+!! Test bitwise operators
+show 5 & 3
+show 5 | 3
+show 5 ^ 3
+show 1 << 3
+show 16 >> 2
+show ~0
+
+!! Combined
+show (1 << 4) | (1 << 2)
+show 255 & 15

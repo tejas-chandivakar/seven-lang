@@ -40,10 +40,10 @@ global rt_init
 rt_init:
     push rbp
     mov rbp, rsp
-    ; mmap(NULL, 1048576, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0)
+    ; mmap(NULL, 16777216, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0)
     mov rax, 9              ; sys_mmap
     xor rdi, rdi            ; addr = NULL
-    mov rsi, 1048576        ; 1MB
+    mov rsi, 16777216       ; 16MB
     mov rdx, 3              ; PROT_READ | PROT_WRITE
     mov r10, 34             ; MAP_PRIVATE | MAP_ANONYMOUS
     mov r8, -1              ; fd = -1
@@ -51,7 +51,7 @@ rt_init:
     syscall
     mov [heap_base], rax
     mov [heap_ptr], rax
-    add rax, 1048576
+    add rax, 16777216
     mov [heap_end], rax
     pop rbp
     ret
@@ -1316,7 +1316,7 @@ rt_len:
     mov rcx, [rdi + 8]       ; potential capacity
     cmp rcx, 0
     je .str_len
-    cmp rcx, 1048576
+    cmp rcx, 16777216
     ja .str_len
     cmp rax, rcx
     ja .str_len
@@ -2101,6 +2101,179 @@ rt_range:
 .range_done:
     mov rax, r14
     pop rbx
+    pop r14
+    pop r13
+    pop r12
+    pop rbp
+    ret
+
+; ============================================================
+; rt_str_char_at — Get character at index as new 1-char string
+; rdi = string ptr, rsi = index
+; Returns: rax = pointer to new 1-char null-terminated string
+; ============================================================
+global rt_str_char_at
+rt_str_char_at:
+    push rbp
+    mov rbp, rsp
+    push r12
+    ; Handle negative index
+    test rsi, rsi
+    jns .sca_pos
+    push rdi
+    push rsi
+    call rt_str_len
+    pop rsi
+    pop rdi
+    add rsi, rax
+    js .sca_empty
+.sca_pos:
+    ; Bounds check
+    push rdi
+    push rsi
+    call rt_str_len
+    pop rsi
+    pop rdi
+    cmp rsi, rax
+    jge .sca_empty
+    ; Get the byte
+    movzx r12d, byte [rdi + rsi]
+    ; Allocate 2 bytes (char + null)
+    mov rdi, 2
+    call rt_alloc
+    mov byte [rax], r12b
+    mov byte [rax + 1], 0
+    pop r12
+    pop rbp
+    ret
+.sca_empty:
+    mov rdi, 2
+    call rt_alloc
+    mov byte [rax], 0
+    pop r12
+    pop rbp
+    ret
+
+; ============================================================
+; rt_subscript — Auto-detect string vs array subscript
+; rdi = value (string ptr or array ptr), rsi = index
+; Returns: rax = element (array) or 1-char string (string)
+; ============================================================
+global rt_subscript
+rt_subscript:
+    push rbp
+    mov rbp, rsp
+    ; Check if it's a string or array using heuristic
+    cmp rdi, 0
+    jl .sub_arr
+    cmp rdi, 0x400000
+    jbe .sub_arr
+    ; Check array header: [count][capacity] — both should be small positive
+    mov rax, [rdi]           ; potential count
+    mov rcx, [rdi + 8]       ; potential capacity
+    cmp rcx, 0
+    je .sub_str
+    cmp rcx, 16777216
+    ja .sub_str
+    cmp rax, rcx
+    ja .sub_str
+    ; Looks like array
+.sub_arr:
+    call rt_arr_get
+    pop rbp
+    ret
+.sub_str:
+    call rt_str_char_at
+    pop rbp
+    ret
+
+; ============================================================
+; rt_ord — Get ASCII code of first character of string
+; rdi = string ptr, returns rax = integer (0-255)
+; ============================================================
+global rt_ord
+rt_ord:
+    cmp rdi, 0
+    je .ord_zero
+    cmp rdi, 0x400000
+    jbe .ord_zero
+    movzx eax, byte [rdi]
+    ret
+.ord_zero:
+    xor eax, eax
+    ret
+
+; ============================================================
+; rt_chr — Convert integer to 1-char string
+; rdi = integer (0-255), returns rax = pointer to 1-char string
+; ============================================================
+global rt_chr
+rt_chr:
+    push rbp
+    mov rbp, rsp
+    push rdi
+    mov rdi, 2
+    call rt_alloc
+    pop rdi
+    mov byte [rax], dil
+    mov byte [rax + 1], 0
+    pop rbp
+    ret
+
+; ============================================================
+; rt_substr — Extract substring str[start..end)
+; rdi = string ptr, rsi = start index, rdx = end index
+; Returns: rax = pointer to new string on heap
+; ============================================================
+global rt_substr
+rt_substr:
+    push rbp
+    mov rbp, rsp
+    push r12
+    push r13
+    push r14
+    mov r12, rdi             ; source string
+    mov r13, rsi             ; start
+    mov r14, rdx             ; end
+    ; Get string length
+    call rt_str_len
+    ; Clamp start
+    cmp r13, 0
+    jge .ss_start_ok
+    xor r13, r13
+.ss_start_ok:
+    ; Clamp end
+    cmp r14, rax
+    jle .ss_end_ok
+    mov r14, rax
+.ss_end_ok:
+    ; Check valid range
+    cmp r13, r14
+    jge .ss_empty
+    ; Allocate (end - start + 1) bytes
+    mov rdi, r14
+    sub rdi, r13
+    inc rdi                  ; +1 for null terminator
+    call rt_alloc
+    ; Copy bytes: src = r12 + r13, dest = rax, len = r14 - r13
+    mov rcx, r14
+    sub rcx, r13
+    mov rsi, r12
+    add rsi, r13             ; source + start
+    mov rdi, rax             ; dest
+    push rax                 ; save result ptr
+    rep movsb
+    mov byte [rdi], 0        ; null terminate (rdi points past copied data)
+    pop rax
+    pop r14
+    pop r13
+    pop r12
+    pop rbp
+    ret
+.ss_empty:
+    mov rdi, 1
+    call rt_alloc
+    mov byte [rax], 0
     pop r14
     pop r13
     pop r12

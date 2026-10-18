@@ -1,0 +1,11 @@
+!! Test substr() builtin
+s = "Hello World"
+show substr(s, 0, 5)
+show substr(s, 6, 11)
+show substr(s, 0, 1)
+show substr(s, 3, 7)
+
+!! Edge cases
+show substr(s, 0, 0)
+show len(substr(s, 0, 0))
+show substr(s, 0, 100)

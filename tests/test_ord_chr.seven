@@ -1,0 +1,16 @@
+!! Test ord() and chr() builtins
+show ord("A")
+show ord("a")
+show ord("0")
+show ord(" ")
+show ord("Z")
+
+!! chr() - convert int to 1-char string
+show chr(65)
+show chr(97)
+show chr(48)
+show chr(90)
+
+!! Roundtrip
+show ord(chr(72))
+show chr(ord("X"))

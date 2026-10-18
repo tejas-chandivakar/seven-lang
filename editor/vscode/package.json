@@ -1,0 +1,28 @@
+{
+  "name": "seven-language",
+  "displayName": "SEVEN Language",
+  "description": "Syntax highlighting for the SEVEN programming language",
+  "version": "0.1.0",
+  "publisher": "tejas-chandivakar",
+  "engines": {
+    "vscode": "^1.70.0"
+  },
+  "categories": ["Programming Languages"],
+  "contributes": {
+    "languages": [
+      {
+        "id": "seven",
+        "aliases": ["SEVEN", "seven"],
+        "extensions": [".seven", ".sev", ".sv7", ".s7"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "seven",
+        "scopeName": "source.seven",
+        "path": "./syntaxes/seven.tmLanguage.json"
+      }
+    ]
+  }
+}

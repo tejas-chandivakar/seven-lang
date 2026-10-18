@@ -418,6 +418,101 @@ codegen_init:
     ret
 
 ; ============================================================
+; cg_error — Print "Error on line N: " prefix to stderr
+; After calling this, print the actual message and exit
+; ============================================================
+cg_error_prefix: db "Error on line ", 0
+cg_error_colon:  db ": ", 0
+cg_error_nl:     db 10, 0
+
+cg_error:
+    ; rdi = error message (null-terminated)
+    push rdi                 ; save message
+
+    ; Print "Error on line "
+    mov rax, 1
+    mov rdi, 2
+    mov rsi, cg_error_prefix
+    mov rdx, 14
+    syscall
+
+    ; Get current token's line number
+    push rbp
+    call cg_peek
+    movzx edi, word [rax + 2]  ; line number from token
+    pop rbp
+
+    ; Print line number
+    call cg_print_int_stderr
+
+    ; Print ": "
+    mov rax, 1
+    mov rdi, 2
+    mov rsi, cg_error_colon
+    mov rdx, 2
+    syscall
+
+    ; Print message
+    pop rdi                  ; restore message
+    mov rsi, rdi
+    ; get length
+    xor rdx, rdx
+.len:
+    cmp byte [rsi + rdx], 0
+    je .print
+    inc rdx
+    jmp .len
+.print:
+    mov rax, 1
+    mov rdi, 2
+    syscall
+
+    ; Print newline
+    mov rax, 1
+    mov rdi, 2
+    mov rsi, cg_error_nl
+    mov rdx, 1
+    syscall
+
+    ; Exit with error
+    mov rdi, 1
+    mov rax, 60
+    syscall
+
+; cg_print_int_stderr — Print integer edi to stderr
+cg_print_int_stderr:
+    push rbp
+    mov rbp, rsp
+    sub rsp, 24
+    mov eax, edi
+    lea rbx, [rsp + 23]
+    mov byte [rbx], 0
+.loop:
+    dec rbx
+    xor edx, edx
+    mov ecx, 10
+    div ecx
+    add dl, '0'
+    mov [rbx], dl
+    cmp eax, 0
+    jne .loop
+    lea rdx, [rsp + 23]
+    sub rdx, rbx
+    mov rsi, rbx
+    mov rax, 1
+    mov rdi, 2
+    syscall
+    add rsp, 24
+    pop rbp
+    ret
+
+; Error message strings
+cg_err_unknown_stmt  db "Unknown statement", 0
+cg_err_unknown_kw    db "Unknown keyword", 0
+cg_err_undeclared    db "Undeclared variable", 0
+cg_err_div_zero      db "Division by zero", 0
+
+; ============================================================
 ; out_str — Write null-terminated string to output buffer
 ; rdi = string
 ; ============================================================
@@ -1173,10 +1268,9 @@ codegen_stmt:
     cmp rax, 1
     je .do_write_file
 
-    ; Unknown keyword — skip
-    call cg_advance
-    pop rbp
-    ret
+    ; Unknown keyword — report error with line number
+    mov rdi, cg_err_unknown_kw
+    call cg_error
 
 ; ---- show ----
 .do_show:

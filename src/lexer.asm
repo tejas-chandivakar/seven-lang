@@ -313,7 +313,10 @@ emit_token:
     lea rbx, [tok_buf + rax]
     mov [rbx], dil           ; type
     mov [rbx + 1], sil       ; subtype
-    mov word [rbx + 2], 0    ; padding
+    push rax
+    mov rax, [src_line]
+    mov [rbx + 2], ax        ; line number (16-bit)
+    pop rax
     mov [rbx + 4], ecx       ; length
     mov [rbx + 8], rdx       ; pointer
     inc qword [tok_count]

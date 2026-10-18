@@ -17,13 +17,24 @@
 
 section .data
     ; ---- Messages ----
-    msg_banner  db "SEVEN Compiler v0.1 (Phase 1 Bootstrap)", 10, 0
+    msg_banner  db "SEVEN Compiler v0.4", 10, 0
     msg_banner_len equ $ - msg_banner
 
-    msg_usage   db "Usage: seven <command> <file>", 10
+    msg_version db "SEVEN Language Compiler", 10
+                db "  Version:  0.4.0", 10
+                db "  Phase:    4 (Developer Tools)", 10
+                db "  Target:   x86-64 Linux (ELF64)", 10
+                db "  Author:   Tejas Chandivakar", 10
+                db "  Tagline:  Fast as Assembly. Simple as Python.", 10, 0
+    msg_version_len equ $ - msg_version
+
+    msg_usage   db "Usage: seven <command> <file>", 10, 10
                 db "Commands:", 10
-                db "  build <file.seven>  - compile to executable", 10
-                db "  lex <file.seven>    - show tokens (debug)", 10
+                db "  build <file.seven>  - compile to .asm", 10
+                db "  run   <file.seven>  - compile and run", 10
+                db "  lex   <file.seven>  - show tokens (debug)", 10
+                db "  version             - show version info", 10
+                db "  help                - show this help", 10
                 db 10
                 db "Accepted extensions: .seven .sev .sv7 .s7", 10, 0
     msg_usage_len equ $ - msg_usage
@@ -72,6 +83,22 @@ section .data
     cmd_build   db "build", 0
     cmd_lex     db "lex", 0
     cmd_run     db "run", 0
+    cmd_version db "version", 0
+    cmd_help    db "help", 0
+
+    ; Run mode strings
+    nasm_path   db "/usr/bin/nasm", 0
+    nasm_str    db "nasm", 0
+    nasm_f_flag db "-f", 0
+    nasm_fmt    db "elf64", 0
+    nasm_w_flag db "-w-label-redef-late", 0
+    nasm_o_flag db "-o", 0
+    ld_path     db "/usr/bin/ld", 0
+    ld_str      db "ld", 0
+    msg_run_err db "Error: run step failed", 10, 0
+    msg_run_err_len equ $ - msg_run_err
+    msg_running db "Running...", 10, 0
+    msg_running_len equ $ - msg_running
 
     ; Debug format strings
     dbg_tok_pre  db "  [", 0
@@ -85,6 +112,13 @@ section .bss
     argv_file   resq 1       ; pointer to filename string
     out_filename resb 256    ; output .asm filename
     base_name   resb 256     ; filename without extension
+    obj_filename resb 256    ; output .o filename
+    bin_filename resb 256    ; output binary filename
+    runtime_path resb 512    ; path to runtime.o
+    is_run_mode resq 1       ; 1 if running in `run` mode
+    nasm_argv   resq 10      ; argv for nasm exec
+    ld_argv     resq 10      ; argv for ld exec
+    bin_argv    resq 4       ; argv for binary exec
 
 section .text
     global _start
@@ -103,13 +137,30 @@ _start:
     mov rax, [rsp]
     mov [argc], rax
 
-    ; Check minimum args (program + command + file = 3)
-    cmp rax, 3
-    jl .check_no_args
+    ; Need at least 2 args (program + something)
+    cmp rax, 2
+    jl .show_usage
 
-    ; Get command (argv[1])
+    ; Get command/file (argv[1])
     mov rax, [rsp + 16]
     mov [argv_cmd], rax
+
+    ; Check no-file commands first: version, help
+    mov rdi, [argv_cmd]
+    mov rsi, cmd_version
+    call str_equal
+    cmp rax, 1
+    je .do_version
+
+    mov rdi, [argv_cmd]
+    mov rsi, cmd_help
+    call str_equal
+    cmp rax, 1
+    je .do_help
+
+    ; Commands that need a file need 3 args
+    cmp qword [argc], 3
+    jl .check_shorthand
 
     ; Get filename (argv[2])
     mov rax, [rsp + 24]
@@ -132,17 +183,27 @@ _start:
     mov rsi, cmd_run
     call str_equal
     cmp rax, 1
-    je .do_build             ; run = build for now
+    je .do_run
 
     jmp .show_usage
 
-.check_no_args:
-    ; If just 2 args (seven <file>), assume build
-    cmp qword [argc], 2
-    jne .show_usage
+.check_shorthand:
+    ; 2 args: seven <file> — assume build
     mov rax, [rsp + 16]
     mov [argv_file], rax
     jmp .do_build
+
+; ============================================================
+; do_version — Print version info
+; ============================================================
+.do_version:
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, msg_version
+    mov rdx, msg_version_len
+    syscall
+    xor rdi, rdi
+    jmp .exit
 
 ; ============================================================
 ; do_build — Full compilation pipeline
@@ -211,6 +272,120 @@ _start:
 
     ; Exit 0
     xor rdi, rdi
+    jmp .exit
+
+; ============================================================
+; do_run — Compile, assemble, link, and execute
+; ============================================================
+.do_run:
+    mov qword [is_run_mode], 1
+
+    ; Print banner
+    mov rax, 1
+    mov rdi, 2
+    mov rsi, msg_banner
+    mov rdx, msg_banner_len
+    syscall
+
+    ; Step 1: Lex
+    call print_msg_lexing
+    call lexer_init
+    mov rdi, [argv_file]
+    call lexer_load_file
+    cmp rax, 0
+    jne .file_error
+    call lexer_tokenize
+    call print_msg_done
+
+    ; Step 2: Codegen
+    call print_msg_codegen
+    call codegen_init
+    call codegen_program
+    call print_msg_done
+
+    ; Step 3: Write .asm
+    call print_msg_writing
+    call make_output_filename
+    mov rdi, out_filename
+    call codegen_write_file
+    cmp rax, 0
+    jne .write_error
+    call print_msg_done
+
+    ; Build obj and bin filenames from base
+    call make_obj_filename
+    call make_bin_filename
+    call find_runtime_path
+
+    ; Step 4: Run nasm — nasm -f elf64 -w-label-redef-late file.asm -o file.o
+    mov qword [nasm_argv + 0],  nasm_str
+    mov qword [nasm_argv + 8],  nasm_f_flag
+    mov qword [nasm_argv + 16], nasm_fmt
+    mov qword [nasm_argv + 24], nasm_w_flag
+    mov rax, out_filename
+    mov qword [nasm_argv + 32], rax
+    mov qword [nasm_argv + 40], nasm_o_flag
+    mov rax, obj_filename
+    mov qword [nasm_argv + 48], rax
+    mov qword [nasm_argv + 56], 0
+
+    mov rdi, nasm_path
+    mov rsi, nasm_argv
+    call fork_exec_wait
+    cmp rax, 0
+    jne .run_step_failed
+
+    ; Step 5: Run ld — ld file.o runtime.o -o file
+    mov qword [ld_argv + 0], ld_str
+    mov rax, obj_filename
+    mov qword [ld_argv + 8], rax
+    mov rax, runtime_path
+    mov qword [ld_argv + 16], rax
+    mov qword [ld_argv + 24], nasm_o_flag
+    mov rax, bin_filename
+    mov qword [ld_argv + 32], rax
+    mov qword [ld_argv + 40], 0
+
+    mov rdi, ld_path
+    mov rsi, ld_argv
+    call fork_exec_wait
+    cmp rax, 0
+    jne .run_step_failed
+
+    ; Step 6: Execute the binary
+    mov rax, 1
+    mov rdi, 2
+    mov rsi, msg_running
+    mov rdx, msg_running_len
+    syscall
+
+    mov rax, bin_filename
+    mov qword [bin_argv + 0], rax
+    mov qword [bin_argv + 8], 0
+
+    mov rdi, bin_filename
+    mov rsi, bin_argv
+    call fork_exec_wait
+    push rax                 ; save exit code
+
+    ; Step 7: Clean up temp files
+    mov rdi, out_filename
+    call delete_file
+    mov rdi, obj_filename
+    call delete_file
+    mov rdi, bin_filename
+    call delete_file
+
+    pop rdi                  ; exit code from binary
+    jmp .exit
+
+.run_step_failed:
+    mov rax, 1
+    mov rdi, 2
+    mov rsi, msg_run_err
+    mov rdx, msg_run_err_len
+    syscall
+    mov rdi, 1
     jmp .exit
 
 ; ============================================================
@@ -342,6 +517,15 @@ _start:
 
 .write_error:
     mov rdi, 1
+    jmp .exit
+
+.do_help:
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, msg_usage
+    mov rdx, msg_usage_len
+    syscall
+    xor rdi, rdi
     jmp .exit
 
 .show_usage:
@@ -581,5 +765,230 @@ print_msg_done:
     mov rdi, 2
     mov rsi, msg_done
     mov rdx, 5
+    syscall
+    ret
+
+; ============================================================
+; fork_exec_wait — Fork, exec a program, wait for it
+; rdi = path to executable
+; rsi = argv array (null-terminated)
+; Returns: rax = child exit code (0 = success)
+; ============================================================
+fork_exec_wait:
+    push rbp
+    mov rbp, rsp
+    push r12
+    push r13
+    push r14
+    sub rsp, 8              ; align + space for wstatus
+
+    mov r12, rdi             ; path
+    mov r13, rsi             ; argv
+
+    ; fork() = syscall 57
+    mov rax, 57
+    syscall
+    cmp rax, 0
+    jl .few_error            ; fork failed
+    je .few_child            ; child process
+
+    ; Parent: wait for child
+    mov r14, rax             ; child pid
+    ; wait4(pid, &wstatus, 0, NULL) = syscall 61
+    mov rdi, r14
+    lea rsi, [rbp - 32]     ; wstatus on stack
+    xor rdx, rdx            ; options = 0
+    xor r10, r10             ; rusage = NULL
+    mov rax, 61
+    syscall
+
+    ; Extract exit code: wstatus >> 8 & 0xFF
+    mov eax, [rbp - 32]
+    shr eax, 8
+    and eax, 0xFF
+
+    add rsp, 8
+    pop r14
+    pop r13
+    pop r12
+    pop rbp
+    ret
+
+.few_child:
+    ; execve(path, argv, envp=NULL) = syscall 59
+    mov rdi, r12
+    mov rsi, r13
+    xor rdx, rdx            ; envp = NULL
+    mov rax, 59
+    syscall
+    ; If execve returns, it failed — exit(127)
+    mov rdi, 127
+    mov rax, 60
+    syscall
+
+.few_error:
+    mov rax, 1
+    add rsp, 8
+    pop r14
+    pop r13
+    pop r12
+    pop rbp
+    ret
+
+; ============================================================
+; make_obj_filename — Create .o filename from out_filename
+; e.g. "test.asm" → "test.o"
+; ============================================================
+make_obj_filename:
+    lea rsi, [out_filename]
+    lea rdi, [obj_filename]
+.mol:
+    movzx eax, byte [rsi]
+    cmp al, 0
+    je .mo_ext
+    cmp al, '.'
+    je .mo_dot
+    mov [rdi], al
+    inc rsi
+    inc rdi
+    jmp .mol
+.mo_dot:
+    ; Check if this is the .asm extension
+    cmp byte [rsi + 1], 'a'
+    jne .mo_copy
+    cmp byte [rsi + 2], 's'
+    jne .mo_copy
+    cmp byte [rsi + 3], 'm'
+    jne .mo_copy
+.mo_ext:
+    mov byte [rdi], '.'
+    mov byte [rdi + 1], 'o'
+    mov byte [rdi + 2], 0
+    ret
+.mo_copy:
+    mov [rdi], al
+    inc rsi
+    inc rdi
+    jmp .mol
+
+; ============================================================
+; make_bin_filename — Create binary filename (no extension)
+; e.g. "test.asm" → "test"
+; ============================================================
+make_bin_filename:
+    lea rsi, [out_filename]
+    lea rdi, [bin_filename]
+.mbl:
+    movzx eax, byte [rsi]
+    cmp al, 0
+    je .mb_done
+    cmp al, '.'
+    je .mb_dot
+    mov [rdi], al
+    inc rsi
+    inc rdi
+    jmp .mbl
+.mb_dot:
+    cmp byte [rsi + 1], 'a'
+    jne .mb_copy
+    cmp byte [rsi + 2], 's'
+    jne .mb_copy
+    cmp byte [rsi + 3], 'm'
+    jne .mb_copy
+.mb_done:
+    mov byte [rdi], 0
+    ret
+.mb_copy:
+    mov [rdi], al
+    inc rsi
+    inc rdi
+    jmp .mbl
+
+; ============================================================
+; find_runtime_path — Find runtime.o relative to the compiler
+; Uses /proc/self/exe to find compiler location, then appends runtime.o
+; ============================================================
+find_runtime_path:
+    push rbp
+    mov rbp, rsp
+    push r12
+
+    ; readlink("/proc/self/exe", buf, 511) = syscall 89
+    lea rdi, [.proc_self]
+    lea rsi, [runtime_path]
+    mov rdx, 511
+    mov rax, 89
+    syscall
+    cmp rax, 0
+    jle .frp_fallback
+
+    ; Null-terminate
+    lea rdi, [runtime_path]
+    mov byte [rdi + rax], 0
+
+    ; Find last '/' and replace everything after with "runtime.o"
+    mov r12, rax
+    lea rdi, [runtime_path]
+    add rdi, r12
+.frp_scan:
+    cmp rdi, runtime_path
+    jbe .frp_fallback
+    dec rdi
+    cmp byte [rdi], '/'
+    jne .frp_scan
+
+    ; rdi points to last '/', write "runtime.o" after it
+    inc rdi
+    mov byte [rdi],     'r'
+    mov byte [rdi + 1], 'u'
+    mov byte [rdi + 2], 'n'
+    mov byte [rdi + 3], 't'
+    mov byte [rdi + 4], 'i'
+    mov byte [rdi + 5], 'm'
+    mov byte [rdi + 6], 'e'
+    mov byte [rdi + 7], '.'
+    mov byte [rdi + 8], 'o'
+    mov byte [rdi + 9], 0
+
+    pop r12
+    pop rbp
+    ret
+
+.frp_fallback:
+    ; Fallback: use "build/runtime.o"
+    lea rdi, [runtime_path]
+    mov byte [rdi],      'b'
+    mov byte [rdi + 1],  'u'
+    mov byte [rdi + 2],  'i'
+    mov byte [rdi + 3],  'l'
+    mov byte [rdi + 4],  'd'
+    mov byte [rdi + 5],  '/'
+    mov byte [rdi + 6],  'r'
+    mov byte [rdi + 7],  'u'
+    mov byte [rdi + 8],  'n'
+    mov byte [rdi + 9],  't'
+    mov byte [rdi + 10], 'i'
+    mov byte [rdi + 11], 'm'
+    mov byte [rdi + 12], 'e'
+    mov byte [rdi + 13], '.'
+    mov byte [rdi + 14], 'o'
+    mov byte [rdi + 15], 0
+
+    pop r12
+    pop rbp
+    ret
+
+section .rodata
+.proc_self: db "/proc/self/exe", 0
+
+section .text
+
+; ============================================================
+; delete_file — Unlink a file
+; rdi = path (null-terminated)
+; ============================================================
+delete_file:
+    ; unlink() = syscall 87
+    mov rax, 87
     syscall
     ret

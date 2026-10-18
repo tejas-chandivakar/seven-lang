@@ -4,7 +4,7 @@
 
 **S**peed · **E**asy · **V**ersatile · **E**fficient · **N**ative
 
-Created by **Tejas Chandivakar** — Vadodara, Gujarat, India
+Created by **Tejas Chandivakar**
 
 ---
 

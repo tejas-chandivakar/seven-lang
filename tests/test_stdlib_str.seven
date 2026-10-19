@@ -1,0 +1,39 @@
+!! Phase 6: String stdlib tests
+
+!! replace(str, old, new)
+show "--- replace ---"
+show replace("hello world", "world", "SEVEN")
+show replace("aaa", "a", "bb")
+show replace("no match", "xyz", "abc")
+
+!! upper(str) / lower(str)
+show "--- upper/lower ---"
+show upper("hello")
+show lower("HELLO")
+show upper("Seven Language")
+
+!! trim(str)
+show "--- trim ---"
+show trim("  hello  ")
+show trim("no spaces")
+
+!! find(str, sub)
+show "--- find ---"
+show find("hello world", "world")
+show find("hello", "xyz")
+show find("abcabc", "bc")
+
+!! count(str, sub)
+show "--- count ---"
+show count("banana", "an")
+show count("hello", "l")
+show count("aaa", "a")
+show count("hello", "xyz")
+
+!! pad(str, width, char)
+show "--- pad ---"
+show pad("42", 5, "0")
+show pad("hello", 3, "x")
+show pad("7", 4, " ")
+
+show "done"

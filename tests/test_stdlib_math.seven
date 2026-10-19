@@ -1,0 +1,38 @@
+!! Phase 6: Math stdlib tests
+
+!! pow(base, exp)
+show "--- pow ---"
+show pow(2, 10)
+show pow(3, 3)
+show pow(5, 0)
+show pow(10, 1)
+
+!! clamp(val, lo, hi)
+show "--- clamp ---"
+show clamp(5, 1, 10)
+show clamp(-5, 0, 100)
+show clamp(999, 0, 100)
+show clamp(50, 50, 50)
+
+!! sign(n)
+show "--- sign ---"
+show sign(42)
+show sign(-7)
+show sign(0)
+
+!! gcd(a, b)
+show "--- gcd ---"
+show gcd(12, 8)
+show gcd(100, 75)
+show gcd(7, 13)
+show gcd(0, 5)
+
+!! sum(arr) and avg(arr)
+show "--- sum/avg ---"
+nums = [10, 20, 30, 40]
+show sum(nums)
+show avg(nums)
+show sum([1, 2, 3, 4, 5])
+show avg([1, 2, 3, 4, 5])
+
+show "done"

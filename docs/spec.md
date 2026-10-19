@@ -1,8 +1,8 @@
 # SEVEN Language Specification
 
-**Version:** 0.3 (Phase 1 Draft — Mode system, No `:` blocks)
+**Version:** 0.6 (Phase 6 — Standard Library)
 **Author:** Tejas Chandivakar
-**Status:** Bootstrap Compiler in progress
+**Status:** Phase 6 complete — Standard Library
 
 ---
 
@@ -246,17 +246,120 @@ index_expr  = expression ;    (* negative allowed *)
 - Mode is file-scoped. Cross-file imports work regardless of mode.
 - Both modes produce identical compiled output.
 
-## 7. Runtime Model (Phase 1)
+## 7. Built-in Functions
 
-- **No garbage collection.** Bump arena freed on exit.
+### Original (Phase 1-5)
+| Function | Description |
+|----------|-------------|
+| `len(x)` | String length or array count |
+| `type(x)` | Returns "int", "string", or "array" |
+| `str(x)` | Convert to string |
+| `int(x)` | Convert string to integer |
+| `slice(arr, start, stop)` | Sub-array |
+| `reverse(arr)` | Reversed copy |
+| `step(arr, n)` | Every n-th element |
+| `abs(n)` | Absolute value |
+| `min(a, b)` | Minimum |
+| `max(a, b)` | Maximum |
+| `sqrt(n)` | Integer square root |
+| `random(n)` | Random integer 0..n-1 |
+| `sort(arr)` | Sorted copy |
+| `join(arr, sep)` | Join array to string |
+| `range(n)` / `range(a,b)` | Generate integer array |
+| `ord(ch)` | Character to ASCII code |
+| `chr(n)` | ASCII code to character |
+| `substr(s, start, len)` | Substring |
+| `push(arr, val)` | Append to array |
+| `pop(arr)` | Remove last element |
+| `exit(code)` | Exit program |
+
+### String Functions (Phase 6)
+| Function | Description |
+|----------|-------------|
+| `replace(str, old, new)` | Replace all occurrences |
+| `upper(str)` | Convert to uppercase |
+| `lower(str)` | Convert to lowercase |
+| `trim(str)` | Strip leading/trailing whitespace |
+| `find(str, sub)` | Find substring index (-1 if not found) |
+| `count(str, sub)` | Count non-overlapping occurrences |
+| `pad(str, width, char)` | Left-pad to width |
+
+### Math Functions (Phase 6)
+| Function | Description |
+|----------|-------------|
+| `pow(base, exp)` | Integer exponentiation |
+| `clamp(val, lo, hi)` | Clamp value to range |
+| `sign(n)` | Returns -1, 0, or 1 |
+| `gcd(a, b)` | Greatest common divisor |
+| `sum(arr)` | Sum of array elements |
+| `avg(arr)` | Average (integer division) |
+
+### Array Functions (Phase 6)
+| Function | Description |
+|----------|-------------|
+| `find(arr, val)` | Find index of element (-1 if not found) |
+| `fill(n, val)` | Create array of n copies |
+| `concat(arr1, arr2)` | Merge two arrays |
+| `unique(arr)` | Deduplicated copy |
+| `insert(arr, idx, val)` | Insert element at index |
+| `remove(arr, idx)` | Remove element at index |
+
+### Conversion Functions (Phase 6)
+| Function | Description |
+|----------|-------------|
+| `hex(n)` | Integer to "0xFF" hex string |
+| `bin(n)` | Integer to "0b1010" binary string |
+| `bool(val)` | Convert to 1 or 0 |
+| `number(str)` | String to integer (alias for int) |
+
+### File I/O Functions (Phase 6)
+| Function | Description |
+|----------|-------------|
+| `exists(path)` | Check if file exists (1/0) |
+| `append(path, data)` | Append data to file |
+| `delete(path)` | Delete file |
+| `lines(path)` | Read file as array of lines |
+
+### OS/System Functions (Phase 6)
+| Function | Description |
+|----------|-------------|
+| `time()` | Unix timestamp in seconds |
+| `clock()` | Monotonic nanoseconds |
+| `sleep(seconds)` | Pause execution |
+| `args()` | Command-line arguments as array |
+| `env(name)` | Get environment variable |
+| `system(cmd)` | Execute shell command, return exit code |
+
+### String Methods
+Called on string values with dot syntax: `s.upper()`, `s.lower()`, etc.
+
+| Method | Description |
+|--------|-------------|
+| `.upper()` | Uppercase copy |
+| `.lower()` | Lowercase copy |
+| `.trim()` | Strip whitespace |
+| `.contains(sub)` | Substring test (bool) |
+| `.replace(old, new)` | Replace all |
+| `.len()` | String length |
+| `.startswith(pre)` | Prefix test |
+| `.endswith(suf)` | Suffix test |
+| `.index(sub)` | Find substring position |
+| `.split(sep)` | Split into array |
+| `.repeat(n)` | Repeat n times |
+
+## 8. Runtime Model
+
+- **No garbage collection.** 16MB bump arena freed on exit.
 - **Stack-based expression evaluation** in generated code.
-- **Errors compile to error-code checks + jumps** (no unwinding runtime in Phase 1).
+- **All variables are global** (BSS slots).
+- **Values are 64-bit integers** — strings and arrays are heap pointers.
+- **String/int detection** uses magnitude heuristic (> 0x400000 = string pointer).
 
-## 8. Reserved for Later Phases
+## 9. Reserved for Later Phases
 
-- Async, generators, channels, mutex (Phase 3+)
-- Decorators, operator overloading, comptime (Phase 3+)
-- Modules, imports, package manager (Phase 5)
-- `mode strict` — optional type annotations (future)
+- Async, generators, channels, mutex
+- Decorators, operator overloading, comptime
+- Modules, imports, package manager
+- `mode strict` — optional type annotations
 
-See `roadmap.md` for full phase plan and `syntax-changes.md` for decision history.
+See `roadmap.md` for full phase plan.

@@ -1,78 +1,115 @@
 # SEVEN Development Roadmap
 
-## Phase 1 — Mini Bootstrap Compiler (CURRENT)
-**Duration:** 3-4 months
+## Phase 1 — Mini Bootstrap Compiler (COMPLETE)
 **Language:** x86-64 NASM Assembly
 **Goal:** First working `seven build main.seven → executable`
 
-### Step 1.1 — Lexer (`src/lexer.asm`)
-- [ ] File I/O (open, read, close)
-- [ ] Whitespace / comment skipping (`!!`)
-- [ ] Identifier + keyword scan
-- [ ] Number literals (int, hex `0x`, binary `0b`, float)
-- [ ] String literals with escape sequences
-- [ ] Operator scan (single + multi-char: `**`, `==`, `!=`, `<=`, `>=`, `<<`, `>>`)
-- [ ] Token emit + debug print
-- [ ] Line/column tracking for error messages
-
-### Step 1.2 — Parser (`src/parser.asm`)
-- [ ] Token stream (peek/consume)
-- [ ] Expression precedence climbing
-- [ ] Statement dispatch
-- [ ] AST bump allocator
-- [ ] Grammar coverage: assign, show, if/elif/else, repeat, while, func/return, arrays
-- [ ] Error reporting (line/col + expected/found)
-
-### Step 1.3 — Code Generator (`src/codegen.asm`)
-- [ ] Emit `section .text` / `.data` / `.bss`
-- [ ] `_start` prologue + exit epilogue
-- [ ] Integer arithmetic
-- [ ] Variables (stack-frame slot per var)
-- [ ] Control flow (if/repeat/while + unique labels)
-- [ ] Functions (call/ret, argument passing via SysV AMD64 ABI)
-- [ ] `show` runtime (write syscall)
-- [ ] `ask` runtime (read syscall)
-- [ ] String literal pool
-
-### Step 1.4 — Runtime (`src/runtime.asm`)
-- [ ] itoa / atoi
-- [ ] print_int / print_string / println
-- [ ] read_line
-- [ ] arena allocator (bump)
-- [ ] error_exit(msg)
-
-### Step 1.5 — Testing
-- [ ] Every file in `tests/` compiles and runs
-- [ ] Golden-output comparison
-- [ ] Error-path tests (syntax errors, div-by-zero, etc.)
-
-**End of Phase 1:** `./seven build examples/hello.seven` produces a working native executable.
+- [x] Lexer (tokenizer)
+- [x] Code Generator (single-pass, no AST)
+- [x] Runtime library (print, strings, arrays, file I/O)
+- [x] 39 core tests passing
 
 ---
 
-## Phase 2 — Self-Hosted Compiler
-Rewrite lexer/parser/codegen in SEVEN itself. Add optimizer.
+## Phase 2 — Core Language Features (COMPLETE)
+**Goal:** Expand language with practical features
 
-## Phase 3 — Standard Library
-math, string, array, file, time, os, data structures.
+- [x] String methods (.upper, .lower, .trim, .contains, .replace, .split, etc.)
+- [x] Array operations (push, pop, sort, join, range, slice, reverse, step)
+- [x] Comparison operators (above, below, atleast, atmost, is, isnt)
+- [x] Error handling (try/catch/done)
+- [x] File I/O (write/read statements)
 
-## Phase 4 — Developer Tools
+---
+
+## Phase 3 — Expression System (COMPLETE)
+**Goal:** Full expression evaluation
+
+- [x] Operator precedence (or → and → compare → add → mul → unary → primary)
+- [x] Boolean operators (and, or, not)
+- [x] String interpolation
+- [x] Negative indexing
+
+---
+
+## Phase 4 — Advanced Features (COMPLETE)
+**Goal:** Functions, classes, natural mode
+
+- [x] User-defined functions with parameters
+- [x] Variadic parameters (many)
+- [x] Array subscript assignment
+- [x] Each/as iteration with index
+- [x] Inline assembly (asm: block)
+
+---
+
+## Phase 5 — Self-Hosted Compiler (COMPLETE)
+**Goal:** Compiler written in SEVEN itself
+
+- [x] Self-hosted compiler bootstraps successfully
+- [x] 46 tests passing
+
+---
+
+## Phase 6 — Standard Library (COMPLETE)
+**Goal:** Expand built-in functions for real-world programs
+
+### String Functions
+- [x] `replace(str, old, new)` — replace substring
+- [x] `upper(str)` / `lower(str)` — case conversion
+- [x] `trim(str)` — strip whitespace
+- [x] `find(str, sub)` — find substring index
+- [x] `count(str, sub)` — count occurrences
+- [x] `pad(str, width, char)` — left-pad to width
+
+### Math Functions
+- [x] `pow(base, exp)` — integer exponentiation
+- [x] `clamp(val, lo, hi)` — clamp to range
+- [x] `sign(n)` — returns -1, 0, or 1
+- [x] `gcd(a, b)` — greatest common divisor
+- [x] `sum(arr)` — sum array elements
+- [x] `avg(arr)` — average (integer division)
+
+### Array Functions
+- [x] `find(arr, val)` — find index of element
+- [x] `fill(n, val)` — create array of n copies
+- [x] `concat(arr1, arr2)` — merge arrays
+- [x] `unique(arr)` — deduplicate
+- [x] `insert(arr, idx, val)` — insert at index
+- [x] `remove(arr, idx)` — remove at index
+
+### Conversion Functions
+- [x] `hex(n)` — integer to hex string
+- [x] `bin(n)` — integer to binary string
+- [x] `bool(val)` — convert to boolean (1/0)
+- [x] `number(str)` — string to integer
+
+### File I/O Functions
+- [x] `exists(path)` — check if file exists
+- [x] `append(path, data)` — append to file
+- [x] `delete(path)` — delete file
+- [x] `lines(path)` — read file as array of lines
+
+### OS/System Functions
+- [x] `time()` — unix timestamp (seconds)
+- [x] `clock()` — monotonic nanoseconds
+- [x] `sleep(seconds)` — pause execution
+- [x] `args()` — command-line arguments as array
+- [x] `env(name)` — get environment variable
+- [x] `system(cmd)` — execute shell command
+
+**Total: 28 new built-in functions, 51 tests passing**
+
+---
+
+## Phase 7 — Developer Tools
 REPL, formatter, linter, debugger, VS Code LSP, profiler.
 
-## Phase 5 — Package Manager (SPM)
+## Phase 8 — Package Manager (SPM)
 `spm init`, `spm install`, `spm publish`, registry.
 
-## Phase 6 — Testing Framework
+## Phase 9 — Testing Framework
 Unit tests, benchmarks, coverage, mocks.
 
-## Phase 7 — Documentation + Website
+## Phase 10 — Documentation + Website
 sevenlang.org, docs, playground, tutorials.
-
-## Phase 8 — Domain Libraries
-Web, DB, AI/ML, GUI, Networking, Crypto, Graphics.
-
-## Phase 9 — Community + Ecosystem
-GitHub, Discord, meetups, RFC process.
-
-## Phase 10 — Enterprise + Future
-Cross-compile, FFI, JIT, GPU, WASM, RISC-V, Quantum.

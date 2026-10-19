@@ -1,0 +1,49 @@
+!! Phase 6: Array stdlib tests
+
+!! find() — works for arrays and strings
+show "--- find ---"
+arr = [10, 20, 30, 40]
+show find(arr, 30)
+show find(arr, 99)
+show find("hello", "ll")
+
+!! fill(n, val)
+show "--- fill ---"
+a = fill(5, 0)
+show len(a)
+show a[0]
+show a[4]
+b = fill(3, 42)
+show b[0], b[1], b[2]
+
+!! concat(arr1, arr2)
+show "--- concat ---"
+x = [1, 2, 3]
+y = [4, 5, 6]
+z = concat(x, y)
+show len(z)
+show z[0], z[3], z[5]
+
+!! unique(arr)
+show "--- unique ---"
+dupes = [1, 2, 2, 3, 3, 3, 1]
+u = unique(dupes)
+show len(u)
+show u[0], u[1], u[2]
+
+!! insert(arr, idx, val)
+show "--- insert ---"
+nums = [1, 2, 4, 5]
+nums = insert(nums, 2, 3)
+show len(nums)
+show nums[0], nums[1], nums[2], nums[3], nums[4]
+
+!! remove(arr, idx)
+show "--- remove ---"
+data = [10, 20, 30, 40, 50]
+removed = remove(data, 2)
+show removed
+show len(data)
+show data[0], data[1], data[2], data[3]
+
+show "done"

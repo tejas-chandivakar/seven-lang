@@ -1,0 +1,29 @@
+!! Phase 6: Conversion stdlib tests
+
+!! hex(n)
+show "--- hex ---"
+show hex(255)
+show hex(16)
+show hex(0)
+show hex(1024)
+
+!! bin(n)
+show "--- bin ---"
+show bin(10)
+show bin(255)
+show bin(0)
+show bin(1)
+
+!! bool(val)
+show "--- bool ---"
+show bool(42)
+show bool(0)
+show bool(1)
+show bool("")
+
+!! number(str) — alias for int()
+show "--- number ---"
+show number("42")
+show number("100")
+
+show "done"

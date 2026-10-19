@@ -29,6 +29,8 @@ section .bss
     heap_base    resq 1         ; bump allocator base
     heap_ptr     resq 1         ; bump allocator current
     heap_end     resq 1         ; bump allocator end
+    saved_rsp    resq 1         ; initial rsp at _start (for argc/argv access)
+    timespec_buf resb 16        ; for clock_gettime (sec + nsec)
 
 section .text
 
@@ -987,6 +989,154 @@ rt_str_replace:
     call rt_str_copy
     pop rax
     add rsp, 16
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop rbp
+    ret
+
+; ============================================================
+; rt_str_count — Count non-overlapping occurrences of sub in str
+; rdi = string, rsi = substring, returns rax = count
+; ============================================================
+global rt_str_count
+rt_str_count:
+    push rbp
+    mov rbp, rsp
+    push r12
+    push r13
+    push r14
+    push r15
+    mov r12, rdi             ; string
+    mov r13, rsi             ; substring
+    ; Get lengths
+    call rt_str_len
+    mov r14, rax             ; str len
+    mov rdi, r13
+    call rt_str_len
+    mov r15, rax             ; sub len
+    xor rcx, rcx             ; count = 0
+    xor r8, r8               ; position = 0
+    cmp r15, 0
+    je .sc_done              ; empty sub → 0
+.sc_loop:
+    mov rax, r14
+    sub rax, r15
+    cmp r8, rax
+    jg .sc_done
+    ; Compare sub at position r8
+    xor r9, r9
+.sc_cmp:
+    cmp r9, r15
+    je .sc_match
+    lea rax, [r12 + r8]
+    movzx eax, byte [rax + r9]
+    cmp al, [r13 + r9]
+    jne .sc_next
+    inc r9
+    jmp .sc_cmp
+.sc_match:
+    inc rcx
+    add r8, r15              ; skip past match (non-overlapping)
+    jmp .sc_loop
+.sc_next:
+    inc r8
+    jmp .sc_loop
+.sc_done:
+    mov rax, rcx
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop rbp
+    ret
+
+; ============================================================
+; rt_str_pad — Pad string to width with char
+; rdi = string, rsi = target width, rdx = pad char (as string ptr)
+; Returns rax = new padded string (left-padded)
+; ============================================================
+global rt_str_pad
+rt_str_pad:
+    push rbp
+    mov rbp, rsp
+    push r12
+    push r13
+    push r14
+    push r15
+    mov r12, rdi             ; string
+    mov r13, rsi             ; target width
+    mov r14, rdx             ; pad char string ptr
+    ; Get string length
+    call rt_str_len
+    mov r15, rax             ; str len
+    ; If already >= width, return copy
+    cmp r15, r13
+    jge .sp_copy
+    ; Get pad char (first char of pad string)
+    movzx ecx, byte [r14]
+    cmp cl, 0
+    je .sp_copy              ; empty pad → return copy
+    push rcx                 ; save pad char
+    ; Allocate width + 1
+    lea rdi, [r13 + 1]
+    call rt_alloc
+    push rax                 ; save result ptr
+    ; Fill pad chars
+    mov rcx, r13
+    sub rcx, r15             ; pad_count = width - len
+    pop rax
+    push rax
+    xor r8, r8
+    mov r9, [rsp + 8]        ; pad char from stack
+.sp_fill:
+    cmp r8, rcx
+    je .sp_copy_str
+    mov [rax + r8], r9b
+    inc r8
+    jmp .sp_fill
+.sp_copy_str:
+    ; Copy original string after pad
+    xor r9, r9
+.sp_copy_loop:
+    cmp r9, r15
+    je .sp_term
+    movzx edx, byte [r12 + r9]
+    pop rax
+    push rax
+    mov [rax + r8], dl
+    inc r8
+    inc r9
+    jmp .sp_copy_loop
+.sp_term:
+    pop rax
+    mov byte [rax + r8], 0
+    add rsp, 8               ; clean pad char from stack
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop rbp
+    ret
+.sp_copy:
+    ; Return copy of original
+    lea rdi, [r15 + 1]
+    call rt_alloc
+    push rax
+    xor rcx, rcx
+.sp_copy_orig:
+    cmp rcx, r15
+    je .sp_copy_done
+    movzx edx, byte [r12 + rcx]
+    pop rax
+    push rax
+    mov [rax + rcx], dl
+    inc rcx
+    jmp .sp_copy_orig
+.sp_copy_done:
+    pop rax
+    mov byte [rax + rcx], 0
     pop r15
     pop r14
     pop r13
@@ -2279,6 +2429,1068 @@ rt_substr:
     pop r12
     pop rbp
     ret
+
+; ============================================================
+; rt_arr_find — Find index of value in array (-1 if not found)
+; rdi = array ptr, rsi = value, returns rax = index or -1
+; ============================================================
+global rt_arr_find
+rt_arr_find:
+    push rbx
+    push r12
+    push r13
+    push r14
+    mov r12, [rdi]           ; count
+    lea r13, [rdi + 16]      ; elements start
+    mov r14, rsi             ; value to find
+    xor rbx, rbx             ; index = 0
+    cmp r14, 0
+    jl .af_int_loop
+    mov rax, 0x400000
+    cmp r14, rax
+    jbe .af_int_loop
+.af_str_loop:
+    cmp rbx, r12
+    je .af_not_found
+    mov rdi, [r13 + rbx * 8]
+    mov rsi, r14
+    call rt_str_eq
+    cmp rax, 1
+    je .af_found
+    inc rbx
+    jmp .af_str_loop
+.af_int_loop:
+    cmp rbx, r12
+    je .af_not_found
+    cmp [r13 + rbx * 8], r14
+    je .af_found
+    inc rbx
+    jmp .af_int_loop
+.af_found:
+    mov rax, rbx
+    jmp .af_done
+.af_not_found:
+    mov rax, -1
+.af_done:
+    pop r14
+    pop r13
+    pop r12
+    pop rbx
+    ret
+
+; ============================================================
+; rt_find — Generic find: detects array vs string and dispatches
+; rdi = array or string, rsi = value/substring
+; Returns rax = index (-1 if not found)
+; ============================================================
+global rt_find
+rt_find:
+    ; Check if rdi is an array (pointer > 0x400000 AND [rdi] is small count)
+    cmp rdi, 0x400000
+    jb .find_str
+    ; Could be string or array — check if [rdi] looks like an array count
+    ; Array layout: [count:8][capacity:8][...], count < capacity
+    ; String: first bytes are ASCII chars (usually < 128)
+    ; Heuristic: if [rdi+8] > [rdi] and [rdi] < 0x100000, it's an array
+    mov rax, [rdi]           ; potential count
+    cmp rax, 0x100000
+    jge .find_str            ; too large for array count
+    mov rcx, [rdi + 8]      ; potential capacity
+    cmp rcx, rax
+    jl .find_str             ; capacity < count → not an array
+    cmp rcx, 0x100000
+    jge .find_str            ; capacity too large
+    ; Looks like an array
+    jmp rt_arr_find
+.find_str:
+    jmp rt_str_index
+
+; ============================================================
+; rt_arr_fill — Create array of n copies of value
+; rdi = count, rsi = value, returns rax = new array ptr
+; ============================================================
+global rt_arr_fill
+rt_arr_fill:
+    push rbp
+    mov rbp, rsp
+    push r12
+    push r13
+    mov r12, rdi             ; count
+    mov r13, rsi             ; value
+    ; Create new array with capacity = count
+    mov rdi, r12
+    cmp rdi, 8
+    jge .fill_cap_ok
+    mov rdi, 8
+.fill_cap_ok:
+    call rt_arr_new
+    push rax                 ; save array ptr
+    ; Push value n times
+    xor rcx, rcx
+.fill_loop:
+    cmp rcx, r12
+    je .fill_done
+    push rcx
+    pop rcx
+    push rcx
+    mov rdi, [rsp + 8]      ; array ptr (may have been reallocated)
+    mov rsi, r13
+    call rt_arr_push
+    mov [rsp + 8], rax       ; update if reallocated
+    pop rcx
+    inc rcx
+    jmp .fill_loop
+.fill_done:
+    pop rax
+    pop r13
+    pop r12
+    pop rbp
+    ret
+
+; ============================================================
+; rt_arr_concat — Concatenate two arrays into a new one
+; rdi = arr1, rsi = arr2, returns rax = new array
+; ============================================================
+global rt_arr_concat
+rt_arr_concat:
+    push rbp
+    mov rbp, rsp
+    push r12
+    push r13
+    push r14
+    push r15
+    mov r12, rdi             ; arr1
+    mov r13, rsi             ; arr2
+    ; Total count
+    mov r14, [r12]           ; arr1 count
+    mov r15, [r13]           ; arr2 count
+    mov rdi, r14
+    add rdi, r15
+    cmp rdi, 8
+    jge .cc_cap_ok
+    mov rdi, 8
+.cc_cap_ok:
+    call rt_arr_new
+    push rax                 ; save result
+    ; Copy arr1 elements
+    xor rcx, rcx
+.cc_loop1:
+    cmp rcx, r14
+    je .cc_loop2_start
+    push rcx
+    mov rdi, [rsp + 8]
+    mov rsi, [r12 + 16 + rcx * 8]
+    call rt_arr_push
+    mov [rsp + 8], rax
+    pop rcx
+    inc rcx
+    jmp .cc_loop1
+.cc_loop2_start:
+    xor rcx, rcx
+.cc_loop2:
+    cmp rcx, r15
+    je .cc_done
+    push rcx
+    mov rdi, [rsp + 8]
+    mov rsi, [r13 + 16 + rcx * 8]
+    call rt_arr_push
+    mov [rsp + 8], rax
+    pop rcx
+    inc rcx
+    jmp .cc_loop2
+.cc_done:
+    pop rax
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop rbp
+    ret
+
+; ============================================================
+; rt_arr_unique — Return new array with duplicates removed
+; rdi = array ptr, returns rax = new array
+; ============================================================
+global rt_arr_unique
+rt_arr_unique:
+    push rbp
+    mov rbp, rsp
+    push r12
+    push r13
+    push r14
+    mov r12, rdi             ; source array
+    mov r13, [r12]           ; count
+    xor rdi, rdi
+    call rt_arr_new
+    push rax                 ; result array
+    xor r14, r14             ; index
+.uniq_loop:
+    cmp r14, r13
+    je .uniq_done
+    mov rsi, [r12 + 16 + r14 * 8]
+    push rsi
+    mov rdi, [rsp + 8]      ; result array
+    call rt_arr_contains
+    pop rsi
+    cmp rax, 1
+    je .uniq_skip
+    ; Not in result yet — push it
+    push rsi
+    mov rdi, [rsp + 8]
+    pop rsi
+    call rt_arr_push
+    mov [rsp], rax           ; update result ptr
+.uniq_skip:
+    inc r14
+    jmp .uniq_loop
+.uniq_done:
+    pop rax
+    pop r14
+    pop r13
+    pop r12
+    pop rbp
+    ret
+
+; ============================================================
+; rt_arr_insert — Insert value at index, shift elements right
+; rdi = array ptr, rsi = index, rdx = value, returns rax = array ptr
+; ============================================================
+global rt_arr_insert
+rt_arr_insert:
+    push rbp
+    mov rbp, rsp
+    push r12
+    push r13
+    push r14
+    push r15
+    mov r12, rdi             ; array
+    mov r13, rsi             ; index
+    mov r14, rdx             ; value
+    ; First push a dummy to ensure capacity
+    mov rdi, r12
+    mov rsi, 0
+    call rt_arr_push
+    mov r12, rax             ; potentially reallocated
+    ; Now shift elements right from end to index
+    mov r15, [r12]           ; new count (already incremented by push)
+    dec r15                  ; last valid index
+.ins_shift:
+    cmp r15, r13
+    jle .ins_place
+    mov rax, [r12 + 16 + r15 * 8 - 8]
+    mov [r12 + 16 + r15 * 8], rax
+    dec r15
+    jmp .ins_shift
+.ins_place:
+    mov [r12 + 16 + r13 * 8], r14
+    mov rax, r12
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop rbp
+    ret
+
+; ============================================================
+; rt_arr_remove — Remove element at index, shift elements left
+; rdi = array ptr, rsi = index, returns rax = removed value
+; ============================================================
+global rt_arr_remove
+rt_arr_remove:
+    push r12
+    push r13
+    push r14
+    mov r12, rdi             ; array
+    mov r13, rsi             ; index
+    mov r14, [r12]           ; count
+    ; Bounds check
+    cmp r13, r14
+    jge .rem_oob
+    ; Save removed value
+    mov rax, [r12 + 16 + r13 * 8]
+    push rax
+    ; Shift left
+    lea rcx, [r13 + 1]
+.rem_shift:
+    cmp rcx, r14
+    je .rem_done
+    mov rax, [r12 + 16 + rcx * 8]
+    mov [r12 + 16 + rcx * 8 - 8], rax
+    inc rcx
+    jmp .rem_shift
+.rem_done:
+    dec qword [r12]
+    pop rax
+    pop r14
+    pop r13
+    pop r12
+    ret
+.rem_oob:
+    xor rax, rax
+    pop r14
+    pop r13
+    pop r12
+    ret
+
+; ============================================================
+; rt_pow — Integer exponentiation: rdi = base, rsi = exp, returns rax
+; ============================================================
+global rt_pow
+rt_pow:
+    mov rax, 1
+    cmp rsi, 0
+    je .pow_done
+.pow_loop:
+    imul rax, rdi
+    dec rsi
+    jnz .pow_loop
+.pow_done:
+    ret
+
+; ============================================================
+; rt_clamp — Clamp rdi to range [rsi, rdx]
+; rdi = value, rsi = min, rdx = max, returns rax
+; ============================================================
+global rt_clamp
+rt_clamp:
+    mov rax, rdi
+    cmp rax, rsi
+    jge .clamp_not_low
+    mov rax, rsi
+    ret
+.clamp_not_low:
+    cmp rax, rdx
+    jle .clamp_done
+    mov rax, rdx
+.clamp_done:
+    ret
+
+; ============================================================
+; rt_sign — Sign of number: rdi = value, returns rax (-1, 0, 1)
+; ============================================================
+global rt_sign
+rt_sign:
+    cmp rdi, 0
+    jg .sign_pos
+    jl .sign_neg
+    xor rax, rax
+    ret
+.sign_pos:
+    mov rax, 1
+    ret
+.sign_neg:
+    mov rax, -1
+    ret
+
+; ============================================================
+; rt_gcd — Greatest common divisor (Euclidean)
+; rdi = a, rsi = b, returns rax
+; ============================================================
+global rt_gcd
+rt_gcd:
+    mov rax, rdi
+    mov rcx, rsi
+    ; Make both positive
+    cmp rax, 0
+    jge .gcd_a_pos
+    neg rax
+.gcd_a_pos:
+    cmp rcx, 0
+    jge .gcd_loop
+    neg rcx
+.gcd_loop:
+    cmp rcx, 0
+    je .gcd_done
+    xor rdx, rdx
+    div rcx
+    mov rax, rcx
+    mov rcx, rdx
+    jmp .gcd_loop
+.gcd_done:
+    ret
+
+; ============================================================
+; rt_arr_sum — Sum all elements in array
+; rdi = array ptr, returns rax = sum
+; ============================================================
+global rt_arr_sum
+rt_arr_sum:
+    mov rcx, [rdi]           ; count
+    xor rax, rax             ; sum = 0
+    cmp rcx, 0
+    je .sum_done
+    lea rsi, [rdi + 16]      ; elements start at offset 16
+.sum_loop:
+    add rax, [rsi]
+    add rsi, 8
+    dec rcx
+    jnz .sum_loop
+.sum_done:
+    ret
+
+; ============================================================
+; rt_arr_avg — Average of array elements (integer division)
+; rdi = array ptr, returns rax = avg
+; ============================================================
+global rt_arr_avg
+rt_arr_avg:
+    push rdi
+    call rt_arr_sum
+    pop rdi
+    mov rcx, [rdi]           ; count
+    cmp rcx, 0
+    je .avg_zero
+    xor rdx, rdx
+    idiv rcx
+    ret
+.avg_zero:
+    xor rax, rax
+    ret
+
+; ============================================================
+; rt_file_exists — Check if file exists
+; rdi = filename string ptr, returns rax = 1 if exists, 0 if not
+; ============================================================
+global rt_file_exists
+rt_file_exists:
+    ; sys_access(filename, F_OK=0)
+    mov rax, 21              ; sys_access
+    mov rsi, 0               ; F_OK
+    syscall
+    cmp rax, 0
+    jl .fexist_no
+    mov rax, 1
+    ret
+.fexist_no:
+    xor rax, rax
+    ret
+
+; ============================================================
+; rt_file_delete — Delete a file
+; rdi = filename string ptr, returns rax = 0 on success, -1 on error
+; ============================================================
+global rt_file_delete
+rt_file_delete:
+    mov rax, 87              ; sys_unlink
+    syscall
+    ret
+
+; ============================================================
+; rt_file_append — Append data to file
+; rdi = filename string ptr, rsi = data string ptr
+; returns rax = 0 on success
+; ============================================================
+global rt_file_append
+rt_file_append:
+    push rbp
+    mov rbp, rsp
+    push r12
+    push r13
+    mov r12, rdi             ; filename
+    mov r13, rsi             ; data
+    ; Get data length
+    mov rdi, r13
+    call rt_str_len
+    push rax                 ; data length
+    ; Open file: O_WRONLY|O_CREAT|O_APPEND = 1|64|1024 = 1089
+    mov rax, 2               ; sys_open
+    mov rdi, r12
+    mov rsi, 1089            ; O_WRONLY|O_CREAT|O_APPEND
+    mov rdx, 0644o           ; permissions
+    syscall
+    cmp rax, 0
+    jl .fappend_err
+    mov r12, rax             ; fd
+    ; Write data
+    mov rax, 1               ; sys_write
+    mov rdi, r12
+    mov rsi, r13
+    pop rdx                  ; data length
+    syscall
+    ; Close
+    mov rax, 3               ; sys_close
+    mov rdi, r12
+    syscall
+    xor rax, rax
+    pop r13
+    pop r12
+    pop rbp
+    ret
+.fappend_err:
+    add rsp, 8               ; clean data length
+    mov rax, -1
+    pop r13
+    pop r12
+    pop rbp
+    ret
+
+; ============================================================
+; rt_file_lines — Read file as array of lines
+; rdi = filename string ptr, returns rax = array of strings
+; ============================================================
+global rt_file_lines
+rt_file_lines:
+    push rbp
+    mov rbp, rsp
+    push r12
+    push r13
+    push r14
+    push r15
+    mov r12, rdi             ; filename
+    ; Read file contents
+    call rt_file_read_str    ; rax = string content, or 0 on error
+    cmp rax, 0
+    je .flines_empty
+    mov r13, rax             ; file content string
+    ; Get content length
+    mov rdi, r13
+    call rt_str_len
+    mov r14, rax             ; content length
+    ; Create result array
+    xor rdi, rdi
+    call rt_arr_new
+    mov r15, rax             ; result array
+    ; Split by newline
+    xor rcx, rcx             ; start of current line
+.flines_loop:
+    cmp rcx, r14
+    jg .flines_done
+    ; Find end of line (or end of string)
+    mov r8, rcx              ; line start
+.flines_find_nl:
+    cmp r8, r14
+    je .flines_emit
+    movzx eax, byte [r13 + r8]
+    cmp al, 10               ; newline
+    je .flines_emit
+    inc r8
+    jmp .flines_find_nl
+.flines_emit:
+    ; Create substring from rcx to r8
+    mov rdi, r8
+    sub rdi, rcx
+    inc rdi                  ; +1 for null
+    push rcx
+    push r8
+    call rt_alloc
+    pop r8
+    pop rcx
+    ; Copy bytes
+    push rax
+    xor r9, r9
+.flines_copy:
+    lea rdx, [rcx + r9]
+    cmp rdx, r8
+    je .flines_term
+    lea rdx, [r13 + rcx]
+    movzx edx, byte [rdx + r9]
+    pop rax
+    push rax
+    mov [rax + r9], dl
+    inc r9
+    jmp .flines_copy
+.flines_term:
+    pop rax
+    mov byte [rax + r9], 0
+    ; Push line to array
+    mov rdi, r15
+    mov rsi, rax
+    call rt_arr_push
+    mov r15, rax             ; update if reallocated
+    ; Move past newline
+    lea rcx, [r8 + 1]
+    jmp .flines_loop
+.flines_done:
+    mov rax, r15
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop rbp
+    ret
+.flines_empty:
+    xor rdi, rdi
+    call rt_arr_new
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop rbp
+    ret
+
+; ============================================================
+; rt_hex — Convert integer to hex string "0xNN..."
+; rdi = value, returns rax = string ptr
+; ============================================================
+global rt_hex
+rt_hex:
+    push rbp
+    mov rbp, rsp
+    push r12
+    push r13
+    mov r12, rdi             ; save value
+    ; Allocate 20 bytes
+    mov rdi, 20
+    call rt_alloc
+    mov r13, rax             ; result ptr
+    mov byte [r13], '0'
+    mov byte [r13 + 1], 'x'
+    cmp r12, 0
+    jne .hex_nonzero
+    mov byte [r13 + 2], '0'
+    mov byte [r13 + 3], 0
+    mov rax, r13
+    pop r13
+    pop r12
+    pop rbp
+    ret
+.hex_nonzero:
+    ; Build digits in reverse on stack
+    sub rsp, 20
+    xor rcx, rcx
+    mov rdi, r12
+    cmp rdi, 0
+    jge .hex_loop
+    neg rdi
+.hex_loop:
+    cmp rdi, 0
+    je .hex_write
+    mov rax, rdi
+    and rax, 0xF
+    cmp al, 10
+    jl .hex_digit
+    add al, 'a' - 10
+    jmp .hex_store
+.hex_digit:
+    add al, '0'
+.hex_store:
+    mov [rsp + rcx], al
+    inc rcx
+    shr rdi, 4
+    jmp .hex_loop
+.hex_write:
+    lea rsi, [r13 + 2]
+    xor r8, r8
+.hex_rev:
+    cmp r8, rcx
+    je .hex_done
+    mov r9, rcx
+    dec r9
+    sub r9, r8
+    movzx edx, byte [rsp + r9]
+    mov [rsi + r8], dl
+    inc r8
+    jmp .hex_rev
+.hex_done:
+    mov byte [rsi + r8], 0
+    add rsp, 20
+    mov rax, r13
+    pop r13
+    pop r12
+    pop rbp
+    ret
+
+; ============================================================
+; rt_bin — Convert integer to binary string "0bNNN..."
+; rdi = value, returns rax = string ptr
+; ============================================================
+global rt_bin
+rt_bin:
+    push rbp
+    mov rbp, rsp
+    push r12
+    push r13
+    mov r12, rdi             ; save value
+    mov rdi, 70
+    call rt_alloc
+    mov r13, rax             ; result ptr
+    mov byte [r13], '0'
+    mov byte [r13 + 1], 'b'
+    cmp r12, 0
+    jne .bin_nonzero
+    mov byte [r13 + 2], '0'
+    mov byte [r13 + 3], 0
+    mov rax, r13
+    pop r13
+    pop r12
+    pop rbp
+    ret
+.bin_nonzero:
+    sub rsp, 68
+    xor rcx, rcx
+    mov rdi, r12
+    cmp rdi, 0
+    jge .bin_loop
+    neg rdi
+.bin_loop:
+    cmp rdi, 0
+    je .bin_write
+    mov rax, rdi
+    and rax, 1
+    add al, '0'
+    mov [rsp + rcx], al
+    inc rcx
+    shr rdi, 1
+    jmp .bin_loop
+.bin_write:
+    lea rsi, [r13 + 2]
+    xor r8, r8
+.bin_rev:
+    cmp r8, rcx
+    je .bin_done
+    mov r9, rcx
+    dec r9
+    sub r9, r8
+    movzx edx, byte [rsp + r9]
+    mov [rsi + r8], dl
+    inc r8
+    jmp .bin_rev
+.bin_done:
+    mov byte [rsi + r8], 0
+    add rsp, 68
+    mov rax, r13
+    pop r13
+    pop r12
+    pop rbp
+    ret
+
+; ============================================================
+; rt_bool — Convert value to boolean (0 or 1)
+; rdi = value (0, empty string, empty array = 0; else 1)
+; returns rax = 0 or 1
+; ============================================================
+global rt_bool
+rt_bool:
+    cmp rdi, 0
+    je .bool_false
+    ; Check if it's a string pointer
+    cmp rdi, 0x400000
+    jb .bool_true
+    ; Could be string or array — check first byte
+    movzx eax, byte [rdi]
+    cmp al, 0
+    je .bool_false           ; empty string
+    ; Check if array with count 0
+    mov rax, [rdi]
+    cmp rax, 0
+    je .bool_check_arr
+    jmp .bool_true
+.bool_check_arr:
+    ; [rdi] = 0 could be empty array or empty string (first byte 0)
+    ; Already checked first byte above for string, so this is array
+    jmp .bool_false
+.bool_true:
+    mov rax, 1
+    ret
+.bool_false:
+    xor rax, rax
+    ret
+
+; ============================================================
+; rt_time — Return current unix timestamp (seconds since epoch)
+; No args, returns seconds in rax
+; ============================================================
+global rt_time
+rt_time:
+    push rbp
+    mov rbp, rsp
+    sub rsp, 16
+    ; clock_gettime(CLOCK_REALTIME=0, &timespec)
+    mov rax, 228             ; sys_clock_gettime
+    xor rdi, rdi             ; CLOCK_REALTIME = 0
+    lea rsi, [rbp - 16]     ; timespec on stack
+    syscall
+    mov rax, [rbp - 16]     ; tv_sec
+    leave
+    ret
+
+; ============================================================
+; rt_clock — Return monotonic nanoseconds for benchmarking
+; No args, returns nanoseconds in rax
+; ============================================================
+global rt_clock
+rt_clock:
+    push rbp
+    mov rbp, rsp
+    sub rsp, 16
+    ; clock_gettime(CLOCK_MONOTONIC=1, &timespec)
+    mov rax, 228             ; sys_clock_gettime
+    mov rdi, 1               ; CLOCK_MONOTONIC
+    lea rsi, [rbp - 16]
+    syscall
+    mov rax, [rbp - 16]     ; tv_sec
+    imul rax, 1000000000     ; sec * 1e9
+    add rax, [rbp - 8]      ; + tv_nsec
+    leave
+    ret
+
+; ============================================================
+; rt_sleep — Sleep for rdi seconds
+; rdi = seconds to sleep
+; ============================================================
+global rt_sleep
+rt_sleep:
+    push rbp
+    mov rbp, rsp
+    sub rsp, 16
+    mov [rbp - 16], rdi      ; tv_sec = seconds
+    mov qword [rbp - 8], 0   ; tv_nsec = 0
+    ; nanosleep(&req, NULL)
+    mov rax, 35               ; sys_nanosleep
+    lea rdi, [rbp - 16]      ; req
+    xor rsi, rsi              ; rem = NULL
+    syscall
+    xor rax, rax
+    leave
+    ret
+
+; ============================================================
+; rt_args — Return command-line args as SEVEN array
+; Uses saved_rsp to access argc/argv from _start
+; Returns array pointer in rax
+; ============================================================
+global rt_args
+global saved_rsp
+rt_args:
+    push rbp
+    mov rbp, rsp
+    push r12
+    push r13
+    push r14
+
+    ; saved_rsp points to original stack at _start
+    ; Linux stack at _start: [argc][argv[0]][argv[1]]...[NULL][envp...]
+    mov r12, [saved_rsp]     ; original rsp
+    mov r13, [r12]           ; argc
+    lea r14, [r12 + 8]       ; &argv[0]
+
+    ; Create new array
+    mov rdi, r13
+    call rt_arr_new          ; rax = new array
+    push rax                 ; save array ptr
+
+    ; Push each argv string
+    xor r12, r12             ; i = 0
+.args_loop:
+    cmp r12, r13
+    jge .args_done
+    mov rdi, [r14 + r12 * 8] ; argv[i] (C string ptr)
+    ; Need to copy to heap since argv strings are on stack
+    ; Find length
+    push rdi
+    xor rcx, rcx
+.args_strlen:
+    cmp byte [rdi + rcx], 0
+    je .args_strlen_done
+    inc rcx
+    jmp .args_strlen
+.args_strlen_done:
+    ; Allocate rcx+1 bytes
+    push rcx
+    lea rdi, [rcx + 1]
+    call rt_alloc            ; rax = heap ptr
+    pop rcx
+    pop rsi                  ; original string ptr
+    ; Copy
+    push rax
+    push rcx
+    mov rdi, rax
+.args_copy:
+    cmp rcx, 0
+    je .args_copy_done
+    mov al, [rsi]
+    mov [rdi], al
+    inc rsi
+    inc rdi
+    dec rcx
+    jmp .args_copy
+.args_copy_done:
+    mov byte [rdi], 0        ; null terminate
+    pop rcx
+    pop rax                  ; heap string ptr
+    ; Push to array: rdi=array, rsi=value
+    mov rsi, rax
+    mov rdi, [rsp]           ; array ptr
+    call rt_arr_push
+    inc r12
+    jmp .args_loop
+.args_done:
+    pop rax                  ; return array
+    pop r14
+    pop r13
+    pop r12
+    pop rbp
+    ret
+
+; ============================================================
+; rt_env — Get environment variable value
+; rdi = variable name (string ptr)
+; Returns: string ptr in rax, or 0 if not found
+; ============================================================
+global rt_env
+rt_env:
+    push rbp
+    mov rbp, rsp
+    push r12
+    push r13
+    push r14
+    push r15
+
+    mov r12, rdi             ; name to find
+
+    ; Find name length
+    xor r13, r13
+.env_namelen:
+    cmp byte [r12 + r13], 0
+    je .env_namelen_done
+    inc r13
+    jmp .env_namelen
+
+.env_namelen_done:
+    ; Walk envp: after argv on the stack
+    ; saved_rsp -> [argc][argv[0]]...[argv[argc-1]][NULL][envp[0]]...
+    mov r14, [saved_rsp]
+    mov rax, [r14]           ; argc
+    lea r14, [r14 + 8 + rax * 8 + 8] ; skip argc + argv + NULL
+
+.env_loop:
+    mov r15, [r14]           ; envp[i]
+    test r15, r15
+    jz .env_not_found        ; NULL = end of env
+
+    ; Compare name: check if envp[i] starts with name + '='
+    xor rcx, rcx
+.env_cmp:
+    cmp rcx, r13
+    je .env_check_eq         ; matched all name chars
+    movzx eax, byte [r12 + rcx]
+    cmp al, byte [r15 + rcx]
+    jne .env_next
+    inc rcx
+    jmp .env_cmp
+
+.env_check_eq:
+    cmp byte [r15 + rcx], '='
+    jne .env_next
+
+    ; Found! Copy value part (after '=') to heap
+    lea rsi, [r15 + rcx + 1] ; value start
+    ; Find value length
+    xor rdx, rdx
+.env_vallen:
+    cmp byte [rsi + rdx], 0
+    je .env_vallen_done
+    inc rdx
+    jmp .env_vallen
+.env_vallen_done:
+    ; Allocate and copy
+    push rsi
+    push rdx
+    lea rdi, [rdx + 1]
+    call rt_alloc
+    pop rdx
+    pop rsi
+    mov rdi, rax
+    push rax
+    mov rcx, rdx
+.env_copy:
+    cmp rcx, 0
+    je .env_copy_done
+    mov al, [rsi]
+    mov [rdi], al
+    inc rsi
+    inc rdi
+    dec rcx
+    jmp .env_copy
+.env_copy_done:
+    mov byte [rdi], 0
+    pop rax
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop rbp
+    ret
+
+.env_next:
+    add r14, 8
+    jmp .env_loop
+
+.env_not_found:
+    xor rax, rax             ; return 0 (empty/null)
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop rbp
+    ret
+
+; ============================================================
+; rt_system — Execute shell command
+; rdi = command string ptr
+; Returns exit code in rax
+; ============================================================
+global rt_system
+rt_system:
+    push rbp
+    mov rbp, rsp
+    push r12
+
+    mov r12, rdi             ; save command
+
+    ; fork()
+    mov rax, 57              ; sys_fork
+    syscall
+    test rax, rax
+    jz .system_child
+    ; Parent: wait for child
+    push rax                 ; save child pid
+    ; wait4(pid, &status, 0, NULL)
+    mov rdi, rax             ; pid
+    lea rsi, [rbp - 24]     ; &status (use stack space)
+    xor rdx, rdx             ; options = 0
+    xor r10, r10             ; rusage = NULL
+    mov rax, 61              ; sys_wait4
+    syscall
+    ; Get exit status: WEXITSTATUS = (status >> 8) & 0xff
+    mov eax, [rbp - 24]
+    shr eax, 8
+    and eax, 0xff
+    movzx rax, al
+    pop rcx                  ; discard child pid
+    pop r12
+    pop rbp
+    ret
+
+.system_child:
+    ; execve("/bin/sh", ["/bin/sh", "-c", cmd, NULL], envp)
+    ; Build argv on stack
+    sub rsp, 32
+    lea rax, [rel .sh_path]
+    mov [rsp], rax           ; argv[0] = "/bin/sh"
+    lea rax, [rel .sh_c_flag]
+    mov [rsp + 8], rax       ; argv[1] = "-c"
+    mov [rsp + 16], r12      ; argv[2] = command
+    mov qword [rsp + 24], 0  ; argv[3] = NULL
+    ; execve
+    lea rdi, [rel .sh_path]  ; filename
+    mov rsi, rsp             ; argv
+    ; Get envp from saved_rsp
+    mov rdx, [saved_rsp]
+    mov rax, [rdx]           ; argc
+    lea rdx, [rdx + 8 + rax * 8 + 8] ; envp
+    mov rax, 59              ; sys_execve
+    syscall
+    ; If exec fails, exit child
+    mov rax, 60
+    mov rdi, 127
+    syscall
+
+section .rodata
+.sh_path:   db "/bin/sh", 0
+.sh_c_flag: db "-c", 0
+
+section .text
 
 ; ============================================================
 ; rt_exit — Exit with code in rdi

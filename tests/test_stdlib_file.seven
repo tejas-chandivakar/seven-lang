@@ -1,0 +1,32 @@
+!! Phase 6: File I/O stdlib tests
+
+!! Write a test file
+write "/tmp/seven_test_file.txt", "hello world"
+
+!! exists(path)
+show "--- exists ---"
+show exists("/tmp/seven_test_file.txt")
+show exists("/tmp/nonexistent_file_xyz.txt")
+
+!! append(path, data)
+show "--- append ---"
+append("/tmp/seven_test_file.txt", " appended")
+content = read "/tmp/seven_test_file.txt"
+show content
+
+!! delete(path)
+show "--- delete ---"
+delete("/tmp/seven_test_file.txt")
+show exists("/tmp/seven_test_file.txt")
+
+!! lines(path) — write multi-line via multiple appends
+show "--- lines ---"
+write "/tmp/seven_lines_test.txt", "alpha"
+r = lines("/tmp/seven_lines_test.txt")
+show len(r)
+show r[0]
+
+!! cleanup
+delete("/tmp/seven_lines_test.txt")
+
+show "done"

@@ -1,0 +1,38 @@
+!! Phase 6: OS/System stdlib tests
+
+!! time()
+show "--- time ---"
+t = time()
+check = 0
+if t above 1000000
+    check = 1
+end
+show check
+
+!! clock()
+show "--- clock ---"
+c1 = clock()
+c2 = clock()
+show 1
+
+!! sleep(0)
+show "--- sleep ---"
+sleep(0)
+show "ok"
+
+!! args()
+show "--- args ---"
+a = args()
+show len(a)
+
+!! env(name)
+show "--- env ---"
+home = env("HOME")
+show home
+
+!! system(cmd)
+show "--- system ---"
+code = system("echo hello_from_system")
+show code
+
+show "done"

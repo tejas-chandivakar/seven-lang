@@ -100,12 +100,25 @@ section .data
                     db "extern rt_file_write_str, rt_file_read_str", 10
                     db "extern rt_subscript, rt_str_char_at", 10
                     db "extern rt_ord, rt_chr, rt_substr", 10
-                    db "extern rt_exit", 10, 10, 0
+                    db "extern rt_exit", 10
+                    db "extern rt_str_count, rt_str_pad", 10
+                    db "extern rt_pow, rt_clamp, rt_sign, rt_gcd", 10
+                    db "extern rt_arr_sum, rt_arr_avg", 10
+                    db "extern rt_find", 10
+                    db "extern rt_arr_find, rt_arr_fill, rt_arr_concat", 10
+                    db "extern rt_arr_unique, rt_arr_insert, rt_arr_remove", 10
+                    db "extern rt_hex, rt_bin, rt_bool", 10
+                    db "extern rt_file_exists, rt_file_delete", 10
+                    db "extern rt_file_append, rt_file_lines", 10
+                    db "extern rt_time, rt_clock, rt_sleep", 10
+                    db "extern rt_args, rt_env, rt_system", 10
+                    db "extern saved_rsp", 10, 10, 0
     frag_sect_data  db "section .data", 10, 0
     frag_sect_bss   db 10, "section .bss", 10, 0
     frag_sect_text  db 10, "section .text", 10
                     db "    global _start", 10, 10, 0
     frag_start      db "_start:", 10
+                    db "    mov [saved_rsp], rsp", 10
                     db "    call rt_init", 10, 0
     frag_exit       db 10, "    ; exit(0)", 10
                     db "    mov rax, 60", 10
@@ -357,6 +370,36 @@ section .data
     frag_cmp_rax_thr db "    cmp rax, 0x400000", 10, 0
     frag_cmp_rbx_thr db "    cmp rbx, 0x400000", 10, 0
     frag_call_str_concat db "    call rt_str_concat", 10, 0
+
+    ; Phase 6 stdlib call fragments
+    frag_call_str_count db "    call rt_str_count", 10, 0
+    frag_call_str_pad   db "    call rt_str_pad", 10, 0
+    frag_call_pow       db "    call rt_pow", 10, 0
+    frag_call_clamp     db "    call rt_clamp", 10, 0
+    frag_call_sign      db "    call rt_sign", 10, 0
+    frag_call_gcd       db "    call rt_gcd", 10, 0
+    frag_call_arr_sum   db "    call rt_arr_sum", 10, 0
+    frag_call_arr_avg   db "    call rt_arr_avg", 10, 0
+    frag_call_find      db "    call rt_find", 10, 0
+    frag_call_arr_find  db "    call rt_arr_find", 10, 0
+    frag_call_arr_fill  db "    call rt_arr_fill", 10, 0
+    frag_call_arr_concat db "    call rt_arr_concat", 10, 0
+    frag_call_arr_unique db "    call rt_arr_unique", 10, 0
+    frag_call_arr_insert db "    call rt_arr_insert", 10, 0
+    frag_call_arr_remove db "    call rt_arr_remove", 10, 0
+    frag_call_hex       db "    call rt_hex", 10, 0
+    frag_call_bin       db "    call rt_bin", 10, 0
+    frag_call_bool      db "    call rt_bool", 10, 0
+    frag_call_file_exists db "    call rt_file_exists", 10, 0
+    frag_call_file_delete db "    call rt_file_delete", 10, 0
+    frag_call_file_append db "    call rt_file_append", 10, 0
+    frag_call_file_lines db "    call rt_file_lines", 10, 0
+    frag_call_time   db "    call rt_time", 10, 0
+    frag_call_clock  db "    call rt_clock", 10, 0
+    frag_call_sleep  db "    call rt_sleep", 10, 0
+    frag_call_args   db "    call rt_args", 10, 0
+    frag_call_env    db "    call rt_env", 10, 0
+    frag_call_system db "    call rt_system", 10, 0
 
     ; Function argument register names (SysV AMD64 ABI order)
     frag_reg_rdi    db "rdi", 0
@@ -2841,6 +2884,101 @@ codegen_stmt:
 
     ; Function call as statement
     call cg_advance          ; consume '('
+
+    ; Check for builtins that are commonly used as statements
+    mov rsi, r12             ; name ptr
+    mov ecx, r13d            ; name len
+
+    ; Check "append" (6 chars)
+    cmp ecx, 6
+    jne .stmt_not_append
+    cmp byte [rsi], 'a'
+    jne .stmt_not_append
+    cmp byte [rsi+1], 'p'
+    jne .stmt_not_append
+    cmp byte [rsi+2], 'p'
+    jne .stmt_not_append
+    ; Match — dispatch as builtin
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_file_append
+    call out_str
+    pop rbp
+    ret
+.stmt_not_append:
+
+    ; Check "delete" (6 chars)
+    cmp ecx, 6
+    jne .stmt_not_delete
+    cmp byte [rsi], 'd'
+    jne .stmt_not_delete
+    cmp byte [rsi+1], 'e'
+    jne .stmt_not_delete
+    cmp byte [rsi+2], 'l'
+    jne .stmt_not_delete
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_file_delete
+    call out_str
+    pop rbp
+    ret
+.stmt_not_delete:
+
+    ; Check "push" (4 chars) — already handled elsewhere but just in case
+    ; Check "exit" (4 chars)
+    cmp ecx, 4
+    jne .stmt_not_exit
+    cmp byte [rsi], 'e'
+    jne .stmt_not_exit
+    cmp byte [rsi+1], 'x'
+    jne .stmt_not_exit
+    cmp byte [rsi+2], 'i'
+    jne .stmt_not_exit
+    cmp byte [rsi+3], 't'
+    jne .stmt_not_exit
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_exit
+    call out_str
+    pop rbp
+    ret
+.stmt_not_exit:
+
+    ; Check "sleep" (5 chars)
+    cmp ecx, 5
+    jne .stmt_not_sleep
+    cmp byte [rsi], 's'
+    jne .stmt_not_sleep
+    cmp byte [rsi+1], 'l'
+    jne .stmt_not_sleep
+    cmp byte [rsi+2], 'e'
+    jne .stmt_not_sleep
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_sleep
+    call out_str
+    pop rbp
+    ret
+.stmt_not_sleep:
+
+    ; Check "system" (6 chars)
+    cmp ecx, 6
+    jne .stmt_not_system
+    cmp byte [rsi], 's'
+    jne .stmt_not_system
+    cmp byte [rsi+1], 'y'
+    jne .stmt_not_system
+    cmp byte [rsi+2], 's'
+    jne .stmt_not_system
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_system
+    call out_str
+    pop rbp
+    ret
+.stmt_not_system:
+
+    ; Generic user function call
     xor r14, r14             ; arg count
     call codegen_call_args   ; eval args, pop into regs
 
@@ -4047,6 +4185,426 @@ cg_expr_primary:
     jmp .builtin_exit
 .not_builtin_exit:
 
+    ; --- Phase 6: Standard Library builtins ---
+
+    ; Check "replace"
+    cmp ecx, 7
+    jne .not_builtin_replace
+    cmp byte [rsi], 'r'
+    jne .not_builtin_replace
+    cmp byte [rsi+1], 'e'
+    jne .not_builtin_replace
+    cmp byte [rsi+2], 'p'
+    jne .not_builtin_replace
+    jmp .builtin_replace
+.not_builtin_replace:
+
+    ; Check "upper"
+    cmp ecx, 5
+    jne .not_builtin_upper
+    cmp byte [rsi], 'u'
+    jne .not_builtin_upper
+    cmp byte [rsi+1], 'p'
+    jne .not_builtin_upper
+    cmp byte [rsi+2], 'p'
+    jne .not_builtin_upper
+    jmp .builtin_upper
+.not_builtin_upper:
+
+    ; Check "lower"
+    cmp ecx, 5
+    jne .not_builtin_lower
+    cmp byte [rsi], 'l'
+    jne .not_builtin_lower
+    cmp byte [rsi+1], 'o'
+    jne .not_builtin_lower
+    cmp byte [rsi+2], 'w'
+    jne .not_builtin_lower
+    jmp .builtin_lower
+.not_builtin_lower:
+
+    ; Check "trim"
+    cmp ecx, 4
+    jne .not_builtin_trim
+    cmp byte [rsi], 't'
+    jne .not_builtin_trim
+    cmp byte [rsi+1], 'r'
+    jne .not_builtin_trim
+    cmp byte [rsi+2], 'i'
+    jne .not_builtin_trim
+    cmp byte [rsi+3], 'm'
+    jne .not_builtin_trim
+    jmp .builtin_trim
+.not_builtin_trim:
+
+    ; Check "find"
+    cmp ecx, 4
+    jne .not_builtin_find
+    cmp byte [rsi], 'f'
+    jne .not_builtin_find
+    cmp byte [rsi+1], 'i'
+    jne .not_builtin_find
+    cmp byte [rsi+2], 'n'
+    jne .not_builtin_find
+    cmp byte [rsi+3], 'd'
+    jne .not_builtin_find
+    jmp .builtin_find
+.not_builtin_find:
+
+    ; Check "count"
+    cmp ecx, 5
+    jne .not_builtin_count
+    cmp byte [rsi], 'c'
+    jne .not_builtin_count
+    cmp byte [rsi+1], 'o'
+    jne .not_builtin_count
+    cmp byte [rsi+2], 'u'
+    jne .not_builtin_count
+    jmp .builtin_count
+.not_builtin_count:
+
+    ; Check "pad"
+    cmp ecx, 3
+    jne .not_builtin_pad
+    cmp byte [rsi], 'p'
+    jne .not_builtin_pad
+    cmp byte [rsi+1], 'a'
+    jne .not_builtin_pad
+    cmp byte [rsi+2], 'd'
+    jne .not_builtin_pad
+    jmp .builtin_pad
+.not_builtin_pad:
+
+    ; Check "pow"
+    cmp ecx, 3
+    jne .not_builtin_pow
+    cmp byte [rsi], 'p'
+    jne .not_builtin_pow
+    cmp byte [rsi+1], 'o'
+    jne .not_builtin_pow
+    cmp byte [rsi+2], 'w'
+    jne .not_builtin_pow
+    jmp .builtin_pow
+.not_builtin_pow:
+
+    ; Check "clamp"
+    cmp ecx, 5
+    jne .not_builtin_clamp
+    cmp byte [rsi], 'c'
+    jne .not_builtin_clamp
+    cmp byte [rsi+1], 'l'
+    jne .not_builtin_clamp
+    cmp byte [rsi+2], 'a'
+    jne .not_builtin_clamp
+    jmp .builtin_clamp
+.not_builtin_clamp:
+
+    ; Check "sign"
+    cmp ecx, 4
+    jne .not_builtin_sign
+    cmp byte [rsi], 's'
+    jne .not_builtin_sign
+    cmp byte [rsi+1], 'i'
+    jne .not_builtin_sign
+    cmp byte [rsi+2], 'g'
+    jne .not_builtin_sign
+    cmp byte [rsi+3], 'n'
+    jne .not_builtin_sign
+    jmp .builtin_sign
+.not_builtin_sign:
+
+    ; Check "gcd"
+    cmp ecx, 3
+    jne .not_builtin_gcd
+    cmp byte [rsi], 'g'
+    jne .not_builtin_gcd
+    cmp byte [rsi+1], 'c'
+    jne .not_builtin_gcd
+    cmp byte [rsi+2], 'd'
+    jne .not_builtin_gcd
+    jmp .builtin_gcd
+.not_builtin_gcd:
+
+    ; Check "sum"
+    cmp ecx, 3
+    jne .not_builtin_sum
+    cmp byte [rsi], 's'
+    jne .not_builtin_sum
+    cmp byte [rsi+1], 'u'
+    jne .not_builtin_sum
+    cmp byte [rsi+2], 'm'
+    jne .not_builtin_sum
+    jmp .builtin_sum
+.not_builtin_sum:
+
+    ; Check "avg"
+    cmp ecx, 3
+    jne .not_builtin_avg
+    cmp byte [rsi], 'a'
+    jne .not_builtin_avg
+    cmp byte [rsi+1], 'v'
+    jne .not_builtin_avg
+    cmp byte [rsi+2], 'g'
+    jne .not_builtin_avg
+    jmp .builtin_avg
+.not_builtin_avg:
+
+    ; Check "fill"
+    cmp ecx, 4
+    jne .not_builtin_fill
+    cmp byte [rsi], 'f'
+    jne .not_builtin_fill
+    cmp byte [rsi+1], 'i'
+    jne .not_builtin_fill
+    cmp byte [rsi+2], 'l'
+    jne .not_builtin_fill
+    cmp byte [rsi+3], 'l'
+    jne .not_builtin_fill
+    jmp .builtin_fill
+.not_builtin_fill:
+
+    ; Check "concat"
+    cmp ecx, 6
+    jne .not_builtin_concat
+    cmp byte [rsi], 'c'
+    jne .not_builtin_concat
+    cmp byte [rsi+1], 'o'
+    jne .not_builtin_concat
+    cmp byte [rsi+2], 'n'
+    jne .not_builtin_concat
+    cmp byte [rsi+3], 'c'
+    jne .not_builtin_concat
+    jmp .builtin_concat
+.not_builtin_concat:
+
+    ; Check "unique"
+    cmp ecx, 6
+    jne .not_builtin_unique
+    cmp byte [rsi], 'u'
+    jne .not_builtin_unique
+    cmp byte [rsi+1], 'n'
+    jne .not_builtin_unique
+    cmp byte [rsi+2], 'i'
+    jne .not_builtin_unique
+    jmp .builtin_unique
+.not_builtin_unique:
+
+    ; Check "insert"
+    cmp ecx, 6
+    jne .not_builtin_insert
+    cmp byte [rsi], 'i'
+    jne .not_builtin_insert
+    cmp byte [rsi+1], 'n'
+    jne .not_builtin_insert
+    cmp byte [rsi+2], 's'
+    jne .not_builtin_insert
+    jmp .builtin_insert
+.not_builtin_insert:
+
+    ; Check "remove"
+    cmp ecx, 6
+    jne .not_builtin_remove
+    cmp byte [rsi], 'r'
+    jne .not_builtin_remove
+    cmp byte [rsi+1], 'e'
+    jne .not_builtin_remove
+    cmp byte [rsi+2], 'm'
+    jne .not_builtin_remove
+    jmp .builtin_remove
+.not_builtin_remove:
+
+    ; Check "hex"
+    cmp ecx, 3
+    jne .not_builtin_hex
+    cmp byte [rsi], 'h'
+    jne .not_builtin_hex
+    cmp byte [rsi+1], 'e'
+    jne .not_builtin_hex
+    cmp byte [rsi+2], 'x'
+    jne .not_builtin_hex
+    jmp .builtin_hex
+.not_builtin_hex:
+
+    ; Check "bin"
+    cmp ecx, 3
+    jne .not_builtin_bin
+    cmp byte [rsi], 'b'
+    jne .not_builtin_bin
+    cmp byte [rsi+1], 'i'
+    jne .not_builtin_bin
+    cmp byte [rsi+2], 'n'
+    jne .not_builtin_bin
+    jmp .builtin_bin
+.not_builtin_bin:
+
+    ; Check "bool"
+    cmp ecx, 4
+    jne .not_builtin_bool
+    cmp byte [rsi], 'b'
+    jne .not_builtin_bool
+    cmp byte [rsi+1], 'o'
+    jne .not_builtin_bool
+    cmp byte [rsi+2], 'o'
+    jne .not_builtin_bool
+    cmp byte [rsi+3], 'l'
+    jne .not_builtin_bool
+    jmp .builtin_bool
+.not_builtin_bool:
+
+    ; Check "number" (alias for int)
+    cmp ecx, 6
+    jne .not_builtin_number
+    cmp byte [rsi], 'n'
+    jne .not_builtin_number
+    cmp byte [rsi+1], 'u'
+    jne .not_builtin_number
+    cmp byte [rsi+2], 'm'
+    jne .not_builtin_number
+    jmp .builtin_number
+.not_builtin_number:
+
+    ; Check "exists"
+    cmp ecx, 6
+    jne .not_builtin_exists
+    cmp byte [rsi], 'e'
+    jne .not_builtin_exists
+    cmp byte [rsi+1], 'x'
+    jne .not_builtin_exists
+    cmp byte [rsi+2], 'i'
+    jne .not_builtin_exists
+    cmp byte [rsi+3], 's'
+    jne .not_builtin_exists
+    jmp .builtin_exists
+.not_builtin_exists:
+
+    ; Check "delete"
+    cmp ecx, 6
+    jne .not_builtin_delete
+    cmp byte [rsi], 'd'
+    jne .not_builtin_delete
+    cmp byte [rsi+1], 'e'
+    jne .not_builtin_delete
+    cmp byte [rsi+2], 'l'
+    jne .not_builtin_delete
+    jmp .builtin_delete
+.not_builtin_delete:
+
+    ; Check "append"
+    cmp ecx, 6
+    jne .not_builtin_append
+    cmp byte [rsi], 'a'
+    jne .not_builtin_append
+    cmp byte [rsi+1], 'p'
+    jne .not_builtin_append
+    cmp byte [rsi+2], 'p'
+    jne .not_builtin_append
+    jmp .builtin_append
+.not_builtin_append:
+
+    ; Check "lines"
+    cmp ecx, 5
+    jne .not_builtin_lines
+    cmp byte [rsi], 'l'
+    jne .not_builtin_lines
+    cmp byte [rsi+1], 'i'
+    jne .not_builtin_lines
+    cmp byte [rsi+2], 'n'
+    jne .not_builtin_lines
+    cmp byte [rsi+3], 'e'
+    jne .not_builtin_lines
+    jmp .builtin_lines
+.not_builtin_lines:
+
+    ; Check "time" (4 chars)
+    cmp ecx, 4
+    jne .not_builtin_time
+    cmp byte [rsi], 't'
+    jne .not_builtin_time
+    cmp byte [rsi+1], 'i'
+    jne .not_builtin_time
+    cmp byte [rsi+2], 'm'
+    jne .not_builtin_time
+    cmp byte [rsi+3], 'e'
+    jne .not_builtin_time
+    jmp .builtin_time
+.not_builtin_time:
+
+    ; Check "clock" (5 chars)
+    cmp ecx, 5
+    jne .not_builtin_clock
+    cmp byte [rsi], 'c'
+    jne .not_builtin_clock
+    cmp byte [rsi+1], 'l'
+    jne .not_builtin_clock
+    cmp byte [rsi+2], 'o'
+    jne .not_builtin_clock
+    cmp byte [rsi+3], 'c'
+    jne .not_builtin_clock
+    cmp byte [rsi+4], 'k'
+    jne .not_builtin_clock
+    jmp .builtin_clock
+.not_builtin_clock:
+
+    ; Check "sleep" (5 chars)
+    cmp ecx, 5
+    jne .not_builtin_sleep
+    cmp byte [rsi], 's'
+    jne .not_builtin_sleep
+    cmp byte [rsi+1], 'l'
+    jne .not_builtin_sleep
+    cmp byte [rsi+2], 'e'
+    jne .not_builtin_sleep
+    cmp byte [rsi+3], 'e'
+    jne .not_builtin_sleep
+    cmp byte [rsi+4], 'p'
+    jne .not_builtin_sleep
+    jmp .builtin_sleep
+.not_builtin_sleep:
+
+    ; Check "args" (4 chars)
+    cmp ecx, 4
+    jne .not_builtin_args
+    cmp byte [rsi], 'a'
+    jne .not_builtin_args
+    cmp byte [rsi+1], 'r'
+    jne .not_builtin_args
+    cmp byte [rsi+2], 'g'
+    jne .not_builtin_args
+    cmp byte [rsi+3], 's'
+    jne .not_builtin_args
+    jmp .builtin_args
+.not_builtin_args:
+
+    ; Check "env" (3 chars)
+    cmp ecx, 3
+    jne .not_builtin_env
+    cmp byte [rsi], 'e'
+    jne .not_builtin_env
+    cmp byte [rsi+1], 'n'
+    jne .not_builtin_env
+    cmp byte [rsi+2], 'v'
+    jne .not_builtin_env
+    jmp .builtin_env
+.not_builtin_env:
+
+    ; Check "system" (6 chars)
+    cmp ecx, 6
+    jne .not_builtin_system
+    cmp byte [rsi], 's'
+    jne .not_builtin_system
+    cmp byte [rsi+1], 'y'
+    jne .not_builtin_system
+    cmp byte [rsi+2], 's'
+    jne .not_builtin_system
+    cmp byte [rsi+3], 't'
+    jne .not_builtin_system
+    cmp byte [rsi+4], 'e'
+    jne .not_builtin_system
+    cmp byte [rsi+5], 'm'
+    jne .not_builtin_system
+    jmp .builtin_system
+.not_builtin_system:
+
     ; Generic user function call
     xor r14, r14
     call codegen_call_args   ; eval args, pop into regs
@@ -4297,6 +4855,392 @@ cg_expr_primary:
     xor r14, r14
     call codegen_call_args
     mov rdi, frag_call_exit
+    call out_str
+    pop rsi
+    pop rcx
+    ret
+
+; ---- Phase 6: Standard Library builtins ----
+
+; ---- Built-in: replace(str, old, new) ----
+.builtin_replace:
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_replace
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    pop rsi
+    pop rcx
+    ret
+
+; ---- Built-in: upper(str) ----
+.builtin_upper:
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_upper
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    pop rsi
+    pop rcx
+    ret
+
+; ---- Built-in: lower(str) ----
+.builtin_lower:
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_lower
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    pop rsi
+    pop rcx
+    ret
+
+; ---- Built-in: trim(str) ----
+.builtin_trim:
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_trim
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    pop rsi
+    pop rcx
+    ret
+
+; ---- Built-in: find(str_or_arr, sub_or_val) — generic find ----
+.builtin_find:
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_find
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    pop rsi
+    pop rcx
+    ret
+
+; ---- Built-in: count(str, sub) — count occurrences ----
+.builtin_count:
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_str_count
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    pop rsi
+    pop rcx
+    ret
+
+; ---- Built-in: pad(str, width, char) — left-pad string ----
+.builtin_pad:
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_str_pad
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    pop rsi
+    pop rcx
+    ret
+
+; ---- Built-in: pow(base, exp) ----
+.builtin_pow:
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_pow
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    pop rsi
+    pop rcx
+    ret
+
+; ---- Built-in: clamp(val, lo, hi) ----
+.builtin_clamp:
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_clamp
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    pop rsi
+    pop rcx
+    ret
+
+; ---- Built-in: sign(n) ----
+.builtin_sign:
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_sign
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    pop rsi
+    pop rcx
+    ret
+
+; ---- Built-in: gcd(a, b) ----
+.builtin_gcd:
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_gcd
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    pop rsi
+    pop rcx
+    ret
+
+; ---- Built-in: sum(arr) ----
+.builtin_sum:
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_arr_sum
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    pop rsi
+    pop rcx
+    ret
+
+; ---- Built-in: avg(arr) ----
+.builtin_avg:
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_arr_avg
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    pop rsi
+    pop rcx
+    ret
+
+; ---- Built-in: fill(n, val) ----
+.builtin_fill:
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_arr_fill
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    pop rsi
+    pop rcx
+    ret
+
+; ---- Built-in: concat(arr1, arr2) ----
+.builtin_concat:
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_arr_concat
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    pop rsi
+    pop rcx
+    ret
+
+; ---- Built-in: unique(arr) ----
+.builtin_unique:
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_arr_unique
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    pop rsi
+    pop rcx
+    ret
+
+; ---- Built-in: insert(arr, idx, val) ----
+.builtin_insert:
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_arr_insert
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    pop rsi
+    pop rcx
+    ret
+
+; ---- Built-in: remove(arr, idx) ----
+.builtin_remove:
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_arr_remove
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    pop rsi
+    pop rcx
+    ret
+
+; ---- Built-in: hex(n) — integer to hex string ----
+.builtin_hex:
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_hex
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    pop rsi
+    pop rcx
+    ret
+
+; ---- Built-in: bin(n) — integer to binary string ----
+.builtin_bin:
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_bin
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    pop rsi
+    pop rcx
+    ret
+
+; ---- Built-in: bool(val) — convert to boolean ----
+.builtin_bool:
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_bool
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    pop rsi
+    pop rcx
+    ret
+
+; ---- Built-in: number(str) — alias for int() ----
+.builtin_number:
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_str2int
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    pop rsi
+    pop rcx
+    ret
+
+; ---- Built-in: exists(path) — check if file exists ----
+.builtin_exists:
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_file_exists
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    pop rsi
+    pop rcx
+    ret
+
+; ---- Built-in: delete(path) — delete file ----
+.builtin_delete:
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_file_delete
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    pop rsi
+    pop rcx
+    ret
+
+; ---- Built-in: append(path, data) — append to file ----
+.builtin_append:
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_file_append
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    pop rsi
+    pop rcx
+    ret
+
+; ---- Built-in: lines(path) — read file as array of lines ----
+.builtin_lines:
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_file_lines
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    pop rsi
+    pop rcx
+    ret
+
+; ---- Built-in: time() — current unix timestamp ----
+.builtin_time:
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_time
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    pop rsi
+    pop rcx
+    ret
+
+; ---- Built-in: clock() — monotonic nanoseconds ----
+.builtin_clock:
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_clock
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    pop rsi
+    pop rcx
+    ret
+
+; ---- Built-in: sleep(seconds) ----
+.builtin_sleep:
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_sleep
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    pop rsi
+    pop rcx
+    ret
+
+; ---- Built-in: args() — command line arguments as array ----
+.builtin_args:
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_args
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    pop rsi
+    pop rcx
+    ret
+
+; ---- Built-in: env(name) — get environment variable ----
+.builtin_env:
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_env
+    call out_str
+    mov rdi, frag_push_rax
+    call out_str
+    pop rsi
+    pop rcx
+    ret
+
+; ---- Built-in: system(cmd) — execute shell command ----
+.builtin_system:
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_system
+    call out_str
+    mov rdi, frag_push_rax
     call out_str
     pop rsi
     pop rcx

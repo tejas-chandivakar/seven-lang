@@ -1,0 +1,117 @@
+#!/bin/bash
+# ============================================================
+# SEVEN Language — Code Formatter
+# Usage: seven-fmt <file.seven> [--check] [--indent N]
+# ============================================================
+
+set -e
+
+INDENT_SIZE=4
+CHECK_ONLY=false
+FILES=()
+
+# Parse args
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --check) CHECK_ONLY=true ;;
+        --indent) shift; INDENT_SIZE="$1" ;;
+        --help|-h)
+            echo "Usage: seven-fmt <file.seven> [options]"
+            echo ""
+            echo "Options:"
+            echo "  --check       Only check, don't modify (exit 1 if changes needed)"
+            echo "  --indent N    Set indent size (default: 4)"
+            echo "  --help        Show this help"
+            exit 0
+            ;;
+        *) FILES+=("$1") ;;
+    esac
+    shift
+done
+
+if [ ${#FILES[@]} -eq 0 ]; then
+    echo "Error: no input file"
+    echo "Usage: seven-fmt <file.seven> [--check]"
+    exit 1
+fi
+
+format_file() {
+    local file="$1"
+    local depth=0
+    local formatted=""
+    local changed=false
+
+    while IFS= read -r line || [ -n "$line" ]; do
+        # Strip leading/trailing whitespace
+        local trimmed="${line#"${line%%[![:space:]]*}"}"
+        trimmed="${trimmed%"${trimmed##*[![:space:]]}"}"
+
+        # Empty line or comment-only — preserve
+        if [ -z "$trimmed" ]; then
+            formatted+=$'\n'
+            continue
+        fi
+
+        # Check if this line closes a block (dedent before printing)
+        local first_word="${trimmed%% *}"
+        case "$first_word" in
+            end|done|else|elif|catch)
+                depth=$((depth - 1))
+                if [ $depth -lt 0 ]; then depth=0; fi
+                ;;
+        esac
+
+        # Build indented line
+        local indent=""
+        local i=0
+        while [ $i -lt $((depth * INDENT_SIZE)) ]; do
+            indent+=" "
+            i=$((i + 1))
+        done
+        local new_line="${indent}${trimmed}"
+        formatted+="${new_line}"$'\n'
+
+        # Check if original differs
+        if [ "$line" != "$new_line" ]; then
+            changed=true
+        fi
+
+        # Check if this line opens a block (indent after printing)
+        case "$first_word" in
+            if|while|each|func|repeat|try|else|elif|catch)
+                depth=$((depth + 1))
+                ;;
+        esac
+    done < "$file"
+
+    if [ "$CHECK_ONLY" = true ]; then
+        if [ "$changed" = true ]; then
+            echo "Would reformat: $file"
+            # Show diff
+            diff --color=auto <(cat "$file") <(echo -n "$formatted") || true
+            return 1
+        else
+            echo "Already formatted: $file"
+            return 0
+        fi
+    else
+        if [ "$changed" = true ]; then
+            echo -n "$formatted" > "$file"
+            echo "Formatted: $file"
+        else
+            echo "Already formatted: $file"
+        fi
+    fi
+}
+
+EXIT_CODE=0
+for file in "${FILES[@]}"; do
+    if [ ! -f "$file" ]; then
+        echo "Error: file not found: $file"
+        EXIT_CODE=1
+        continue
+    fi
+    format_file "$file" || EXIT_CODE=1
+done
+
+exit $EXIT_CODE

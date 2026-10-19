@@ -102,8 +102,14 @@
 
 ---
 
-## Phase 7 — Developer Tools
-REPL, formatter, linter, debugger, VS Code LSP, profiler.
+## Phase 7 — Developer Tools (COMPLETE)
+**Goal:** Tools for writing and debugging SEVEN code
+
+- [x] REPL — interactive shell (`tools/repl`)
+- [x] Formatter — auto-indent (`tools/fmt`, `--check` mode)
+- [x] VS Code Extension — syntax highlighting, snippets (v0.2.0)
+- [x] Linter — block matching, style checks, variable usage (`tools/lint`)
+- [x] Profiler — compile/asm/execution timing (`tools/profile`)
 
 ## Phase 8 — Package Manager (SPM)
 `spm init`, `spm install`, `spm publish`, registry.

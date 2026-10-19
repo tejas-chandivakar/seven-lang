@@ -1,8 +1,8 @@
 # SEVEN Language Specification
 
-**Version:** 0.6 (Phase 6 — Standard Library)
+**Version:** 0.7 (Phase 7 — Developer Tools)
 **Author:** Tejas Chandivakar
-**Status:** Phase 6 complete — Standard Library
+**Status:** Phase 7 complete — Developer Tools
 
 ---
 
@@ -355,7 +355,17 @@ Called on string values with dot syntax: `s.upper()`, `s.lower()`, etc.
 - **Values are 64-bit integers** — strings and arrays are heap pointers.
 - **String/int detection** uses magnitude heuristic (> 0x400000 = string pointer).
 
-## 9. Reserved for Later Phases
+## 9. Developer Tools
+
+| Tool | Command | Description |
+|------|---------|-------------|
+| REPL | `tools/repl` | Interactive shell with history, `.help`, `.clear`, `.undo` |
+| Formatter | `tools/fmt file.seven` | Auto-indent (4 spaces default), `--check` mode |
+| Linter | `tools/lint file.seven` | Block matching, style checks, unused variables |
+| Profiler | `tools/profile file.seven [N]` | Compile/asm/execution timing over N runs |
+| VS Code | `editor/vscode/` | Syntax highlighting, snippets (v0.2.0) |
+
+## 10. Reserved for Later Phases
 
 - Async, generators, channels, mutex
 - Decorators, operator overloading, comptime

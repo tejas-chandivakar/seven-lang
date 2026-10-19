@@ -1,0 +1,234 @@
+#!/bin/bash
+# ============================================================
+# SEVEN Language — Interactive REPL
+# Accumulates statements, recompiles and runs each time
+# ============================================================
+
+SEVEN_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+SEVEN="$SEVEN_DIR/build/seven"
+RUNTIME_OBJ="$SEVEN_DIR/build/runtime.o"
+TMPDIR="/tmp/seven_repl_$$"
+
+mkdir -p "$TMPDIR"
+trap 'rm -rf "$TMPDIR"' EXIT
+
+PROGRAM_FILE="$TMPDIR/repl.seven"
+ASM_FILE="$TMPDIR/repl.asm"
+OBJ_FILE="$TMPDIR/repl.o"
+BIN_FILE="$TMPDIR/repl"
+PREV_OUTPUT="$TMPDIR/prev_output"
+CURR_OUTPUT="$TMPDIR/curr_output"
+
+# Initialize
+> "$PROGRAM_FILE"
+> "$PREV_OUTPUT"
+
+LINES=()
+LINE_NUM=0
+
+# Colors
+BOLD='\033[1m'
+CYAN='\033[36m'
+GREEN='\033[32m'
+RED='\033[31m'
+YELLOW='\033[33m'
+DIM='\033[2m'
+RESET='\033[0m'
+
+echo -e "${BOLD}SEVEN Language REPL v0.1${RESET}"
+echo -e "${DIM}Type SEVEN code. Commands: .help .clear .show .exit${RESET}"
+echo ""
+
+compile_and_run() {
+    # Write accumulated program
+    > "$PROGRAM_FILE"
+    for line in "${LINES[@]}"; do
+        echo "$line" >> "$PROGRAM_FILE"
+    done
+
+    # Compile
+    cd "$TMPDIR"
+    "$SEVEN" build "$PROGRAM_FILE" > /dev/null 2>&1
+    if [ $? -ne 0 ]; then
+        return 1
+    fi
+
+    # Assemble
+    nasm -f elf64 "$ASM_FILE" -o "$OBJ_FILE" 2>/dev/null
+    if [ $? -ne 0 ]; then
+        return 2
+    fi
+
+    # Link
+    ld "$OBJ_FILE" "$RUNTIME_OBJ" -o "$BIN_FILE" 2>/dev/null
+    if [ $? -ne 0 ]; then
+        return 3
+    fi
+
+    # Run and capture output
+    "$BIN_FILE" > "$CURR_OUTPUT" 2>&1
+    return 0
+}
+
+show_new_output() {
+    # Show only new lines compared to previous output
+    local prev_lines=$(wc -l < "$PREV_OUTPUT" 2>/dev/null || echo 0)
+    local curr_lines=$(wc -l < "$CURR_OUTPUT" 2>/dev/null || echo 0)
+
+    if [ "$curr_lines" -gt "$prev_lines" ]; then
+        tail -n +$((prev_lines + 1)) "$CURR_OUTPUT"
+    elif [ "$curr_lines" -eq "$prev_lines" ]; then
+        # Check if last line changed
+        local prev_last=$(tail -1 "$PREV_OUTPUT" 2>/dev/null)
+        local curr_last=$(tail -1 "$CURR_OUTPUT" 2>/dev/null)
+        if [ "$prev_last" != "$curr_last" ] && [ -n "$curr_last" ]; then
+            echo "$curr_last"
+        fi
+    fi
+
+    # Save current as previous
+    cp "$CURR_OUTPUT" "$PREV_OUTPUT"
+}
+
+while true; do
+    LINE_NUM=$((LINE_NUM + 1))
+
+    # Check if inside a block (if/while/each/func/repeat/try)
+    DEPTH=0
+    for line in "${LINES[@]}"; do
+        # Count block openers
+        case "$line" in
+            if\ *|while\ *|each\ *|func\ *|repeat\ *|try*)
+                DEPTH=$((DEPTH + 1))
+                ;;
+        esac
+        # Count block closers
+        case "$line" in
+            end|end\ *|done|done\ *)
+                DEPTH=$((DEPTH - 1))
+                if [ $DEPTH -lt 0 ]; then DEPTH=0; fi
+                ;;
+        esac
+    done
+
+    if [ $DEPTH -gt 0 ]; then
+        PROMPT="$(printf '%*s' $((DEPTH * 2)) '')... "
+    else
+        PROMPT="${GREEN}seven>${RESET} "
+    fi
+
+    echo -en "$PROMPT"
+    read -r INPUT
+    if [ $? -ne 0 ]; then
+        echo ""
+        break
+    fi
+
+    # Skip empty lines
+    [ -z "$INPUT" ] && continue
+
+    # Meta commands
+    case "$INPUT" in
+        .exit|.quit|.q)
+            echo -e "${DIM}Goodbye!${RESET}"
+            break
+            ;;
+        .help)
+            echo -e "${BOLD}REPL Commands:${RESET}"
+            echo "  .help     Show this help"
+            echo "  .clear    Clear all accumulated code"
+            echo "  .show     Show current program"
+            echo "  .undo     Remove last line"
+            echo "  .exit     Exit REPL"
+            echo ""
+            echo -e "${BOLD}SEVEN Examples:${RESET}"
+            echo '  show "hello"'
+            echo '  x = 42'
+            echo '  show x + 10'
+            echo '  nums = [1, 2, 3]'
+            echo '  each nums as n'
+            echo '      show n'
+            echo '  end'
+            continue
+            ;;
+        .clear)
+            LINES=()
+            > "$PREV_OUTPUT"
+            echo -e "${DIM}Cleared.${RESET}"
+            continue
+            ;;
+        .show)
+            if [ ${#LINES[@]} -eq 0 ]; then
+                echo -e "${DIM}(empty)${RESET}"
+            else
+                echo -e "${DIM}--- program ---${RESET}"
+                local_num=1
+                for line in "${LINES[@]}"; do
+                    printf "${DIM}%3d${RESET} %s\n" $local_num "$line"
+                    local_num=$((local_num + 1))
+                done
+                echo -e "${DIM}--- end ---${RESET}"
+            fi
+            continue
+            ;;
+        .undo)
+            if [ ${#LINES[@]} -gt 0 ]; then
+                unset 'LINES[${#LINES[@]}-1]'
+                # Recompile to get correct prev output
+                if [ ${#LINES[@]} -gt 0 ]; then
+                    compile_and_run > /dev/null 2>&1
+                    cp "$CURR_OUTPUT" "$PREV_OUTPUT"
+                else
+                    > "$PREV_OUTPUT"
+                fi
+                echo -e "${DIM}Last line removed.${RESET}"
+            else
+                echo -e "${DIM}Nothing to undo.${RESET}"
+            fi
+            continue
+            ;;
+        .*)
+            echo -e "${RED}Unknown command: $INPUT${RESET}"
+            continue
+            ;;
+    esac
+
+    # Add the line
+    LINES+=("$INPUT")
+
+    # If we're inside a block, don't compile yet
+    DEPTH=0
+    for line in "${LINES[@]}"; do
+        case "$line" in
+            if\ *|while\ *|each\ *|func\ *|repeat\ *|try*)
+                DEPTH=$((DEPTH + 1))
+                ;;
+        esac
+        case "$line" in
+            end|end\ *|done|done\ *)
+                DEPTH=$((DEPTH - 1))
+                if [ $DEPTH -lt 0 ]; then DEPTH=0; fi
+                ;;
+        esac
+    done
+
+    if [ $DEPTH -gt 0 ]; then
+        continue
+    fi
+
+    # Compile and run
+    compile_and_run
+    STATUS=$?
+
+    if [ $STATUS -ne 0 ]; then
+        # Remove the bad line
+        unset 'LINES[${#LINES[@]}-1]'
+        case $STATUS in
+            1) echo -e "${RED}Error: compilation failed${RESET}" ;;
+            2) echo -e "${RED}Error: assembly failed${RESET}" ;;
+            3) echo -e "${RED}Error: link failed${RESET}" ;;
+        esac
+    else
+        show_new_output
+    fi
+done

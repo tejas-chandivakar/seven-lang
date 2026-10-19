@@ -1,0 +1,98 @@
+{
+  "If block": {
+    "prefix": "if",
+    "body": [
+      "if ${1:condition}",
+      "    ${2:body}",
+      "end"
+    ],
+    "description": "If block"
+  },
+  "If-else block": {
+    "prefix": "ifelse",
+    "body": [
+      "if ${1:condition}",
+      "    ${2:then}",
+      "else",
+      "    ${3:else}",
+      "end"
+    ],
+    "description": "If-else block"
+  },
+  "While loop": {
+    "prefix": "while",
+    "body": [
+      "while ${1:condition}",
+      "    ${2:body}",
+      "end"
+    ],
+    "description": "While loop"
+  },
+  "Repeat loop": {
+    "prefix": "repeat",
+    "body": [
+      "repeat ${1:n} times",
+      "    ${2:body}",
+      "end"
+    ],
+    "description": "Repeat N times"
+  },
+  "Each loop": {
+    "prefix": "each",
+    "body": [
+      "each ${1:list} as ${2:item}",
+      "    ${3:body}",
+      "end"
+    ],
+    "description": "Each loop"
+  },
+  "Each with index": {
+    "prefix": "eachi",
+    "body": [
+      "each ${1:list} as ${2:i}, ${3:item}",
+      "    ${4:body}",
+      "end"
+    ],
+    "description": "Each loop with index"
+  },
+  "Function": {
+    "prefix": "func",
+    "body": [
+      "func ${1:name}(${2:params})",
+      "    ${3:body}",
+      "end"
+    ],
+    "description": "Function definition"
+  },
+  "Try-catch": {
+    "prefix": "try",
+    "body": [
+      "try",
+      "    ${1:body}",
+      "catch ${2:e}",
+      "    ${3:handler}",
+      "done"
+    ],
+    "description": "Try-catch block"
+  },
+  "Show": {
+    "prefix": "show",
+    "body": "show ${1:expression}",
+    "description": "Print to stdout"
+  },
+  "Ask input": {
+    "prefix": "ask",
+    "body": "${1:name} = ask \"${2:prompt}: \"",
+    "description": "Ask user for input"
+  },
+  "File write": {
+    "prefix": "write",
+    "body": "write \"${1:path}\", ${2:data}",
+    "description": "Write to file"
+  },
+  "File read": {
+    "prefix": "read",
+    "body": "${1:data} = read \"${2:path}\"",
+    "description": "Read from file"
+  }
+}

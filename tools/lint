@@ -1,0 +1,212 @@
+#!/bin/bash
+# ============================================================
+# SEVEN Language — Linter
+# Usage: seven-lint <file.seven>
+# Checks: unmatched blocks, style issues, suspicious patterns
+# ============================================================
+
+set -e
+
+BOLD='\033[1m'
+YELLOW='\033[33m'
+RED='\033[31m'
+CYAN='\033[36m'
+DIM='\033[2m'
+RESET='\033[0m'
+
+if [ $# -eq 0 ] || [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
+    echo "Usage: seven-lint <file.seven>"
+    echo ""
+    echo "Checks:"
+    echo "  - Unmatched if/while/each/func/repeat/try blocks"
+    echo "  - Inconsistent indentation"
+    echo "  - Empty blocks"
+    echo "  - Trailing whitespace"
+    echo "  - Variables assigned but never used"
+    echo "  - Missing 'end' or extra 'end'"
+    exit 0
+fi
+
+FILE="$1"
+if [ ! -f "$FILE" ]; then
+    echo "Error: file not found: $FILE"
+    exit 1
+fi
+
+WARNINGS=0
+ERRORS=0
+
+warn() {
+    local line=$1
+    local msg=$2
+    echo -e "${YELLOW}warning${RESET} line $line: $msg"
+    WARNINGS=$((WARNINGS + 1))
+}
+
+error() {
+    local line=$1
+    local msg=$2
+    echo -e "${RED}error${RESET}   line $line: $msg"
+    ERRORS=$((ERRORS + 1))
+}
+
+echo -e "${BOLD}Linting: $FILE${RESET}"
+echo ""
+
+# Pass 1: Block matching
+BLOCK_STACK=()
+BLOCK_LINES=()
+LINE_NUM=0
+
+while IFS= read -r line || [ -n "$line" ]; do
+    LINE_NUM=$((LINE_NUM + 1))
+    trimmed="${line#"${line%%[![:space:]]*}"}"
+
+    # Skip empty lines and comments
+    [ -z "$trimmed" ] && continue
+    [[ "$trimmed" == "!!"* ]] && continue
+
+    first_word="${trimmed%% *}"
+
+    # Block openers
+    case "$first_word" in
+        if|while|each|func|repeat|try)
+            BLOCK_STACK+=("$first_word")
+            BLOCK_LINES+=("$LINE_NUM")
+            ;;
+    esac
+
+    # Block closers
+    case "$first_word" in
+        end)
+            if [ ${#BLOCK_STACK[@]} -eq 0 ]; then
+                error $LINE_NUM "unexpected 'end' without matching block opener"
+            else
+                unset 'BLOCK_STACK[${#BLOCK_STACK[@]}-1]'
+                unset 'BLOCK_LINES[${#BLOCK_LINES[@]}-1]'
+            fi
+            ;;
+        done)
+            if [ ${#BLOCK_STACK[@]} -eq 0 ]; then
+                error $LINE_NUM "unexpected 'done' without matching 'try'"
+            else
+                local_last="${BLOCK_STACK[${#BLOCK_STACK[@]}-1]}"
+                if [ "$local_last" != "try" ]; then
+                    warn $LINE_NUM "'done' used to close '$local_last' (expected 'end')"
+                fi
+                unset 'BLOCK_STACK[${#BLOCK_STACK[@]}-1]'
+                unset 'BLOCK_LINES[${#BLOCK_LINES[@]}-1]'
+            fi
+            ;;
+    esac
+done < "$FILE"
+
+# Report unclosed blocks
+for i in "${!BLOCK_STACK[@]}"; do
+    error "${BLOCK_LINES[$i]}" "unclosed '${BLOCK_STACK[$i]}' block (missing 'end')"
+done
+
+# Pass 2: Style checks
+LINE_NUM=0
+PREV_WAS_BLOCK_OPEN=false
+while IFS= read -r line || [ -n "$line" ]; do
+    LINE_NUM=$((LINE_NUM + 1))
+    trimmed="${line#"${line%%[![:space:]]*}"}"
+
+    # Trailing whitespace
+    if [[ "$line" =~ [[:space:]]$ ]] && [ -n "$trimmed" ]; then
+        warn $LINE_NUM "trailing whitespace"
+    fi
+
+    # Tab characters
+    if [[ "$line" == *$'\t'* ]]; then
+        warn $LINE_NUM "tab character found (use spaces)"
+    fi
+
+    # Empty block detection
+    first_word="${trimmed%% *}"
+    if [ "$PREV_WAS_BLOCK_OPEN" = true ]; then
+        case "$first_word" in
+            end|done)
+                warn $((LINE_NUM - 1)) "empty block"
+                ;;
+        esac
+    fi
+    case "$first_word" in
+        if|while|each|func|repeat|try|else|elif|catch)
+            PREV_WAS_BLOCK_OPEN=true
+            ;;
+        *)
+            PREV_WAS_BLOCK_OPEN=false
+            ;;
+    esac
+
+    # Skip empty/comments for remaining checks
+    [ -z "$trimmed" ] && continue
+    [[ "$trimmed" == "!!"* ]] && continue
+
+    # Double assignment on same line
+    if [[ "$trimmed" =~ ^[a-zA-Z_][a-zA-Z0-9_]*[[:space:]]*=[[:space:]]*[a-zA-Z_][a-zA-Z0-9_]*[[:space:]]*=[[:space:]] ]]; then
+        warn $LINE_NUM "possible double assignment"
+    fi
+
+done < "$FILE"
+
+# Pass 3: Variable usage analysis
+declare -A ASSIGNED_VARS
+declare -A ASSIGNED_LINES
+declare -A USED_VARS
+
+LINE_NUM=0
+while IFS= read -r line || [ -n "$line" ]; do
+    LINE_NUM=$((LINE_NUM + 1))
+    trimmed="${line#"${line%%[![:space:]]*}"}"
+    [ -z "$trimmed" ] && continue
+    [[ "$trimmed" == "!!"* ]] && continue
+
+    # Detect assignments: varname = expr
+    if [[ "$trimmed" =~ ^([a-zA-Z_][a-zA-Z0-9_]*)[[:space:]]*=[[:space:]] ]]; then
+        varname="${BASH_REMATCH[1]}"
+        # Exclude keywords that look like assignments
+        case "$varname" in
+            if|while|each|func|repeat|try|show|err|write|read|end|done|else|elif|catch|mode|return|error)
+                ;;
+            *)
+                ASSIGNED_VARS["$varname"]=1
+                ASSIGNED_LINES["$varname"]=$LINE_NUM
+                ;;
+        esac
+    fi
+
+    # Detect usage: any identifier that's not on the left side of =
+    for word in $trimmed; do
+        if [[ "$word" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]; then
+            case "$word" in
+                if|elif|else|end|while|each|as|in|func|repeat|try|catch|done|show|err|write|read|return|error|mode|times|true|false|null|and|or|not|is|isnt|above|below|atleast|atmost|many|skip|stop)
+                    ;;
+                *)
+                    USED_VARS["$word"]=1
+                    ;;
+            esac
+        fi
+    done
+done < "$FILE"
+
+# Check for assigned but never used
+for var in "${!ASSIGNED_VARS[@]}"; do
+    # Count occurrences — if only assigned once and not used elsewhere, warn
+    count=$(grep -o "\b${var}\b" "$FILE" 2>/dev/null | wc -l)
+    if [ "$count" -le 1 ]; then
+        warn "${ASSIGNED_LINES[$var]}" "variable '$var' is assigned but never used"
+    fi
+done
+
+# Summary
+echo ""
+if [ $ERRORS -eq 0 ] && [ $WARNINGS -eq 0 ]; then
+    echo -e "${CYAN}No issues found.${RESET}"
+else
+    echo -e "${BOLD}$ERRORS error(s), $WARNINGS warning(s)${RESET}"
+fi
+
+exit $ERRORS

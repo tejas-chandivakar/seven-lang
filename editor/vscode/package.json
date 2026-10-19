@@ -2,7 +2,7 @@
   "name": "seven-language",
   "displayName": "SEVEN Language",
   "description": "Syntax highlighting for the SEVEN programming language",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "tejas-chandivakar",
   "engines": {
     "vscode": "^1.70.0"
@@ -22,6 +22,12 @@
         "language": "seven",
         "scopeName": "source.seven",
         "path": "./syntaxes/seven.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "seven",
+        "path": "./snippets/seven.json"
       }
     ]
   }

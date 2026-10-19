@@ -1,0 +1,10 @@
+!! Benchmark: 100 million loop iterations
+total = 0
+i = 0
+while i below 100000000
+    total = total + 1
+    i = i + 1
+end
+!! total is 100M which is > 0x400000, can't show directly
+!! show a verification value instead
+show total / 100000000

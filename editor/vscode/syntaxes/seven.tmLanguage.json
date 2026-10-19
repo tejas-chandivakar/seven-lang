@@ -21,6 +21,11 @@
     "comments": {
       "patterns": [
         {
+          "name": "comment.block.seven",
+          "begin": "!!!",
+          "end": "!!!"
+        },
+        {
           "name": "comment.line.double-bang.seven",
           "match": "!!.*$"
         }
@@ -65,7 +70,7 @@
       "patterns": [
         {
           "name": "keyword.control.seven",
-          "match": "\\b(if|elif|or if|else|end|while|repeat|each|in|match|case|try|catch|error|return|break|continue|stop)\\b"
+          "match": "\\b(if|elif|or if|else|end|while|repeat|each|in|as|at|match|case|try|catch|done|error|return|break|continue|stop|skip|times)\\b"
         }
       ]
     },
@@ -81,7 +86,7 @@
       "patterns": [
         {
           "name": "keyword.other.declaration.seven",
-          "match": "\\b(func|many|set)\\b"
+          "match": "\\b(func|many|set|mode|hybrid|natural)\\b"
         }
       ]
     },
@@ -97,7 +102,7 @@
       "patterns": [
         {
           "name": "support.function.builtin.seven",
-          "match": "\\b(len|push|pop|slice|reverse|step|abs|min|max|sqrt|random|type|sort|join|range)\\s*\\("
+          "match": "\\b(len|push|pop|slice|reverse|step|abs|min|max|sqrt|random|type|sort|join|range|str|int|ord|chr|substr|exit|replace|upper|lower|trim|find|count|pad|pow|clamp|sign|gcd|sum|avg|fill|concat|unique|insert|remove|hex|bin|bool|number|exists|append|delete|lines|time|clock|sleep|args|env|system)\\s*\\("
         }
       ]
     },
@@ -113,7 +118,7 @@
       "patterns": [
         {
           "name": "constant.language.boolean.seven",
-          "match": "\\b(true|false)\\b"
+          "match": "\\b(true|false|null)\\b"
         }
       ]
     },

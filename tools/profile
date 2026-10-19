@@ -1,0 +1,149 @@
+#!/bin/bash
+# ============================================================
+# SEVEN Language — Profiler
+# Usage: seven-profile <file.seven> [runs]
+# Compiles, runs N times, reports timing statistics
+# ============================================================
+
+set -e
+
+BOLD='\033[1m'
+CYAN='\033[36m'
+GREEN='\033[32m'
+DIM='\033[2m'
+RESET='\033[0m'
+
+if [ $# -eq 0 ] || [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
+    echo "Usage: seven-profile <file.seven> [runs]"
+    echo ""
+    echo "Options:"
+    echo "  runs    Number of runs for timing (default: 5)"
+    echo ""
+    echo "Reports:"
+    echo "  - Compilation time"
+    echo "  - Assembly + link time"
+    echo "  - Execution time (min/max/avg over N runs)"
+    echo "  - Binary size"
+    echo "  - Total time"
+    exit 0
+fi
+
+FILE="$1"
+RUNS=${2:-5}
+
+if [ ! -f "$FILE" ]; then
+    echo "Error: file not found: $FILE"
+    exit 1
+fi
+
+SEVEN_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+SEVEN="$SEVEN_DIR/build/seven"
+RUNTIME_OBJ="$SEVEN_DIR/build/runtime.o"
+TMPDIR="/tmp/seven_profile_$$"
+
+mkdir -p "$TMPDIR"
+trap 'rm -rf "$TMPDIR"' EXIT
+
+BASE=$(basename "$FILE" .seven)
+ASM_FILE="$TMPDIR/$BASE.asm"
+OBJ_FILE="$TMPDIR/$BASE.o"
+BIN_FILE="$TMPDIR/$BASE"
+
+echo -e "${BOLD}SEVEN Profiler${RESET}"
+echo -e "${DIM}File: $FILE | Runs: $RUNS${RESET}"
+echo ""
+
+# Time compilation
+COMPILE_START=$(date +%s%N)
+cd "$TMPDIR"
+"$SEVEN" build "$FILE" > /dev/null 2>&1
+COMPILE_END=$(date +%s%N)
+COMPILE_MS=$(( (COMPILE_END - COMPILE_START) / 1000000 ))
+
+# Move .asm to tmpdir if not already there
+if [ -f "$TMPDIR/$BASE.asm" ]; then
+    true
+elif [ -f "$(pwd)/$BASE.asm" ]; then
+    mv "$(pwd)/$BASE.asm" "$ASM_FILE"
+fi
+
+# Find the .asm file
+if [ ! -f "$ASM_FILE" ]; then
+    # Try current directory
+    for f in *.asm; do
+        if [ -f "$f" ]; then
+            ASM_FILE="$f"
+            break
+        fi
+    done
+fi
+
+# Time assembly + link
+ASM_START=$(date +%s%N)
+nasm -f elf64 "$ASM_FILE" -o "$OBJ_FILE" 2>/dev/null
+ld "$OBJ_FILE" "$RUNTIME_OBJ" -o "$BIN_FILE" 2>/dev/null
+ASM_END=$(date +%s%N)
+ASM_MS=$(( (ASM_END - ASM_START) / 1000000 ))
+
+# Binary size
+BIN_SIZE=$(stat -c %s "$BIN_FILE" 2>/dev/null || echo "?")
+ASM_LINES=$(wc -l < "$ASM_FILE" 2>/dev/null || echo "?")
+
+echo -e "${CYAN}Compilation:${RESET}  ${COMPILE_MS}ms (SEVEN → .asm)"
+echo -e "${CYAN}Assembly:${RESET}     ${ASM_MS}ms (NASM + ld)"
+echo -e "${CYAN}Binary size:${RESET}  ${BIN_SIZE} bytes"
+echo -e "${CYAN}ASM lines:${RESET}    ${ASM_LINES}"
+echo ""
+
+# Time execution (N runs)
+TIMES=()
+for i in $(seq 1 $RUNS); do
+    RUN_START=$(date +%s%N)
+    "$BIN_FILE" > /dev/null 2>&1
+    EXIT_CODE=$?
+    RUN_END=$(date +%s%N)
+    RUN_NS=$((RUN_END - RUN_START))
+    RUN_MS=$((RUN_NS / 1000000))
+    RUN_US=$((RUN_NS / 1000))
+    TIMES+=($RUN_US)
+
+    if [ $EXIT_CODE -ne 0 ] && [ $EXIT_CODE -ne 139 ]; then
+        echo -e "  Run $i: ${RUN_MS}ms (exit $EXIT_CODE)"
+    fi
+done
+
+# Calculate stats (in microseconds)
+MIN=${TIMES[0]}
+MAX=${TIMES[0]}
+SUM=0
+for t in "${TIMES[@]}"; do
+    SUM=$((SUM + t))
+    [ $t -lt $MIN ] && MIN=$t
+    [ $t -gt $MAX ] && MAX=$t
+done
+AVG=$((SUM / RUNS))
+
+# Format output
+fmt_time() {
+    local us=$1
+    if [ $us -ge 1000000 ]; then
+        local ms=$((us / 1000))
+        echo "${ms}ms"
+    elif [ $us -ge 1000 ]; then
+        local ms_whole=$((us / 1000))
+        local ms_frac=$(( (us % 1000) / 100 ))
+        echo "${ms_whole}.${ms_frac}ms"
+    else
+        echo "${us}us"
+    fi
+}
+
+echo -e "${BOLD}Execution (${RUNS} runs):${RESET}"
+echo -e "  ${GREEN}min:${RESET}  $(fmt_time $MIN)"
+echo -e "  ${GREEN}max:${RESET}  $(fmt_time $MAX)"
+echo -e "  ${GREEN}avg:${RESET}  $(fmt_time $AVG)"
+
+# Total
+TOTAL_MS=$((COMPILE_MS + ASM_MS + AVG / 1000))
+echo ""
+echo -e "${BOLD}Total (compile + asm + avg run):${RESET} ${TOTAL_MS}ms"

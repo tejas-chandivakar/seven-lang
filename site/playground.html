@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Playground — SEVEN Language</title>
+    <meta name="description" content="Try SEVEN code examples interactively. See code and output side by side.">
+    <script src="https://cdn.tailwindcss.com/3.4.16"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        seven: {
+                            400: '#59b0ff',
+                            500: '#3b8eff',
+                            600: '#2570f5',
+                        },
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        .code-block { background: #0d1117; }
+        pre code .kw { color: #c084fc; }
+        pre code .str { color: #86efac; }
+        pre code .num { color: #fbbf24; }
+        pre code .cm { color: #6b7280; }
+        pre code .fn { color: #67e8f9; }
+        pre code .io { color: #f472b6; }
+        pre code .op { color: #94a3b8; }
+        .example-btn.active { background: rgba(37,112,245,0.15); border-color: rgba(59,142,255,0.4); color: #59b0ff; }
+    </style>
+</head>
+<body class="bg-[#09090b] text-gray-200 font-sans antialiased">
+
+    <!-- Navbar -->
+    <nav class="fixed top-0 w-full z-50 border-b border-white/5 bg-[#09090b]/80 backdrop-blur-xl">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <a href="index.html" class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-lg bg-seven-600 flex items-center justify-center font-mono font-bold text-white text-sm">7</div>
+                    <span class="font-semibold text-white text-lg tracking-tight">SEVEN</span>
+                </a>
+                <div class="hidden md:flex items-center gap-8">
+                    <a href="docs.html" class="text-sm text-gray-400 hover:text-white transition-colors">Docs</a>
+                    <a href="examples.html" class="text-sm text-gray-400 hover:text-white transition-colors">Examples</a>
+                    <a href="install.html" class="text-sm text-gray-400 hover:text-white transition-colors">Install</a>
+                    <a href="playground.html" class="text-sm text-seven-400 font-medium">Playground</a>
+                    <a href="https://github.com/tejas-chandivakar/seven-lang" target="_blank" class="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-1.5">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                        GitHub
+                    </a>
+                </div>
+                <button id="mobileMenuBtn" class="md:hidden text-gray-400 hover:text-white">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                </button>
+            </div>
+        </div>
+        <div id="mobileMenu" class="hidden md:hidden border-t border-white/5 bg-[#09090b]">
+            <div class="px-4 py-3 space-y-2">
+                <a href="docs.html" class="block text-sm text-gray-400 hover:text-white py-2">Docs</a>
+                <a href="examples.html" class="block text-sm text-gray-400 hover:text-white py-2">Examples</a>
+                <a href="install.html" class="block text-sm text-gray-400 hover:text-white py-2">Install</a>
+                <a href="playground.html" class="block text-sm text-seven-400 font-medium py-2">Playground</a>
+                <a href="https://github.com/tejas-chandivakar/seven-lang" target="_blank" class="block text-sm text-gray-400 hover:text-white py-2">GitHub</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="pt-24 pb-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-10">
+                <h1 class="text-3xl sm:text-4xl font-bold text-white mb-3">Playground</h1>
+                <p class="text-gray-400 text-lg">Explore SEVEN code examples with pre-computed output</p>
+                <p class="text-gray-500 text-sm mt-2">Select an example to see the code and its output side by side</p>
+            </div>
+
+            <div class="flex flex-col lg:flex-row gap-6">
+                <!-- Example selector sidebar -->
+                <div class="lg:w-64 shrink-0">
+                    <div class="lg:sticky lg:top-24 space-y-1.5" id="exampleList">
+                        <button class="example-btn active w-full text-left px-4 py-2.5 rounded-lg text-sm border border-white/5 hover:border-white/10 transition" data-example="hello">Hello World</button>
+                        <button class="example-btn w-full text-left px-4 py-2.5 rounded-lg text-sm text-gray-400 border border-white/5 hover:border-white/10 transition" data-example="variables">Variables & Math</button>
+                        <button class="example-btn w-full text-left px-4 py-2.5 rounded-lg text-sm text-gray-400 border border-white/5 hover:border-white/10 transition" data-example="conditionals">Conditionals</button>
+                        <button class="example-btn w-full text-left px-4 py-2.5 rounded-lg text-sm text-gray-400 border border-white/5 hover:border-white/10 transition" data-example="loops">Loops</button>
+                        <button class="example-btn w-full text-left px-4 py-2.5 rounded-lg text-sm text-gray-400 border border-white/5 hover:border-white/10 transition" data-example="functions">Functions</button>
+                        <button class="example-btn w-full text-left px-4 py-2.5 rounded-lg text-sm text-gray-400 border border-white/5 hover:border-white/10 transition" data-example="arrays">Arrays</button>
+                        <button class="example-btn w-full text-left px-4 py-2.5 rounded-lg text-sm text-gray-400 border border-white/5 hover:border-white/10 transition" data-example="strings">String Methods</button>
+                        <button class="example-btn w-full text-left px-4 py-2.5 rounded-lg text-sm text-gray-400 border border-white/5 hover:border-white/10 transition" data-example="fizzbuzz">FizzBuzz</button>
+                        <button class="example-btn w-full text-left px-4 py-2.5 rounded-lg text-sm text-gray-400 border border-white/5 hover:border-white/10 transition" data-example="factorial">Factorial</button>
+                        <button class="example-btn w-full text-left px-4 py-2.5 rounded-lg text-sm text-gray-400 border border-white/5 hover:border-white/10 transition" data-example="sorting">Sorting</button>
+                        <button class="example-btn w-full text-left px-4 py-2.5 rounded-lg text-sm text-gray-400 border border-white/5 hover:border-white/10 transition" data-example="testing">Testing</button>
+                        <button class="example-btn w-full text-left px-4 py-2.5 rounded-lg text-sm text-gray-400 border border-white/5 hover:border-white/10 transition" data-example="errorhandling">Error Handling</button>
+                        <button class="example-btn w-full text-left px-4 py-2.5 rounded-lg text-sm text-gray-400 border border-white/5 hover:border-white/10 transition" data-example="natural">Natural Mode</button>
+                    </div>
+                </div>
+
+                <!-- Code + Output panels -->
+                <div class="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Code panel -->
+                    <div class="code-block rounded-2xl border border-white/5 overflow-hidden">
+                        <div class="flex items-center gap-2 px-4 py-3 border-b border-white/5">
+                            <div class="flex gap-1.5">
+                                <div class="w-3 h-3 rounded-full bg-red-500/70"></div>
+                                <div class="w-3 h-3 rounded-full bg-yellow-500/70"></div>
+                                <div class="w-3 h-3 rounded-full bg-green-500/70"></div>
+                            </div>
+                            <span class="text-xs text-gray-500 font-mono ml-2" id="codeFilename">hello.seven</span>
+                        </div>
+                        <pre class="px-5 py-4 text-sm font-mono leading-relaxed overflow-x-auto min-h-[300px]" id="codePanel"><code></code></pre>
+                    </div>
+
+                    <!-- Output panel -->
+                    <div class="code-block rounded-2xl border border-white/5 overflow-hidden">
+                        <div class="flex items-center gap-2 px-4 py-3 border-b border-white/5">
+                            <div class="flex gap-1.5">
+                                <div class="w-3 h-3 rounded-full bg-red-500/70"></div>
+                                <div class="w-3 h-3 rounded-full bg-yellow-500/70"></div>
+                                <div class="w-3 h-3 rounded-full bg-green-500/70"></div>
+                            </div>
+                            <span class="text-xs text-gray-500 font-mono ml-2">Output</span>
+                            <span class="ml-auto text-xs text-emerald-400 font-mono">&#10003; exit code 0</span>
+                        </div>
+                        <pre class="px-5 py-4 text-sm font-mono leading-relaxed overflow-x-auto min-h-[300px] text-emerald-300/90" id="outputPanel"></pre>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Install CTA -->
+            <div class="text-center mt-16 pt-10 border-t border-white/5">
+                <p class="text-gray-400 mb-4">Want to run your own SEVEN code?</p>
+                <a href="install.html" class="inline-block px-8 py-3 rounded-xl bg-seven-600 hover:bg-seven-500 text-white font-medium transition-all shadow-lg shadow-seven-600/20">
+                    Install SEVEN
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="border-t border-white/5 py-10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-6 h-6 rounded-md bg-seven-600 flex items-center justify-center font-mono font-bold text-white text-xs">7</div>
+                    <span class="text-sm text-gray-500">SEVEN Language &copy; 2024-2026 Tejas Chandivakar</span>
+                </div>
+                <div class="flex items-center gap-6">
+                    <a href="docs.html" class="text-sm text-gray-500 hover:text-gray-300 transition-colors">Docs</a>
+                    <a href="examples.html" class="text-sm text-gray-500 hover:text-gray-300 transition-colors">Examples</a>
+                    <a href="install.html" class="text-sm text-gray-500 hover:text-gray-300 transition-colors">Install</a>
+                    <a href="playground.html" class="text-sm text-gray-500 hover:text-gray-300 transition-colors">Playground</a>
+                    <a href="https://github.com/tejas-chandivakar/seven-lang" target="_blank" class="text-sm text-gray-500 hover:text-gray-300 transition-colors">GitHub</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+    const examples = {
+        hello: {
+            file: "hello.seven",
+            code: `<span class="cm">!! Hello World in SEVEN</span>\n<span class="io">show</span> <span class="str">"Hello, World!"</span>\n\n<span class="cm">!! String interpolation</span>\n<span class="op">name</span> = <span class="str">"SEVEN"</span>\n<span class="io">show</span> <span class="str">"Welcome to {name}!"</span>\n<span class="io">show</span> <span class="str">"Version: 0.9"</span>`,
+            output: `Hello, World!\nWelcome to SEVEN!\nVersion: 0.9`
+        },
+        variables: {
+            file: "variables.seven",
+            code: `<span class="cm">!! Variables and math</span>\n<span class="op">x</span> = <span class="num">10</span>\n<span class="op">y</span> = <span class="num">3</span>\n\n<span class="io">show</span> <span class="op">x</span> + <span class="op">y</span>\n<span class="io">show</span> <span class="op">x</span> - <span class="op">y</span>\n<span class="io">show</span> <span class="op">x</span> * <span class="op">y</span>\n<span class="io">show</span> <span class="op">x</span> / <span class="op">y</span>\n<span class="io">show</span> <span class="op">x</span> % <span class="op">y</span>\n\n<span class="cm">!! Math builtins</span>\n<span class="io">show</span> <span class="fn">abs</span>(-<span class="num">42</span>)\n<span class="io">show</span> <span class="fn">min</span>(<span class="num">5</span>, <span class="num">9</span>)\n<span class="io">show</span> <span class="fn">max</span>(<span class="num">5</span>, <span class="num">9</span>)\n<span class="io">show</span> <span class="fn">pow</span>(<span class="num">2</span>, <span class="num">10</span>)`,
+            output: `13\n7\n30\n3\n1\n42\n5\n9\n1024`
+        },
+        conditionals: {
+            file: "conditionals.seven",
+            code: `<span class="op">age</span> = <span class="num">18</span>\n\n<span class="kw">if</span> <span class="op">age</span> >= <span class="num">18</span>\n    <span class="io">show</span> <span class="str">"You can vote!"</span>\n<span class="kw">else</span>\n    <span class="io">show</span> <span class="str">"Too young to vote."</span>\n<span class="kw">end</span>\n\n<span class="cm">!! Match statement</span>\n<span class="op">day</span> = <span class="str">"Monday"</span>\n<span class="kw">match</span> <span class="op">day</span>\n    <span class="kw">when</span> <span class="str">"Monday"</span>\n        <span class="io">show</span> <span class="str">"Start of the week"</span>\n    <span class="kw">when</span> <span class="str">"Friday"</span>\n        <span class="io">show</span> <span class="str">"Weekend coming!"</span>\n    <span class="kw">else</span>\n        <span class="io">show</span> <span class="str">"Regular day"</span>\n<span class="kw">end</span>`,
+            output: `You can vote!\nStart of the week`
+        },
+        loops: {
+            file: "loops.seven",
+            code: `<span class="cm">!! Repeat with counter</span>\n<span class="kw">repeat</span> <span class="num">5</span> <span class="kw">times</span> <span class="kw">as</span> <span class="op">i</span>\n    <span class="io">show</span> <span class="str">"i = "</span> + <span class="op">i</span>\n<span class="kw">end</span>\n\n<span class="cm">!! While loop</span>\n<span class="op">x</span> = <span class="num">1</span>\n<span class="kw">while</span> <span class="op">x</span> <= <span class="num">4</span>\n    <span class="io">show</span> <span class="str">"x = "</span> + <span class="op">x</span>\n    <span class="op">x</span> = <span class="op">x</span> + <span class="num">1</span>\n<span class="kw">end</span>\n\n<span class="cm">!! Each loop</span>\n<span class="op">fruits</span> = [<span class="str">"apple"</span>, <span class="str">"banana"</span>, <span class="str">"cherry"</span>]\n<span class="kw">each</span> <span class="op">fruits</span> <span class="kw">as</span> <span class="op">f</span>\n    <span class="io">show</span> <span class="op">f</span>\n<span class="kw">end</span>`,
+            output: `i = 0\ni = 1\ni = 2\ni = 3\ni = 4\nx = 1\nx = 2\nx = 3\nx = 4\napple\nbanana\ncherry`
+        },
+        functions: {
+            file: "functions.seven",
+            code: `<span class="kw">func</span> <span class="fn">greet</span>(<span class="op">name</span>)\n    <span class="io">show</span> <span class="str">"Hello, "</span> + <span class="op">name</span> + <span class="str">"!"</span>\n<span class="kw">end</span>\n\n<span class="kw">func</span> <span class="fn">add</span>(<span class="op">a</span>, <span class="op">b</span>)\n    <span class="kw">return</span> <span class="op">a</span> + <span class="op">b</span>\n<span class="kw">end</span>\n\n<span class="kw">func</span> <span class="fn">sum_all</span>(<span class="kw">many</span> <span class="op">nums</span>)\n    <span class="op">total</span> = <span class="num">0</span>\n    <span class="kw">each</span> <span class="op">nums</span> <span class="kw">as</span> <span class="op">n</span>\n        <span class="op">total</span> = <span class="op">total</span> + <span class="op">n</span>\n    <span class="kw">end</span>\n    <span class="kw">return</span> <span class="op">total</span>\n<span class="kw">end</span>\n\n<span class="fn">greet</span>(<span class="str">"World"</span>)\n<span class="io">show</span> <span class="fn">add</span>(<span class="num">3</span>, <span class="num">7</span>)\n<span class="io">show</span> <span class="fn">sum_all</span>(<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>, <span class="num">4</span>, <span class="num">5</span>)`,
+            output: `Hello, World!\n10\n15`
+        },
+        arrays: {
+            file: "arrays.seven",
+            code: `<span class="op">nums</span> = [<span class="num">50</span>, <span class="num">10</span>, <span class="num">30</span>, <span class="num">20</span>, <span class="num">40</span>]\n<span class="io">show</span> <span class="str">"Length: "</span> + <span class="fn">len</span>(<span class="op">nums</span>)\n\n<span class="cm">!! Sort and show</span>\n<span class="op">sorted</span> = <span class="fn">sort</span>(<span class="op">nums</span>)\n<span class="kw">each</span> <span class="op">sorted</span> <span class="kw">as</span> <span class="op">n</span>\n    <span class="io">show</span> <span class="op">n</span>\n<span class="kw">end</span>\n\n<span class="cm">!! Other operations</span>\n<span class="io">show</span> <span class="str">"Sum: "</span> + <span class="fn">sum</span>(<span class="op">nums</span>)\n<span class="io">show</span> <span class="str">"Avg: "</span> + <span class="fn">avg</span>(<span class="op">nums</span>)\n\n<span class="op">u</span> = <span class="fn">unique</span>([<span class="num">1</span>, <span class="num">2</span>, <span class="num">2</span>, <span class="num">3</span>, <span class="num">3</span>])\n<span class="io">show</span> <span class="str">"Unique count: "</span> + <span class="fn">len</span>(<span class="op">u</span>)`,
+            output: `Length: 5\n10\n20\n30\n40\n50\nSum: 150\nAvg: 30\nUnique count: 3`
+        },
+        strings: {
+            file: "strings.seven",
+            code: `<span class="op">s</span> = <span class="str">"Hello, World!"</span>\n\n<span class="io">show</span> <span class="fn">upper</span>(<span class="op">s</span>)\n<span class="io">show</span> <span class="fn">lower</span>(<span class="op">s</span>)\n<span class="io">show</span> <span class="fn">len</span>(<span class="op">s</span>)\n\n<span class="cm">!! Method syntax</span>\n<span class="io">show</span> <span class="op">s</span>.<span class="fn">startswith</span>(<span class="str">"Hello"</span>)\n<span class="io">show</span> <span class="op">s</span>.<span class="fn">index</span>(<span class="str">"World"</span>)\n\n<span class="cm">!! String functions</span>\n<span class="io">show</span> <span class="fn">replace</span>(<span class="op">s</span>, <span class="str">"World"</span>, <span class="str">"SEVEN"</span>)\n<span class="io">show</span> <span class="fn">trim</span>(<span class="str">"  spaces  "</span>)\n<span class="io">show</span> <span class="str">"ha"</span>.<span class="fn">repeat</span>(<span class="num">3</span>)\n<span class="io">show</span> <span class="fn">ord</span>(<span class="str">"A"</span>)\n<span class="io">show</span> <span class="fn">chr</span>(<span class="num">65</span>)`,
+            output: `HELLO, WORLD!\nhello, world!\n13\n1\n7\nHello, SEVEN!\nspaces\nhahaha\n65\nA`
+        },
+        fizzbuzz: {
+            file: "fizzbuzz.seven",
+            code: `<span class="cm">!! Classic FizzBuzz</span>\n<span class="kw">repeat</span> <span class="num">20</span> <span class="kw">times</span> <span class="kw">as</span> <span class="op">i</span>\n    <span class="op">n</span> = <span class="op">i</span> + <span class="num">1</span>\n    <span class="kw">if</span> <span class="op">n</span> % <span class="num">15</span> == <span class="num">0</span>\n        <span class="io">show</span> <span class="str">"FizzBuzz"</span>\n    <span class="kw">orif</span> <span class="op">n</span> % <span class="num">3</span> == <span class="num">0</span>\n        <span class="io">show</span> <span class="str">"Fizz"</span>\n    <span class="kw">orif</span> <span class="op">n</span> % <span class="num">5</span> == <span class="num">0</span>\n        <span class="io">show</span> <span class="str">"Buzz"</span>\n    <span class="kw">else</span>\n        <span class="io">show</span> <span class="op">n</span>\n    <span class="kw">end</span>\n<span class="kw">end</span>`,
+            output: `1\n2\nFizz\n4\nBuzz\nFizz\n7\n8\nFizz\nBuzz\n11\nFizz\n13\n14\nFizzBuzz\n16\n17\nFizz\n19\nBuzz`
+        },
+        factorial: {
+            file: "factorial.seven",
+            code: `<span class="cm">!! Recursive factorial</span>\n<span class="kw">func</span> <span class="fn">factorial</span>(<span class="op">n</span>)\n    <span class="kw">if</span> <span class="op">n</span> <= <span class="num">1</span>\n        <span class="kw">return</span> <span class="num">1</span>\n    <span class="kw">end</span>\n    <span class="kw">return</span> <span class="op">n</span> * <span class="fn">factorial</span>(<span class="op">n</span> - <span class="num">1</span>)\n<span class="kw">end</span>\n\n<span class="kw">repeat</span> <span class="num">10</span> <span class="kw">times</span> <span class="kw">as</span> <span class="op">i</span>\n    <span class="op">n</span> = <span class="op">i</span> + <span class="num">1</span>\n    <span class="io">show</span> <span class="fn">str</span>(<span class="op">n</span>) + <span class="str">"! = "</span> + <span class="fn">factorial</span>(<span class="op">n</span>)\n<span class="kw">end</span>`,
+            output: `1! = 1\n2! = 2\n3! = 6\n4! = 24\n5! = 120\n6! = 720\n7! = 5040\n8! = 40320\n9! = 362880\n10! = 3628800`
+        },
+        sorting: {
+            file: "sorting.seven",
+            code: `<span class="cm">!! Sort and manipulate arrays</span>\n<span class="op">data</span> = [<span class="num">42</span>, <span class="num">17</span>, <span class="num">93</span>, <span class="num">5</span>, <span class="num">68</span>, <span class="num">31</span>]\n<span class="io">show</span> <span class="str">"Original:"</span>\n<span class="io">show</span> <span class="fn">join</span>(<span class="op">data</span>, <span class="str">", "</span>)\n\n<span class="op">sorted</span> = <span class="fn">sort</span>(<span class="op">data</span>)\n<span class="io">show</span> <span class="str">"Sorted:"</span>\n<span class="io">show</span> <span class="fn">join</span>(<span class="op">sorted</span>, <span class="str">", "</span>)\n\n<span class="op">rev</span> = <span class="fn">reverse</span>(<span class="op">sorted</span>)\n<span class="io">show</span> <span class="str">"Reversed:"</span>\n<span class="io">show</span> <span class="fn">join</span>(<span class="op">rev</span>, <span class="str">", "</span>)\n\n<span class="io">show</span> <span class="str">"Min: "</span> + <span class="op">sorted</span>[<span class="num">0</span>]\n<span class="io">show</span> <span class="str">"Max: "</span> + <span class="op">rev</span>[<span class="num">0</span>]`,
+            output: `Original:\n42, 17, 93, 5, 68, 31\nSorted:\n5, 17, 31, 42, 68, 93\nReversed:\n93, 68, 42, 31, 17, 5\nMin: 5\nMax: 93`
+        },
+        testing: {
+            file: "test_example.seven",
+            code: `<span class="cm">!! Assert-based testing</span>\n<span class="op">x</span> = <span class="num">5</span> + <span class="num">3</span>\n<span class="fn">assert</span>(<span class="op">x</span> == <span class="num">8</span>, <span class="str">"addition works"</span>)\n\n<span class="fn">assert</span>(<span class="fn">abs</span>(-<span class="num">7</span>) == <span class="num">7</span>, <span class="str">"abs works"</span>)\n<span class="fn">assert</span>(<span class="fn">len</span>(<span class="str">"hello"</span>) == <span class="num">5</span>, <span class="str">"len works"</span>)\n\n<span class="op">nums</span> = [<span class="num">3</span>, <span class="num">1</span>, <span class="num">2</span>]\n<span class="op">s</span> = <span class="fn">sort</span>(<span class="op">nums</span>)\n<span class="fn">assert</span>(<span class="op">s</span>[<span class="num">0</span>] == <span class="num">1</span>, <span class="str">"sort works"</span>)\n\n<span class="kw">func</span> <span class="fn">double</span>(<span class="op">n</span>)\n    <span class="kw">return</span> <span class="op">n</span> * <span class="num">2</span>\n<span class="kw">end</span>\n<span class="fn">assert</span>(<span class="fn">double</span>(<span class="num">5</span>) == <span class="num">10</span>, <span class="str">"functions work"</span>)\n\n<span class="io">show</span> <span class="str">"All tests passed!"</span>`,
+            output: `All tests passed!`
+        },
+        errorhandling: {
+            file: "errors.seven",
+            code: `<span class="cm">!! Try-catch error handling</span>\n<span class="kw">try</span>\n    <span class="op">result</span> = <span class="num">100</span> / <span class="num">0</span>\n    <span class="io">show</span> <span class="op">result</span>\n<span class="kw">catch</span> <span class="op">e</span>\n    <span class="io">show</span> <span class="str">"Caught: "</span> + <span class="op">e</span>\n<span class="kw">done</span>\n\n<span class="io">show</span> <span class="str">"Program continues!"</span>\n\n<span class="cm">!! Custom errors</span>\n<span class="kw">func</span> <span class="fn">safe_div</span>(<span class="op">a</span>, <span class="op">b</span>)\n    <span class="kw">if</span> <span class="op">b</span> == <span class="num">0</span>\n        <span class="kw">error</span> <span class="str">"division by zero"</span>\n    <span class="kw">end</span>\n    <span class="kw">return</span> <span class="op">a</span> / <span class="op">b</span>\n<span class="kw">end</span>\n\n<span class="io">show</span> <span class="fn">safe_div</span>(<span class="num">10</span>, <span class="num">2</span>)`,
+            output: `Caught: division by zero\nProgram continues!\n5`
+        },
+        natural: {
+            file: "natural.seven",
+            code: `<span class="kw">mode natural</span>\n\n<span class="cm">!! English-like syntax</span>\n<span class="op">fruits</span> = [<span class="str">"apple"</span>, <span class="str">"banana"</span>, <span class="str">"cherry"</span>]\n\n<span class="io">show</span> <span class="str">"I have "</span> + <span class="fn">len</span>(<span class="op">fruits</span>) + <span class="str">" fruits"</span>\n\n<span class="kw">each</span> <span class="op">fruits</span> <span class="kw">as</span> <span class="op">i</span>, <span class="op">fruit</span>\n    <span class="io">show</span> <span class="fn">str</span>(<span class="op">i</span> + <span class="num">1</span>) + <span class="str">". "</span> + <span class="op">fruit</span>\n<span class="kw">end</span>\n\n<span class="fn">push</span>(<span class="op">fruits</span>, <span class="str">"date"</span>)\n<span class="io">show</span> <span class="str">"Now I have "</span> + <span class="fn">len</span>(<span class="op">fruits</span>)`,
+            output: `I have 3 fruits\n1. apple\n2. banana\n3. cherry\nNow I have 4`
+        }
+    };
+
+    function loadExample(name) {
+        const ex = examples[name];
+        if (!ex) return;
+        document.getElementById('codeFilename').textContent = ex.file;
+        document.getElementById('codePanel').querySelector('code').innerHTML = ex.code;
+        document.getElementById('outputPanel').textContent = ex.output;
+        document.querySelectorAll('.example-btn').forEach(b => {
+            b.className = 'example-btn w-full text-left px-4 py-2.5 rounded-lg text-sm text-gray-400 border border-white/5 hover:border-white/10 transition';
+        });
+        document.querySelector(`[data-example="${name}"]`).className = 'example-btn active w-full text-left px-4 py-2.5 rounded-lg text-sm border border-white/5 transition';
+    }
+
+    document.querySelectorAll('.example-btn').forEach(btn => {
+        btn.addEventListener('click', () => loadExample(btn.dataset.example));
+    });
+
+    // Load first example
+    loadExample('hello');
+
+    // Mobile menu
+    document.getElementById('mobileMenuBtn').addEventListener('click', function() {
+        document.getElementById('mobileMenu').classList.toggle('hidden');
+    });
+    </script>
+</body>
+</html>

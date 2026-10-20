@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Examples — SEVEN Language</title>
+    <script src="https://cdn.tailwindcss.com/3.4.16"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        seven: { 400: '#59b0ff', 500: '#3b8eff', 600: '#2570f5' },
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        .code-block { background: #0d1117; }
+        pre code .kw { color: #c084fc; }
+        pre code .str { color: #86efac; }
+        pre code .num { color: #fbbf24; }
+        pre code .cm { color: #6b7280; }
+        pre code .fn { color: #67e8f9; }
+        pre code .io { color: #f472b6; }
+        pre code .op { color: #94a3b8; }
+    </style>
+</head>
+<body class="bg-[#09090b] text-gray-200 font-sans antialiased">
+
+    <!-- Navbar -->
+    <nav class="fixed top-0 w-full z-50 border-b border-white/5 bg-[#09090b]/80 backdrop-blur-xl">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <a href="index.html" class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-lg bg-seven-600 flex items-center justify-center font-mono font-bold text-white text-sm">7</div>
+                    <span class="font-semibold text-white text-lg tracking-tight">SEVEN</span>
+                </a>
+                <div class="hidden md:flex items-center gap-8">
+                    <a href="docs.html" class="text-sm text-gray-400 hover:text-white transition-colors">Docs</a>
+                    <a href="examples.html" class="text-sm text-white transition-colors">Examples</a>
+                    <a href="install.html" class="text-sm text-gray-400 hover:text-white transition-colors">Install</a>
+                    <a href="https://github.com/tejas-chandivakar/seven-lang" target="_blank" class="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-1.5">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                        GitHub
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="pt-28 pb-20">
+        <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h1 class="text-4xl sm:text-5xl font-bold text-white mb-4">Examples</h1>
+            <p class="text-lg text-gray-400 mb-12">Learn SEVEN by example. Each snippet is a complete, runnable program.</p>
+
+            <!-- Hello World -->
+            <div class="mb-10">
+                <h2 class="text-lg font-semibold text-white mb-3">Hello World</h2>
+                <div class="code-block rounded-xl border border-white/5 overflow-hidden">
+                    <div class="flex items-center gap-2 px-4 py-2.5 border-b border-white/5">
+                        <div class="flex gap-1.5"><div class="w-2.5 h-2.5 rounded-full bg-red-500/70"></div><div class="w-2.5 h-2.5 rounded-full bg-yellow-500/70"></div><div class="w-2.5 h-2.5 rounded-full bg-green-500/70"></div></div>
+                        <span class="text-xs text-gray-500 font-mono ml-2">hello.seven</span>
+                    </div>
+                    <pre class="px-5 py-4 text-sm font-mono leading-relaxed overflow-x-auto"><code><span class="io">show</span> <span class="str">"Hello, World!"</span></code></pre>
+                </div>
+            </div>
+
+            <!-- Variables & Input -->
+            <div class="mb-10">
+                <h2 class="text-lg font-semibold text-white mb-3">Variables & Input</h2>
+                <div class="code-block rounded-xl border border-white/5 overflow-hidden">
+                    <div class="flex items-center gap-2 px-4 py-2.5 border-b border-white/5">
+                        <div class="flex gap-1.5"><div class="w-2.5 h-2.5 rounded-full bg-red-500/70"></div><div class="w-2.5 h-2.5 rounded-full bg-yellow-500/70"></div><div class="w-2.5 h-2.5 rounded-full bg-green-500/70"></div></div>
+                        <span class="text-xs text-gray-500 font-mono ml-2">input.seven</span>
+                    </div>
+                    <pre class="px-5 py-4 text-sm font-mono leading-relaxed overflow-x-auto"><code><span class="op">name</span> = <span class="io">ask</span> <span class="str">"What's your name? "</span>
+<span class="op">age</span> = <span class="io">ask</span> <span class="str">"How old are you? "</span>
+
+<span class="io">show</span> <span class="str">"Hello, "</span> + <span class="op">name</span> + <span class="str">"!"</span>
+<span class="io">show</span> <span class="str">"You are "</span> + <span class="op">age</span> + <span class="str">" years old."</span></code></pre>
+                </div>
+            </div>
+
+            <!-- Conditionals -->
+            <div class="mb-10">
+                <h2 class="text-lg font-semibold text-white mb-3">Conditionals</h2>
+                <div class="code-block rounded-xl border border-white/5 overflow-hidden">
+                    <div class="flex items-center gap-2 px-4 py-2.5 border-b border-white/5">
+                        <div class="flex gap-1.5"><div class="w-2.5 h-2.5 rounded-full bg-red-500/70"></div><div class="w-2.5 h-2.5 rounded-full bg-yellow-500/70"></div><div class="w-2.5 h-2.5 rounded-full bg-green-500/70"></div></div>
+                        <span class="text-xs text-gray-500 font-mono ml-2">conditions.seven</span>
+                    </div>
+                    <pre class="px-5 py-4 text-sm font-mono leading-relaxed overflow-x-auto"><code><span class="op">score</span> = <span class="num">85</span>
+
+<span class="kw">if</span> <span class="op">score</span> <span class="kw">atleast</span> <span class="num">90</span>
+    <span class="io">show</span> <span class="str">"Grade: A"</span>
+<span class="kw">elif</span> <span class="op">score</span> <span class="kw">atleast</span> <span class="num">80</span>
+    <span class="io">show</span> <span class="str">"Grade: B"</span>
+<span class="kw">elif</span> <span class="op">score</span> <span class="kw">atleast</span> <span class="num">70</span>
+    <span class="io">show</span> <span class="str">"Grade: C"</span>
+<span class="kw">else</span>
+    <span class="io">show</span> <span class="str">"Grade: F"</span>
+<span class="kw">end</span></code></pre>
+                </div>
+            </div>
+
+            <!-- Loops -->
+            <div class="mb-10">
+                <h2 class="text-lg font-semibold text-white mb-3">Loops</h2>
+                <div class="code-block rounded-xl border border-white/5 overflow-hidden">
+                    <div class="flex items-center gap-2 px-4 py-2.5 border-b border-white/5">
+                        <div class="flex gap-1.5"><div class="w-2.5 h-2.5 rounded-full bg-red-500/70"></div><div class="w-2.5 h-2.5 rounded-full bg-yellow-500/70"></div><div class="w-2.5 h-2.5 rounded-full bg-green-500/70"></div></div>
+                        <span class="text-xs text-gray-500 font-mono ml-2">loops.seven</span>
+                    </div>
+                    <pre class="px-5 py-4 text-sm font-mono leading-relaxed overflow-x-auto"><code><span class="cm">!! Repeat N times</span>
+<span class="kw">repeat</span> <span class="num">5</span> <span class="kw">times</span> <span class="kw">as</span> <span class="op">i</span>
+    <span class="io">show</span> <span class="str">"Iteration "</span> + <span class="op">i</span>
+<span class="kw">end</span>
+
+<span class="cm">!! While loop</span>
+<span class="op">count</span> = <span class="num">0</span>
+<span class="kw">while</span> <span class="op">count</span> <span class="kw">below</span> <span class="num">3</span>
+    <span class="io">show</span> <span class="str">"Count: "</span> + <span class="op">count</span>
+    <span class="op">count</span> = <span class="op">count</span> + <span class="num">1</span>
+<span class="kw">end</span>
+
+<span class="cm">!! Each loop with index</span>
+<span class="op">fruits</span> = [<span class="str">"apple"</span>, <span class="str">"banana"</span>, <span class="str">"cherry"</span>]
+<span class="kw">each</span> <span class="op">fruits</span> <span class="kw">as</span> <span class="op">i</span>, <span class="op">fruit</span>
+    <span class="io">show</span> <span class="op">i</span> + <span class="str">": "</span> + <span class="op">fruit</span>
+<span class="kw">end</span></code></pre>
+                </div>
+            </div>
+
+            <!-- Functions -->
+            <div class="mb-10">
+                <h2 class="text-lg font-semibold text-white mb-3">Functions</h2>
+                <div class="code-block rounded-xl border border-white/5 overflow-hidden">
+                    <div class="flex items-center gap-2 px-4 py-2.5 border-b border-white/5">
+                        <div class="flex gap-1.5"><div class="w-2.5 h-2.5 rounded-full bg-red-500/70"></div><div class="w-2.5 h-2.5 rounded-full bg-yellow-500/70"></div><div class="w-2.5 h-2.5 rounded-full bg-green-500/70"></div></div>
+                        <span class="text-xs text-gray-500 font-mono ml-2">functions.seven</span>
+                    </div>
+                    <pre class="px-5 py-4 text-sm font-mono leading-relaxed overflow-x-auto"><code><span class="kw">func</span> <span class="fn">fibonacci</span>(<span class="op">n</span>)
+    <span class="kw">if</span> <span class="op">n</span> <span class="kw">below</span> <span class="num">2</span>
+        <span class="kw">return</span> <span class="op">n</span>
+    <span class="kw">end</span>
+    <span class="kw">return</span> <span class="fn">fibonacci</span>(<span class="op">n</span> - <span class="num">1</span>) + <span class="fn">fibonacci</span>(<span class="op">n</span> - <span class="num">2</span>)
+<span class="kw">end</span>
+
+<span class="kw">repeat</span> <span class="num">10</span> <span class="kw">times</span> <span class="kw">as</span> <span class="op">i</span>
+    <span class="io">show</span> <span class="str">"fib("</span> + <span class="op">i</span> + <span class="str">") = "</span> + <span class="fn">fibonacci</span>(<span class="op">i</span>)
+<span class="kw">end</span></code></pre>
+                </div>
+            </div>
+
+            <!-- Arrays -->
+            <div class="mb-10">
+                <h2 class="text-lg font-semibold text-white mb-3">Arrays</h2>
+                <div class="code-block rounded-xl border border-white/5 overflow-hidden">
+                    <div class="flex items-center gap-2 px-4 py-2.5 border-b border-white/5">
+                        <div class="flex gap-1.5"><div class="w-2.5 h-2.5 rounded-full bg-red-500/70"></div><div class="w-2.5 h-2.5 rounded-full bg-yellow-500/70"></div><div class="w-2.5 h-2.5 rounded-full bg-green-500/70"></div></div>
+                        <span class="text-xs text-gray-500 font-mono ml-2">arrays.seven</span>
+                    </div>
+                    <pre class="px-5 py-4 text-sm font-mono leading-relaxed overflow-x-auto"><code><span class="op">nums</span> = [<span class="num">5</span>, <span class="num">2</span>, <span class="num">8</span>, <span class="num">1</span>, <span class="num">9</span>, <span class="num">3</span>]
+
+<span class="io">show</span> <span class="str">"Length: "</span> + <span class="fn">len</span>(<span class="op">nums</span>)
+<span class="io">show</span> <span class="str">"Sum:    "</span> + <span class="fn">sum</span>(<span class="op">nums</span>)
+<span class="io">show</span> <span class="str">"Min:    "</span> + <span class="fn">min</span>(<span class="op">nums</span>)
+<span class="io">show</span> <span class="str">"Max:    "</span> + <span class="fn">max</span>(<span class="op">nums</span>)
+
+<span class="fn">sort</span>(<span class="op">nums</span>)
+<span class="io">show</span> <span class="str">"Sorted: "</span> + <span class="fn">join</span>(<span class="op">nums</span>, <span class="str">", "</span>)
+
+<span class="fn">push</span>(<span class="op">nums</span>, <span class="num">7</span>)
+<span class="fn">reverse</span>(<span class="op">nums</span>)
+<span class="io">show</span> <span class="str">"Reversed: "</span> + <span class="fn">join</span>(<span class="op">nums</span>, <span class="str">", "</span>)</code></pre>
+                </div>
+            </div>
+
+            <!-- FizzBuzz -->
+            <div class="mb-10">
+                <h2 class="text-lg font-semibold text-white mb-3">FizzBuzz</h2>
+                <div class="code-block rounded-xl border border-white/5 overflow-hidden">
+                    <div class="flex items-center gap-2 px-4 py-2.5 border-b border-white/5">
+                        <div class="flex gap-1.5"><div class="w-2.5 h-2.5 rounded-full bg-red-500/70"></div><div class="w-2.5 h-2.5 rounded-full bg-yellow-500/70"></div><div class="w-2.5 h-2.5 rounded-full bg-green-500/70"></div></div>
+                        <span class="text-xs text-gray-500 font-mono ml-2">fizzbuzz.seven</span>
+                    </div>
+                    <pre class="px-5 py-4 text-sm font-mono leading-relaxed overflow-x-auto"><code><span class="op">i</span> = <span class="num">1</span>
+<span class="kw">while</span> <span class="op">i</span> <span class="kw">atmost</span> <span class="num">100</span>
+    <span class="kw">if</span> <span class="op">i</span> % <span class="num">15</span> <span class="kw">is</span> <span class="num">0</span>
+        <span class="io">show</span> <span class="str">"FizzBuzz"</span>
+    <span class="kw">elif</span> <span class="op">i</span> % <span class="num">3</span> <span class="kw">is</span> <span class="num">0</span>
+        <span class="io">show</span> <span class="str">"Fizz"</span>
+    <span class="kw">elif</span> <span class="op">i</span> % <span class="num">5</span> <span class="kw">is</span> <span class="num">0</span>
+        <span class="io">show</span> <span class="str">"Buzz"</span>
+    <span class="kw">else</span>
+        <span class="io">show</span> <span class="op">i</span>
+    <span class="kw">end</span>
+    <span class="op">i</span> = <span class="op">i</span> + <span class="num">1</span>
+<span class="kw">end</span></code></pre>
+                </div>
+            </div>
+
+            <!-- File I/O -->
+            <div class="mb-10">
+                <h2 class="text-lg font-semibold text-white mb-3">File I/O</h2>
+                <div class="code-block rounded-xl border border-white/5 overflow-hidden">
+                    <div class="flex items-center gap-2 px-4 py-2.5 border-b border-white/5">
+                        <div class="flex gap-1.5"><div class="w-2.5 h-2.5 rounded-full bg-red-500/70"></div><div class="w-2.5 h-2.5 rounded-full bg-yellow-500/70"></div><div class="w-2.5 h-2.5 rounded-full bg-green-500/70"></div></div>
+                        <span class="text-xs text-gray-500 font-mono ml-2">files.seven</span>
+                    </div>
+                    <pre class="px-5 py-4 text-sm font-mono leading-relaxed overflow-x-auto"><code><span class="cm">!! Write, read, and manipulate files</span>
+<span class="io">write</span> <span class="str">"todo.txt"</span>, <span class="str">"Buy groceries"</span>
+<span class="fn">append</span>(<span class="str">"todo.txt"</span>, <span class="str">"\nClean house"</span>)
+<span class="fn">append</span>(<span class="str">"todo.txt"</span>, <span class="str">"\nWrite code"</span>)
+
+<span class="op">tasks</span> = <span class="fn">lines</span>(<span class="str">"todo.txt"</span>)
+<span class="kw">each</span> <span class="op">tasks</span> <span class="kw">as</span> <span class="op">i</span>, <span class="op">task</span>
+    <span class="io">show</span> (<span class="op">i</span> + <span class="num">1</span>) + <span class="str">". "</span> + <span class="op">task</span>
+<span class="kw">end</span>
+
+<span class="fn">delete</span>(<span class="str">"todo.txt"</span>)</code></pre>
+                </div>
+            </div>
+
+            <!-- Error Handling -->
+            <div class="mb-10">
+                <h2 class="text-lg font-semibold text-white mb-3">Error Handling</h2>
+                <div class="code-block rounded-xl border border-white/5 overflow-hidden">
+                    <div class="flex items-center gap-2 px-4 py-2.5 border-b border-white/5">
+                        <div class="flex gap-1.5"><div class="w-2.5 h-2.5 rounded-full bg-red-500/70"></div><div class="w-2.5 h-2.5 rounded-full bg-yellow-500/70"></div><div class="w-2.5 h-2.5 rounded-full bg-green-500/70"></div></div>
+                        <span class="text-xs text-gray-500 font-mono ml-2">errors.seven</span>
+                    </div>
+                    <pre class="px-5 py-4 text-sm font-mono leading-relaxed overflow-x-auto"><code><span class="kw">func</span> <span class="fn">safe_divide</span>(<span class="op">a</span>, <span class="op">b</span>)
+    <span class="kw">if</span> <span class="op">b</span> <span class="kw">is</span> <span class="num">0</span>
+        <span class="kw">error</span> <span class="str">"Division by zero!"</span>
+    <span class="kw">end</span>
+    <span class="kw">return</span> <span class="op">a</span> / <span class="op">b</span>
+<span class="kw">end</span>
+
+<span class="kw">try</span>
+    <span class="io">show</span> <span class="fn">safe_divide</span>(<span class="num">10</span>, <span class="num">0</span>)
+<span class="kw">catch</span> <span class="op">e</span>
+    <span class="io">err</span> <span class="str">"Error: "</span> + <span class="op">e</span>
+<span class="kw">done</span></code></pre>
+                </div>
+            </div>
+
+            <!-- OS / System -->
+            <div class="mb-10">
+                <h2 class="text-lg font-semibold text-white mb-3">OS & System</h2>
+                <div class="code-block rounded-xl border border-white/5 overflow-hidden">
+                    <div class="flex items-center gap-2 px-4 py-2.5 border-b border-white/5">
+                        <div class="flex gap-1.5"><div class="w-2.5 h-2.5 rounded-full bg-red-500/70"></div><div class="w-2.5 h-2.5 rounded-full bg-yellow-500/70"></div><div class="w-2.5 h-2.5 rounded-full bg-green-500/70"></div></div>
+                        <span class="text-xs text-gray-500 font-mono ml-2">system.seven</span>
+                    </div>
+                    <pre class="px-5 py-4 text-sm font-mono leading-relaxed overflow-x-auto"><code><span class="cm">!! Timing</span>
+<span class="op">start</span> = <span class="fn">clock</span>()
+<span class="fn">sleep</span>(<span class="num">1</span>)
+<span class="op">elapsed</span> = <span class="fn">clock</span>() - <span class="op">start</span>
+<span class="io">show</span> <span class="str">"Elapsed: "</span> + <span class="op">elapsed</span>
+
+<span class="cm">!! Environment</span>
+<span class="op">home</span> = <span class="fn">env</span>(<span class="str">"HOME"</span>)
+<span class="io">show</span> <span class="str">"Home: "</span> + <span class="op">home</span>
+
+<span class="cm">!! Command-line args</span>
+<span class="op">argv</span> = <span class="fn">args</span>()
+<span class="kw">each</span> <span class="op">argv</span> <span class="kw">as</span> <span class="op">arg</span>
+    <span class="io">show</span> <span class="str">"Arg: "</span> + <span class="op">arg</span>
+<span class="kw">end</span>
+
+<span class="cm">!! Run shell commands</span>
+<span class="fn">system</span>(<span class="str">"echo Hello from the shell"</span>)</code></pre>
+                </div>
+            </div>
+
+            <!-- Natural Mode -->
+            <div class="mb-10">
+                <h2 class="text-lg font-semibold text-white mb-3">Natural Mode</h2>
+                <p class="text-gray-400 text-sm mb-3">English-like array syntax with <code class="text-seven-400 font-mono text-xs">mode natural</code>.</p>
+                <div class="code-block rounded-xl border border-white/5 overflow-hidden">
+                    <div class="flex items-center gap-2 px-4 py-2.5 border-b border-white/5">
+                        <div class="flex gap-1.5"><div class="w-2.5 h-2.5 rounded-full bg-red-500/70"></div><div class="w-2.5 h-2.5 rounded-full bg-yellow-500/70"></div><div class="w-2.5 h-2.5 rounded-full bg-green-500/70"></div></div>
+                        <span class="text-xs text-gray-500 font-mono ml-2">natural.seven</span>
+                    </div>
+                    <pre class="px-5 py-4 text-sm font-mono leading-relaxed overflow-x-auto"><code><span class="kw">mode</span> <span class="kw">natural</span>
+
+<span class="op">colors</span> = [<span class="str">"red"</span>, <span class="str">"blue"</span>]
+<span class="kw">add</span> <span class="str">"green"</span> <span class="kw">to</span> <span class="op">colors</span>
+<span class="kw">add</span> <span class="str">"yellow"</span> <span class="kw">to</span> <span class="op">colors</span>
+
+<span class="kw">each</span> <span class="op">colors</span> <span class="kw">as</span> <span class="op">color</span>
+    <span class="io">show</span> <span class="op">color</span>
+<span class="kw">end</span></code></pre>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-white/5 py-10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-6 h-6 rounded-md bg-seven-600 flex items-center justify-center font-mono font-bold text-white text-xs">7</div>
+                    <span class="text-sm text-gray-500">SEVEN Language &copy; 2024 Tejas Chandivakar</span>
+                </div>
+                <div class="flex items-center gap-6">
+                    <a href="docs.html" class="text-sm text-gray-500 hover:text-gray-300 transition-colors">Docs</a>
+                    <a href="install.html" class="text-sm text-gray-500 hover:text-gray-300 transition-colors">Install</a>
+                    <a href="https://github.com/tejas-chandivakar/seven-lang" target="_blank" class="text-sm text-gray-500 hover:text-gray-300 transition-colors">GitHub</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SEVEN — Assembly Speed. Python Simplicity.</title>
+    <meta name="description" content="SEVEN is a compiled programming language that combines assembly-level speed with Python-level simplicity. No VM, no GC, direct x86-64 assembly generation.">
+    <script src="https://cdn.tailwindcss.com/3.4.16"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        seven: {
+                            50: '#eef7ff',
+                            100: '#d9edff',
+                            200: '#bce0ff',
+                            300: '#8eccff',
+                            400: '#59b0ff',
+                            500: '#3b8eff',
+                            600: '#2570f5',
+                            700: '#1a5ae1',
+                            800: '#1c49b6',
+                            900: '#1c408f',
+                            950: '#162957',
+                        },
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        .code-block { background: #0d1117; }
+        .gradient-text {
+            background: linear-gradient(135deg, #3b8eff 0%, #a78bfa 50%, #f472b6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .hero-glow {
+            background: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(59,142,255,0.15), transparent);
+        }
+        .card-glow:hover {
+            box-shadow: 0 0 40px rgba(59,142,255,0.1);
+        }
+        .bar-animate { animation: barGrow 1.5s ease-out forwards; transform-origin: left; }
+        @keyframes barGrow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+        .fade-in { animation: fadeIn 0.8s ease-out forwards; opacity: 0; }
+        @keyframes fadeIn { to { opacity: 1; } }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        pre code .kw { color: #c084fc; }
+        pre code .str { color: #86efac; }
+        pre code .num { color: #fbbf24; }
+        pre code .cm { color: #6b7280; }
+        pre code .fn { color: #67e8f9; }
+        pre code .io { color: #f472b6; }
+        pre code .op { color: #94a3b8; }
+    </style>
+</head>
+<body class="bg-[#09090b] text-gray-200 font-sans antialiased">
+
+    <!-- Navbar -->
+    <nav class="fixed top-0 w-full z-50 border-b border-white/5 bg-[#09090b]/80 backdrop-blur-xl">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <a href="index.html" class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-lg bg-seven-600 flex items-center justify-center font-mono font-bold text-white text-sm">7</div>
+                    <span class="font-semibold text-white text-lg tracking-tight">SEVEN</span>
+                </a>
+                <div class="hidden md:flex items-center gap-8">
+                    <a href="docs.html" class="text-sm text-gray-400 hover:text-white transition-colors">Docs</a>
+                    <a href="examples.html" class="text-sm text-gray-400 hover:text-white transition-colors">Examples</a>
+                    <a href="install.html" class="text-sm text-gray-400 hover:text-white transition-colors">Install</a>
+                    <a href="https://github.com/tejas-chandivakar/seven-lang" target="_blank" class="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-1.5">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                        GitHub
+                    </a>
+                </div>
+                <button id="mobileMenuBtn" class="md:hidden text-gray-400 hover:text-white">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                </button>
+            </div>
+        </div>
+        <!-- Mobile menu -->
+        <div id="mobileMenu" class="hidden md:hidden border-t border-white/5 bg-[#09090b]">
+            <div class="px-4 py-3 space-y-2">
+                <a href="docs.html" class="block text-sm text-gray-400 hover:text-white py-2">Docs</a>
+                <a href="examples.html" class="block text-sm text-gray-400 hover:text-white py-2">Examples</a>
+                <a href="install.html" class="block text-sm text-gray-400 hover:text-white py-2">Install</a>
+                <a href="https://github.com/tejas-chandivakar/seven-lang" target="_blank" class="block text-sm text-gray-400 hover:text-white py-2">GitHub</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="relative pt-32 pb-20 sm:pt-40 sm:pb-28 hero-glow">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="max-w-4xl mx-auto text-center">
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-seven-500/20 bg-seven-500/5 text-seven-400 text-sm mb-8 fade-in">
+                    <span class="w-2 h-2 rounded-full bg-seven-400 animate-pulse"></span>
+                    v0.7 &mdash; Phase 7 Complete
+                </div>
+                <h1 class="text-5xl sm:text-7xl font-extrabold tracking-tight mb-6 fade-in" style="animation-delay:0.1s">
+                    <span class="text-white">Assembly Speed.</span><br>
+                    <span class="gradient-text">Python Simplicity.</span>
+                </h1>
+                <p class="text-lg sm:text-xl text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed fade-in" style="animation-delay:0.2s">
+                    SEVEN is a compiled programming language that generates native x86-64 assembly.
+                    No VM. No garbage collector. No runtime overhead. Just fast, readable code.
+                </p>
+                <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16 fade-in" style="animation-delay:0.3s">
+                    <a href="install.html" class="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-seven-600 hover:bg-seven-500 text-white font-medium transition-all shadow-lg shadow-seven-600/20 hover:shadow-seven-500/30 text-center">
+                        Get Started
+                    </a>
+                    <a href="docs.html" class="w-full sm:w-auto px-8 py-3.5 rounded-xl border border-white/10 hover:border-white/20 text-gray-300 hover:text-white font-medium transition-all text-center">
+                        Read the Docs
+                    </a>
+                </div>
+            </div>
+
+            <!-- Hero Code Block -->
+            <div class="max-w-2xl mx-auto fade-in" style="animation-delay:0.4s">
+                <div class="code-block rounded-2xl border border-white/5 overflow-hidden shadow-2xl">
+                    <div class="flex items-center gap-2 px-4 py-3 border-b border-white/5">
+                        <div class="flex gap-1.5">
+                            <div class="w-3 h-3 rounded-full bg-red-500/70"></div>
+                            <div class="w-3 h-3 rounded-full bg-yellow-500/70"></div>
+                            <div class="w-3 h-3 rounded-full bg-green-500/70"></div>
+                        </div>
+                        <span class="text-xs text-gray-500 font-mono ml-2">hello.seven</span>
+                    </div>
+                    <pre class="px-5 py-4 text-sm sm:text-base font-mono leading-relaxed overflow-x-auto"><code><span class="cm">!! Hello World in SEVEN</span>
+<span class="io">show</span> <span class="str">"Hello, World!"</span>
+
+<span class="cm">!! Variables and input</span>
+<span class="op">name</span> = <span class="io">ask</span> <span class="str">"What's your name? "</span>
+<span class="io">show</span> <span class="str">"Welcome, "</span> + <span class="op">name</span> + <span class="str">"!"</span>
+
+<span class="cm">!! Loops are simple</span>
+<span class="kw">repeat</span> <span class="num">5</span> <span class="kw">times</span>
+    <span class="io">show</span> <span class="str">"SEVEN is fast!"</span>
+<span class="kw">end</span></code></pre>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Grid -->
+    <section class="py-20 sm:py-28 border-t border-white/5">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl sm:text-4xl font-bold text-white mb-4">Why SEVEN?</h2>
+                <p class="text-gray-400 text-lg max-w-2xl mx-auto">Built from scratch in x86-64 Assembly. Every feature designed for speed and clarity.</p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Feature 1 -->
+                <div class="p-6 rounded-2xl border border-white/5 bg-white/[0.02] hover:bg-white/[0.04] card-glow transition-all">
+                    <div class="w-12 h-12 rounded-xl bg-seven-600/10 flex items-center justify-center mb-4">
+                        <svg class="w-6 h-6 text-seven-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-white mb-2">31x Faster than Python</h3>
+                    <p class="text-gray-400 text-sm leading-relaxed">Compiles directly to native x86-64 machine code. No interpreter, no virtual machine, no garbage collector overhead.</p>
+                </div>
+                <!-- Feature 2 -->
+                <div class="p-6 rounded-2xl border border-white/5 bg-white/[0.02] hover:bg-white/[0.04] card-glow transition-all">
+                    <div class="w-12 h-12 rounded-xl bg-purple-600/10 flex items-center justify-center mb-4">
+                        <svg class="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-white mb-2">Human-Readable Syntax</h3>
+                    <p class="text-gray-400 text-sm leading-relaxed">English-like keywords: <code class="text-purple-300 font-mono text-xs">show</code>, <code class="text-purple-300 font-mono text-xs">ask</code>, <code class="text-purple-300 font-mono text-xs">repeat</code>, <code class="text-purple-300 font-mono text-xs">each...as</code>. Code reads like plain English.</p>
+                </div>
+                <!-- Feature 3 -->
+                <div class="p-6 rounded-2xl border border-white/5 bg-white/[0.02] hover:bg-white/[0.04] card-glow transition-all">
+                    <div class="w-12 h-12 rounded-xl bg-pink-600/10 flex items-center justify-center mb-4">
+                        <svg class="w-6 h-6 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-white mb-2">Self-Hosted Compiler</h3>
+                    <p class="text-gray-400 text-sm leading-relaxed">SEVEN compiles itself. The compiler is written in SEVEN, bootstrapped from hand-written x86-64 NASM Assembly.</p>
+                </div>
+                <!-- Feature 4 -->
+                <div class="p-6 rounded-2xl border border-white/5 bg-white/[0.02] hover:bg-white/[0.04] card-glow transition-all">
+                    <div class="w-12 h-12 rounded-xl bg-emerald-600/10 flex items-center justify-center mb-4">
+                        <svg class="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/></svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-white mb-2">47 Built-in Functions</h3>
+                    <p class="text-gray-400 text-sm leading-relaxed">Rich standard library: strings, math, arrays, file I/O, OS system calls. Plus 11 string methods.</p>
+                </div>
+                <!-- Feature 5 -->
+                <div class="p-6 rounded-2xl border border-white/5 bg-white/[0.02] hover:bg-white/[0.04] card-glow transition-all">
+                    <div class="w-12 h-12 rounded-xl bg-amber-600/10 flex items-center justify-center mb-4">
+                        <svg class="w-6 h-6 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z"/></svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-white mb-2">Developer Tools</h3>
+                    <p class="text-gray-400 text-sm leading-relaxed">REPL, code formatter, linter, profiler, and VS Code extension with syntax highlighting and snippets.</p>
+                </div>
+                <!-- Feature 6 -->
+                <div class="p-6 rounded-2xl border border-white/5 bg-white/[0.02] hover:bg-white/[0.04] card-glow transition-all">
+                    <div class="w-12 h-12 rounded-xl bg-cyan-600/10 flex items-center justify-center mb-4">
+                        <svg class="w-6 h-6 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-white mb-2">Two Syntax Modes</h3>
+                    <p class="text-gray-400 text-sm leading-relaxed"><code class="text-cyan-300 font-mono text-xs">mode hybrid</code> for classic style, <code class="text-cyan-300 font-mono text-xs">mode natural</code> for English-like array operations.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Benchmark Section -->
+    <section class="py-20 sm:py-28 border-t border-white/5 bg-white/[0.01]">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl sm:text-4xl font-bold text-white mb-4">Speed Comparison</h2>
+                <p class="text-gray-400 text-lg">100 million loop iterations benchmark</p>
+            </div>
+            <div class="max-w-3xl mx-auto space-y-5" id="benchmarks">
+                <!-- NASM -->
+                <div class="flex items-center gap-4">
+                    <span class="w-20 text-right text-sm font-mono text-gray-400 shrink-0">NASM</span>
+                    <div class="flex-1 h-9 rounded-lg bg-white/5 overflow-hidden">
+                        <div class="h-full rounded-lg bg-emerald-500/80 bar-animate flex items-center justify-end pr-3" style="width:4%">
+                            <span class="text-xs font-mono text-white font-medium">0.025s</span>
+                        </div>
+                    </div>
+                </div>
+                <!-- C -->
+                <div class="flex items-center gap-4">
+                    <span class="w-20 text-right text-sm font-mono text-gray-400 shrink-0">C</span>
+                    <div class="flex-1 h-9 rounded-lg bg-white/5 overflow-hidden">
+                        <div class="h-full rounded-lg bg-emerald-500/60 bar-animate flex items-center justify-end pr-3" style="width:5%;animation-delay:0.1s">
+                            <span class="text-xs font-mono text-white font-medium">0.03s</span>
+                        </div>
+                    </div>
+                </div>
+                <!-- SEVEN -->
+                <div class="flex items-center gap-4">
+                    <span class="w-20 text-right text-sm font-mono font-bold text-seven-400 shrink-0">SEVEN</span>
+                    <div class="flex-1 h-9 rounded-lg bg-white/5 overflow-hidden">
+                        <div class="h-full rounded-lg bg-gradient-to-r from-seven-600 to-seven-400 bar-animate flex items-center justify-end pr-3" style="width:32%;animation-delay:0.2s">
+                            <span class="text-xs font-mono text-white font-bold">0.20s</span>
+                        </div>
+                    </div>
+                </div>
+                <!-- Node.js -->
+                <div class="flex items-center gap-4">
+                    <span class="w-20 text-right text-sm font-mono text-gray-400 shrink-0">Node.js</span>
+                    <div class="flex-1 h-9 rounded-lg bg-white/5 overflow-hidden">
+                        <div class="h-full rounded-lg bg-yellow-500/50 bar-animate flex items-center justify-end pr-3" style="width:40%;animation-delay:0.3s">
+                            <span class="text-xs font-mono text-white font-medium">0.35s</span>
+                        </div>
+                    </div>
+                </div>
+                <!-- Java -->
+                <div class="flex items-center gap-4">
+                    <span class="w-20 text-right text-sm font-mono text-gray-400 shrink-0">Java</span>
+                    <div class="flex-1 h-9 rounded-lg bg-white/5 overflow-hidden">
+                        <div class="h-full rounded-lg bg-orange-500/50 bar-animate flex items-center justify-end pr-3" style="width:45%;animation-delay:0.4s">
+                            <span class="text-xs font-mono text-white font-medium">0.42s</span>
+                        </div>
+                    </div>
+                </div>
+                <!-- Python -->
+                <div class="flex items-center gap-4">
+                    <span class="w-20 text-right text-sm font-mono text-gray-400 shrink-0">Python</span>
+                    <div class="flex-1 h-9 rounded-lg bg-white/5 overflow-hidden">
+                        <div class="h-full rounded-lg bg-red-500/50 bar-animate flex items-center justify-end pr-3" style="width:100%;animation-delay:0.5s">
+                            <span class="text-xs font-mono text-white font-medium">6.2s</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <p class="text-center text-gray-500 text-sm mt-8">100M loop iterations on Linux x86-64. Lower is faster.</p>
+        </div>
+    </section>
+
+    <!-- Code Examples Tabs -->
+    <section class="py-20 sm:py-28 border-t border-white/5">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl sm:text-4xl font-bold text-white mb-4">Code Examples</h2>
+                <p class="text-gray-400 text-lg">Clean, expressive syntax for real-world tasks</p>
+            </div>
+            <div class="max-w-3xl mx-auto">
+                <div class="flex flex-wrap gap-2 mb-6" id="tabBar">
+                    <button class="tab-btn px-4 py-2 rounded-lg text-sm font-medium bg-seven-600/20 text-seven-400 border border-seven-500/30" data-tab="arrays">Arrays</button>
+                    <button class="tab-btn px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white border border-white/5 hover:border-white/10 transition" data-tab="functions">Functions</button>
+                    <button class="tab-btn px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white border border-white/5 hover:border-white/10 transition" data-tab="fileio">File I/O</button>
+                    <button class="tab-btn px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white border border-white/5 hover:border-white/10 transition" data-tab="loops">Loops</button>
+                    <button class="tab-btn px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white border border-white/5 hover:border-white/10 transition" data-tab="errorhandling">Error Handling</button>
+                </div>
+                <div class="code-block rounded-2xl border border-white/5 overflow-hidden">
+                    <div id="tab-arrays" class="tab-content active">
+                        <div class="flex items-center gap-2 px-4 py-3 border-b border-white/5">
+                            <div class="flex gap-1.5"><div class="w-3 h-3 rounded-full bg-red-500/70"></div><div class="w-3 h-3 rounded-full bg-yellow-500/70"></div><div class="w-3 h-3 rounded-full bg-green-500/70"></div></div>
+                            <span class="text-xs text-gray-500 font-mono ml-2">arrays.seven</span>
+                        </div>
+                        <pre class="px-5 py-4 text-sm font-mono leading-relaxed overflow-x-auto"><code><span class="cm">!! Create and manipulate arrays</span>
+<span class="op">nums</span> = [<span class="num">10</span>, <span class="num">20</span>, <span class="num">30</span>, <span class="num">40</span>, <span class="num">50</span>]
+<span class="fn">push</span>(<span class="op">nums</span>, <span class="num">60</span>)
+<span class="fn">sort</span>(<span class="op">nums</span>)
+
+<span class="kw">each</span> <span class="op">nums</span> <span class="kw">as</span> <span class="op">i</span>, <span class="op">val</span>
+    <span class="io">show</span> <span class="str">"["</span> + <span class="op">i</span> + <span class="str">"] = "</span> + <span class="op">val</span>
+<span class="kw">end</span>
+
+<span class="io">show</span> <span class="str">"Sum: "</span> + <span class="fn">sum</span>(<span class="op">nums</span>)
+<span class="io">show</span> <span class="str">"Unique: "</span> + <span class="fn">unique</span>(<span class="op">nums</span>)</code></pre>
+                    </div>
+                    <div id="tab-functions" class="tab-content">
+                        <div class="flex items-center gap-2 px-4 py-3 border-b border-white/5">
+                            <div class="flex gap-1.5"><div class="w-3 h-3 rounded-full bg-red-500/70"></div><div class="w-3 h-3 rounded-full bg-yellow-500/70"></div><div class="w-3 h-3 rounded-full bg-green-500/70"></div></div>
+                            <span class="text-xs text-gray-500 font-mono ml-2">functions.seven</span>
+                        </div>
+                        <pre class="px-5 py-4 text-sm font-mono leading-relaxed overflow-x-auto"><code><span class="cm">!! Define reusable functions</span>
+<span class="kw">func</span> <span class="fn">greet</span>(<span class="op">name</span>)
+    <span class="io">show</span> <span class="str">"Hello, "</span> + <span class="op">name</span> + <span class="str">"!"</span>
+<span class="kw">end</span>
+
+<span class="kw">func</span> <span class="fn">factorial</span>(<span class="op">n</span>)
+    <span class="kw">if</span> <span class="op">n</span> <span class="kw">below</span> <span class="num">2</span>
+        <span class="kw">return</span> <span class="num">1</span>
+    <span class="kw">end</span>
+    <span class="kw">return</span> <span class="op">n</span> * <span class="fn">factorial</span>(<span class="op">n</span> - <span class="num">1</span>)
+<span class="kw">end</span>
+
+<span class="fn">greet</span>(<span class="str">"World"</span>)
+<span class="io">show</span> <span class="str">"10! = "</span> + <span class="fn">factorial</span>(<span class="num">10</span>)</code></pre>
+                    </div>
+                    <div id="tab-fileio" class="tab-content">
+                        <div class="flex items-center gap-2 px-4 py-3 border-b border-white/5">
+                            <div class="flex gap-1.5"><div class="w-3 h-3 rounded-full bg-red-500/70"></div><div class="w-3 h-3 rounded-full bg-yellow-500/70"></div><div class="w-3 h-3 rounded-full bg-green-500/70"></div></div>
+                            <span class="text-xs text-gray-500 font-mono ml-2">file_io.seven</span>
+                        </div>
+                        <pre class="px-5 py-4 text-sm font-mono leading-relaxed overflow-x-auto"><code><span class="cm">!! File operations</span>
+<span class="io">write</span> <span class="str">"notes.txt"</span>, <span class="str">"Hello from SEVEN!"</span>
+<span class="fn">append</span>(<span class="str">"notes.txt"</span>, <span class="str">"\nLine two"</span>)
+
+<span class="kw">if</span> <span class="fn">exists</span>(<span class="str">"notes.txt"</span>)
+    <span class="op">content</span> = <span class="io">read</span> <span class="str">"notes.txt"</span>
+    <span class="io">show</span> <span class="op">content</span>
+
+    <span class="op">all_lines</span> = <span class="fn">lines</span>(<span class="str">"notes.txt"</span>)
+    <span class="kw">each</span> <span class="op">all_lines</span> <span class="kw">as</span> <span class="op">line</span>
+        <span class="io">show</span> <span class="str">"&gt; "</span> + <span class="op">line</span>
+    <span class="kw">end</span>
+<span class="kw">end</span>
+
+<span class="fn">delete</span>(<span class="str">"notes.txt"</span>)</code></pre>
+                    </div>
+                    <div id="tab-loops" class="tab-content">
+                        <div class="flex items-center gap-2 px-4 py-3 border-b border-white/5">
+                            <div class="flex gap-1.5"><div class="w-3 h-3 rounded-full bg-red-500/70"></div><div class="w-3 h-3 rounded-full bg-yellow-500/70"></div><div class="w-3 h-3 rounded-full bg-green-500/70"></div></div>
+                            <span class="text-xs text-gray-500 font-mono ml-2">loops.seven</span>
+                        </div>
+                        <pre class="px-5 py-4 text-sm font-mono leading-relaxed overflow-x-auto"><code><span class="cm">!! Repeat N times</span>
+<span class="kw">repeat</span> <span class="num">5</span> <span class="kw">times</span> <span class="kw">as</span> <span class="op">i</span>
+    <span class="io">show</span> <span class="str">"iteration "</span> + <span class="op">i</span>
+<span class="kw">end</span>
+
+<span class="cm">!! While loop</span>
+<span class="op">x</span> = <span class="num">0</span>
+<span class="kw">while</span> <span class="op">x</span> <span class="kw">below</span> <span class="num">5</span>
+    <span class="io">show</span> <span class="str">"x = "</span> + <span class="op">x</span>
+    <span class="op">x</span> = <span class="op">x</span> + <span class="num">1</span>
+<span class="kw">end</span>
+
+<span class="cm">!! Each with skip and stop</span>
+<span class="op">nums</span> = [<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>, <span class="num">4</span>, <span class="num">5</span>]
+<span class="kw">each</span> <span class="op">nums</span> <span class="kw">as</span> <span class="op">n</span>
+    <span class="kw">if</span> <span class="op">n</span> <span class="kw">is</span> <span class="num">3</span>
+        <span class="kw">skip</span>
+    <span class="kw">end</span>
+    <span class="io">show</span> <span class="op">n</span>
+<span class="kw">end</span></code></pre>
+                    </div>
+                    <div id="tab-errorhandling" class="tab-content">
+                        <div class="flex items-center gap-2 px-4 py-3 border-b border-white/5">
+                            <div class="flex gap-1.5"><div class="w-3 h-3 rounded-full bg-red-500/70"></div><div class="w-3 h-3 rounded-full bg-yellow-500/70"></div><div class="w-3 h-3 rounded-full bg-green-500/70"></div></div>
+                            <span class="text-xs text-gray-500 font-mono ml-2">errors.seven</span>
+                        </div>
+                        <pre class="px-5 py-4 text-sm font-mono leading-relaxed overflow-x-auto"><code><span class="cm">!! Try-catch error handling</span>
+<span class="kw">try</span>
+    <span class="op">result</span> = <span class="num">100</span> / <span class="num">0</span>
+    <span class="io">show</span> <span class="op">result</span>
+<span class="kw">catch</span> <span class="op">e</span>
+    <span class="io">err</span> <span class="str">"Caught: "</span> + <span class="op">e</span>
+<span class="kw">done</span>
+
+<span class="cm">!! Throw custom errors</span>
+<span class="kw">func</span> <span class="fn">divide</span>(<span class="op">a</span>, <span class="op">b</span>)
+    <span class="kw">if</span> <span class="op">b</span> <span class="kw">is</span> <span class="num">0</span>
+        <span class="kw">error</span> <span class="str">"Cannot divide by zero"</span>
+    <span class="kw">end</span>
+    <span class="kw">return</span> <span class="op">a</span> / <span class="op">b</span>
+<span class="kw">end</span>
+
+<span class="io">show</span> <span class="fn">divide</span>(<span class="num">10</span>, <span class="num">3</span>)</code></pre>
+                    </div>
+                </div>
+            </div>
+            <div class="text-center mt-8">
+                <a href="examples.html" class="text-seven-400 hover:text-seven-300 text-sm font-medium transition-colors">View all examples &rarr;</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Built-in Functions -->
+    <section class="py-20 sm:py-28 border-t border-white/5 bg-white/[0.01]">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl sm:text-4xl font-bold text-white mb-4">47 Built-in Functions</h2>
+                <p class="text-gray-400 text-lg">Plus 11 string methods. Everything you need out of the box.</p>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
+                <div class="p-5 rounded-xl border border-white/5 bg-white/[0.02]">
+                    <h3 class="text-sm font-semibold text-seven-400 uppercase tracking-wider mb-3">String</h3>
+                    <p class="font-mono text-sm text-gray-400 leading-loose">replace upper lower trim find count pad substr</p>
+                </div>
+                <div class="p-5 rounded-xl border border-white/5 bg-white/[0.02]">
+                    <h3 class="text-sm font-semibold text-purple-400 uppercase tracking-wider mb-3">Math</h3>
+                    <p class="font-mono text-sm text-gray-400 leading-loose">abs min max sqrt pow clamp sign gcd sum avg random</p>
+                </div>
+                <div class="p-5 rounded-xl border border-white/5 bg-white/[0.02]">
+                    <h3 class="text-sm font-semibold text-emerald-400 uppercase tracking-wider mb-3">Array</h3>
+                    <p class="font-mono text-sm text-gray-400 leading-loose">len push pop sort join range slice reverse step unique fill concat insert remove find</p>
+                </div>
+                <div class="p-5 rounded-xl border border-white/5 bg-white/[0.02]">
+                    <h3 class="text-sm font-semibold text-amber-400 uppercase tracking-wider mb-3">Conversion</h3>
+                    <p class="font-mono text-sm text-gray-400 leading-loose">str int hex bin bool number type ord chr</p>
+                </div>
+                <div class="p-5 rounded-xl border border-white/5 bg-white/[0.02]">
+                    <h3 class="text-sm font-semibold text-pink-400 uppercase tracking-wider mb-3">File I/O</h3>
+                    <p class="font-mono text-sm text-gray-400 leading-loose">read write exists append delete lines</p>
+                </div>
+                <div class="p-5 rounded-xl border border-white/5 bg-white/[0.02]">
+                    <h3 class="text-sm font-semibold text-cyan-400 uppercase tracking-wider mb-3">OS / System</h3>
+                    <p class="font-mono text-sm text-gray-400 leading-loose">time clock sleep args env system exit</p>
+                </div>
+            </div>
+            <div class="text-center mt-8">
+                <a href="docs.html" class="text-seven-400 hover:text-seven-300 text-sm font-medium transition-colors">Full reference in docs &rarr;</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Developer Tools -->
+    <section class="py-20 sm:py-28 border-t border-white/5">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl sm:text-4xl font-bold text-white mb-4">Developer Tools</h2>
+                <p class="text-gray-400 text-lg">Everything you need to write, debug, and optimize SEVEN code</p>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 max-w-5xl mx-auto">
+                <div class="text-center p-6 rounded-2xl border border-white/5 bg-white/[0.02]">
+                    <div class="text-3xl mb-3">&#9654;</div>
+                    <h3 class="font-semibold text-white mb-1">REPL</h3>
+                    <p class="text-gray-500 text-sm">Interactive shell with history, undo, and block support</p>
+                </div>
+                <div class="text-center p-6 rounded-2xl border border-white/5 bg-white/[0.02]">
+                    <div class="text-3xl mb-3">&#9998;</div>
+                    <h3 class="font-semibold text-white mb-1">Formatter</h3>
+                    <p class="text-gray-500 text-sm">Auto-indent with CI-friendly <code class="text-gray-400 font-mono text-xs">--check</code> mode</p>
+                </div>
+                <div class="text-center p-6 rounded-2xl border border-white/5 bg-white/[0.02]">
+                    <div class="text-3xl mb-3">&#128270;</div>
+                    <h3 class="font-semibold text-white mb-1">Linter</h3>
+                    <p class="text-gray-500 text-sm">Block matching, style checks, unused variable detection</p>
+                </div>
+                <div class="text-center p-6 rounded-2xl border border-white/5 bg-white/[0.02]">
+                    <div class="text-3xl mb-3">&#9201;</div>
+                    <h3 class="font-semibold text-white mb-1">Profiler</h3>
+                    <p class="text-gray-500 text-sm">Compile, assembly, and execution timing over N runs</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="py-20 sm:py-28 border-t border-white/5 bg-white/[0.01]">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <h2 class="text-3xl sm:text-4xl font-bold text-white mb-4">Ready to try SEVEN?</h2>
+            <p class="text-gray-400 text-lg mb-8 max-w-xl mx-auto">Get started in minutes. Build something fast.</p>
+            <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+                <a href="install.html" class="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-seven-600 hover:bg-seven-500 text-white font-medium transition-all shadow-lg shadow-seven-600/20">
+                    Install SEVEN
+                </a>
+                <a href="https://github.com/tejas-chandivakar/seven-lang" target="_blank" class="w-full sm:w-auto px-8 py-3.5 rounded-xl border border-white/10 hover:border-white/20 text-gray-300 hover:text-white font-medium transition-all">
+                    Star on GitHub
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="border-t border-white/5 py-10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-6 h-6 rounded-md bg-seven-600 flex items-center justify-center font-mono font-bold text-white text-xs">7</div>
+                    <span class="text-sm text-gray-500">SEVEN Language &copy; 2024 Tejas Chandivakar</span>
+                </div>
+                <div class="flex items-center gap-6">
+                    <a href="docs.html" class="text-sm text-gray-500 hover:text-gray-300 transition-colors">Docs</a>
+                    <a href="examples.html" class="text-sm text-gray-500 hover:text-gray-300 transition-colors">Examples</a>
+                    <a href="install.html" class="text-sm text-gray-500 hover:text-gray-300 transition-colors">Install</a>
+                    <a href="https://github.com/tejas-chandivakar/seven-lang" target="_blank" class="text-sm text-gray-500 hover:text-gray-300 transition-colors">GitHub</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Mobile menu toggle
+        document.getElementById('mobileMenuBtn').addEventListener('click', function() {
+            document.getElementById('mobileMenu').classList.toggle('hidden');
+        });
+
+        // Tab switching
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const tab = this.dataset.tab;
+                document.querySelectorAll('.tab-btn').forEach(b => {
+                    b.className = 'tab-btn px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white border border-white/5 hover:border-white/10 transition';
+                });
+                this.className = 'tab-btn px-4 py-2 rounded-lg text-sm font-medium bg-seven-600/20 text-seven-400 border border-seven-500/30';
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                document.getElementById('tab-' + tab).classList.add('active');
+            });
+        });
+
+        // Animate bars on scroll
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.querySelectorAll('.bar-animate').forEach(bar => {
+                        bar.style.animationPlayState = 'running';
+                    });
+                }
+            });
+        }, { threshold: 0.3 });
+        const benchSection = document.getElementById('benchmarks');
+        if (benchSection) {
+            benchSection.querySelectorAll('.bar-animate').forEach(bar => {
+                bar.style.animationPlayState = 'paused';
+            });
+            observer.observe(benchSection);
+        }
+    </script>
+</body>
+</html>

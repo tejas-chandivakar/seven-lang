@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Install — SEVEN Language</title>
+    <script src="https://cdn.tailwindcss.com/3.4.16"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        seven: { 400: '#59b0ff', 500: '#3b8eff', 600: '#2570f5' },
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        .code-block { background: #0d1117; }
+        .copy-btn:active { transform: scale(0.95); }
+    </style>
+</head>
+<body class="bg-[#09090b] text-gray-200 font-sans antialiased">
+
+    <!-- Navbar -->
+    <nav class="fixed top-0 w-full z-50 border-b border-white/5 bg-[#09090b]/80 backdrop-blur-xl">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <a href="index.html" class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-lg bg-seven-600 flex items-center justify-center font-mono font-bold text-white text-sm">7</div>
+                    <span class="font-semibold text-white text-lg tracking-tight">SEVEN</span>
+                </a>
+                <div class="hidden md:flex items-center gap-8">
+                    <a href="docs.html" class="text-sm text-gray-400 hover:text-white transition-colors">Docs</a>
+                    <a href="examples.html" class="text-sm text-gray-400 hover:text-white transition-colors">Examples</a>
+                    <a href="install.html" class="text-sm text-white transition-colors">Install</a>
+                    <a href="https://github.com/tejas-chandivakar/seven-lang" target="_blank" class="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-1.5">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                        GitHub
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="pt-28 pb-20">
+        <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h1 class="text-4xl sm:text-5xl font-bold text-white mb-4">Install SEVEN</h1>
+            <p class="text-lg text-gray-400 mb-12">Get up and running in under a minute.</p>
+
+            <!-- Requirements -->
+            <section class="mb-12">
+                <h2 class="text-xl font-semibold text-white mb-4">Requirements</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="p-4 rounded-xl border border-white/5 bg-white/[0.02]">
+                        <p class="font-mono text-sm text-seven-400 mb-1">Platform</p>
+                        <p class="text-sm text-gray-400">Linux x86-64</p>
+                    </div>
+                    <div class="p-4 rounded-xl border border-white/5 bg-white/[0.02]">
+                        <p class="font-mono text-sm text-seven-400 mb-1">Assembler</p>
+                        <p class="text-sm text-gray-400">NASM</p>
+                    </div>
+                    <div class="p-4 rounded-xl border border-white/5 bg-white/[0.02]">
+                        <p class="font-mono text-sm text-seven-400 mb-1">Linker</p>
+                        <p class="text-sm text-gray-400">GNU ld</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Install deps -->
+            <section class="mb-12">
+                <h2 class="text-xl font-semibold text-white mb-4">1. Install Dependencies</h2>
+                <div class="code-block rounded-xl border border-white/5 overflow-hidden">
+                    <div class="flex items-center justify-between px-4 py-2.5 border-b border-white/5">
+                        <span class="text-xs text-gray-500 font-mono">Ubuntu / Debian</span>
+                        <button onclick="copyCode(this)" class="copy-btn text-xs text-gray-500 hover:text-white transition px-2 py-1 rounded">Copy</button>
+                    </div>
+                    <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>sudo apt update
+sudo apt install nasm binutils make</code></pre>
+                </div>
+                <div class="code-block rounded-xl border border-white/5 overflow-hidden mt-4">
+                    <div class="flex items-center justify-between px-4 py-2.5 border-b border-white/5">
+                        <span class="text-xs text-gray-500 font-mono">Fedora / RHEL</span>
+                        <button onclick="copyCode(this)" class="copy-btn text-xs text-gray-500 hover:text-white transition px-2 py-1 rounded">Copy</button>
+                    </div>
+                    <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>sudo dnf install nasm binutils make</code></pre>
+                </div>
+                <div class="code-block rounded-xl border border-white/5 overflow-hidden mt-4">
+                    <div class="flex items-center justify-between px-4 py-2.5 border-b border-white/5">
+                        <span class="text-xs text-gray-500 font-mono">Arch Linux</span>
+                        <button onclick="copyCode(this)" class="copy-btn text-xs text-gray-500 hover:text-white transition px-2 py-1 rounded">Copy</button>
+                    </div>
+                    <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>sudo pacman -S nasm binutils make</code></pre>
+                </div>
+            </section>
+
+            <!-- Build from source -->
+            <section class="mb-12">
+                <h2 class="text-xl font-semibold text-white mb-4">2. Build from Source</h2>
+                <div class="code-block rounded-xl border border-white/5 overflow-hidden">
+                    <div class="flex items-center justify-between px-4 py-2.5 border-b border-white/5">
+                        <span class="text-xs text-gray-500 font-mono">Terminal</span>
+                        <button onclick="copyCode(this)" class="copy-btn text-xs text-gray-500 hover:text-white transition px-2 py-1 rounded">Copy</button>
+                    </div>
+                    <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>git clone https://github.com/tejas-chandivakar/seven-lang.git
+cd seven-lang
+make</code></pre>
+                </div>
+                <p class="text-sm text-gray-500 mt-3">This builds the compiler at <code class="text-gray-400 font-mono text-xs">build/seven</code>.</p>
+            </section>
+
+            <!-- Verify -->
+            <section class="mb-12">
+                <h2 class="text-xl font-semibold text-white mb-4">3. Verify Installation</h2>
+                <div class="code-block rounded-xl border border-white/5 overflow-hidden">
+                    <div class="flex items-center justify-between px-4 py-2.5 border-b border-white/5">
+                        <span class="text-xs text-gray-500 font-mono">Terminal</span>
+                    </div>
+                    <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>./build/seven version
+<span class="text-emerald-400">SEVEN v0.7.0</span></code></pre>
+                </div>
+            </section>
+
+            <!-- First program -->
+            <section class="mb-12">
+                <h2 class="text-xl font-semibold text-white mb-4">4. Write Your First Program</h2>
+                <div class="code-block rounded-xl border border-white/5 overflow-hidden">
+                    <div class="flex items-center justify-between px-4 py-2.5 border-b border-white/5">
+                        <span class="text-xs text-gray-500 font-mono">hello.seven</span>
+                    </div>
+                    <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code><span class="text-pink-400">show</span> <span class="text-emerald-400">"Hello, World!"</span></code></pre>
+                </div>
+                <div class="code-block rounded-xl border border-white/5 overflow-hidden mt-4">
+                    <div class="flex items-center justify-between px-4 py-2.5 border-b border-white/5">
+                        <span class="text-xs text-gray-500 font-mono">Compile and run</span>
+                    </div>
+                    <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>./build/seven build hello.seven
+./hello
+<span class="text-emerald-400">Hello, World!</span></code></pre>
+                </div>
+            </section>
+
+            <!-- Windows WSL -->
+            <section class="mb-12">
+                <h2 class="text-xl font-semibold text-white mb-4">Windows (via WSL)</h2>
+                <p class="text-gray-400 text-sm mb-4">SEVEN runs on Windows through the Windows Subsystem for Linux.</p>
+                <div class="code-block rounded-xl border border-white/5 overflow-hidden">
+                    <div class="flex items-center justify-between px-4 py-2.5 border-b border-white/5">
+                        <span class="text-xs text-gray-500 font-mono">PowerShell (one-time setup)</span>
+                    </div>
+                    <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>wsl --install</code></pre>
+                </div>
+                <p class="text-sm text-gray-500 mt-3">After WSL is set up, open it and follow the Linux install steps above.</p>
+            </section>
+
+            <!-- VS Code Extension -->
+            <section class="p-6 rounded-2xl border border-white/5 bg-white/[0.02]">
+                <h2 class="text-xl font-semibold text-white mb-3">VS Code Extension</h2>
+                <p class="text-gray-400 text-sm mb-4">Syntax highlighting and code snippets for SEVEN files.</p>
+                <div class="code-block rounded-xl border border-white/5 overflow-hidden">
+                    <pre class="px-5 py-3 text-sm font-mono text-gray-300 overflow-x-auto"><code>cd editor/vscode
+code --install-extension .</code></pre>
+                </div>
+                <p class="text-sm text-gray-500 mt-3">Supports <code class="text-gray-400 font-mono text-xs">.seven</code>, <code class="text-gray-400 font-mono text-xs">.sev</code>, <code class="text-gray-400 font-mono text-xs">.sv7</code>, <code class="text-gray-400 font-mono text-xs">.s7</code> file extensions.</p>
+            </section>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-white/5 py-10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-6 h-6 rounded-md bg-seven-600 flex items-center justify-center font-mono font-bold text-white text-xs">7</div>
+                    <span class="text-sm text-gray-500">SEVEN Language &copy; 2024 Tejas Chandivakar</span>
+                </div>
+                <div class="flex items-center gap-6">
+                    <a href="docs.html" class="text-sm text-gray-500 hover:text-gray-300 transition-colors">Docs</a>
+                    <a href="examples.html" class="text-sm text-gray-500 hover:text-gray-300 transition-colors">Examples</a>
+                    <a href="https://github.com/tejas-chandivakar/seven-lang" target="_blank" class="text-sm text-gray-500 hover:text-gray-300 transition-colors">GitHub</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        function copyCode(btn) {
+            const code = btn.closest('.code-block').querySelector('code').textContent;
+            navigator.clipboard.writeText(code).then(() => {
+                btn.textContent = 'Copied!';
+                setTimeout(() => btn.textContent = 'Copy', 2000);
+            });
+        }
+    </script>
+</body>
+</html>

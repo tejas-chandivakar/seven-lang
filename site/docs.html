@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Documentation — SEVEN Language</title>
+    <script src="https://cdn.tailwindcss.com/3.4.16"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        seven: { 400: '#59b0ff', 500: '#3b8eff', 600: '#2570f5' },
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        .code-block { background: #0d1117; }
+        pre code .kw { color: #c084fc; }
+        pre code .str { color: #86efac; }
+        pre code .num { color: #fbbf24; }
+        pre code .cm { color: #6b7280; }
+        pre code .fn { color: #67e8f9; }
+        pre code .io { color: #f472b6; }
+        pre code .op { color: #94a3b8; }
+        .doc-section { scroll-margin-top: 5rem; }
+        .sidebar-link.active { color: #3b8eff; border-left-color: #3b8eff; }
+    </style>
+</head>
+<body class="bg-[#09090b] text-gray-200 font-sans antialiased">
+
+    <!-- Navbar -->
+    <nav class="fixed top-0 w-full z-50 border-b border-white/5 bg-[#09090b]/80 backdrop-blur-xl">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <a href="index.html" class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-lg bg-seven-600 flex items-center justify-center font-mono font-bold text-white text-sm">7</div>
+                    <span class="font-semibold text-white text-lg tracking-tight">SEVEN</span>
+                </a>
+                <div class="hidden md:flex items-center gap-8">
+                    <a href="docs.html" class="text-sm text-white transition-colors">Docs</a>
+                    <a href="examples.html" class="text-sm text-gray-400 hover:text-white transition-colors">Examples</a>
+                    <a href="install.html" class="text-sm text-gray-400 hover:text-white transition-colors">Install</a>
+                    <a href="https://github.com/tejas-chandivakar/seven-lang" target="_blank" class="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-1.5">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                        GitHub
+                    </a>
+                </div>
+                <button id="sidebarToggle" class="lg:hidden text-gray-400 hover:text-white">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20">
+        <div class="flex gap-8">
+            <!-- Sidebar -->
+            <aside id="sidebar" class="hidden lg:block w-56 shrink-0 sticky top-20 h-[calc(100vh-5rem)] overflow-y-auto pb-8">
+                <nav class="space-y-1 text-sm">
+                    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 mt-4">Getting Started</p>
+                    <a href="#overview" class="sidebar-link block py-1.5 pl-3 border-l-2 border-transparent text-gray-400 hover:text-white transition-colors">Overview</a>
+                    <a href="#modes" class="sidebar-link block py-1.5 pl-3 border-l-2 border-transparent text-gray-400 hover:text-white transition-colors">Mode System</a>
+
+                    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 mt-6">Language</p>
+                    <a href="#comments" class="sidebar-link block py-1.5 pl-3 border-l-2 border-transparent text-gray-400 hover:text-white transition-colors">Comments</a>
+                    <a href="#variables" class="sidebar-link block py-1.5 pl-3 border-l-2 border-transparent text-gray-400 hover:text-white transition-colors">Variables</a>
+                    <a href="#types" class="sidebar-link block py-1.5 pl-3 border-l-2 border-transparent text-gray-400 hover:text-white transition-colors">Types & Literals</a>
+                    <a href="#operators" class="sidebar-link block py-1.5 pl-3 border-l-2 border-transparent text-gray-400 hover:text-white transition-colors">Operators</a>
+                    <a href="#io" class="sidebar-link block py-1.5 pl-3 border-l-2 border-transparent text-gray-400 hover:text-white transition-colors">I/O</a>
+                    <a href="#control" class="sidebar-link block py-1.5 pl-3 border-l-2 border-transparent text-gray-400 hover:text-white transition-colors">Control Flow</a>
+                    <a href="#functions" class="sidebar-link block py-1.5 pl-3 border-l-2 border-transparent text-gray-400 hover:text-white transition-colors">Functions</a>
+                    <a href="#strings" class="sidebar-link block py-1.5 pl-3 border-l-2 border-transparent text-gray-400 hover:text-white transition-colors">Strings</a>
+                    <a href="#arrays" class="sidebar-link block py-1.5 pl-3 border-l-2 border-transparent text-gray-400 hover:text-white transition-colors">Arrays</a>
+                    <a href="#errors" class="sidebar-link block py-1.5 pl-3 border-l-2 border-transparent text-gray-400 hover:text-white transition-colors">Error Handling</a>
+
+                    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 mt-6">Standard Library</p>
+                    <a href="#builtin-string" class="sidebar-link block py-1.5 pl-3 border-l-2 border-transparent text-gray-400 hover:text-white transition-colors">String Functions</a>
+                    <a href="#builtin-math" class="sidebar-link block py-1.5 pl-3 border-l-2 border-transparent text-gray-400 hover:text-white transition-colors">Math Functions</a>
+                    <a href="#builtin-array" class="sidebar-link block py-1.5 pl-3 border-l-2 border-transparent text-gray-400 hover:text-white transition-colors">Array Functions</a>
+                    <a href="#builtin-convert" class="sidebar-link block py-1.5 pl-3 border-l-2 border-transparent text-gray-400 hover:text-white transition-colors">Conversion</a>
+                    <a href="#builtin-file" class="sidebar-link block py-1.5 pl-3 border-l-2 border-transparent text-gray-400 hover:text-white transition-colors">File I/O</a>
+                    <a href="#builtin-os" class="sidebar-link block py-1.5 pl-3 border-l-2 border-transparent text-gray-400 hover:text-white transition-colors">OS / System</a>
+                    <a href="#string-methods" class="sidebar-link block py-1.5 pl-3 border-l-2 border-transparent text-gray-400 hover:text-white transition-colors">String Methods</a>
+
+                    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 mt-6">Tools</p>
+                    <a href="#tools" class="sidebar-link block py-1.5 pl-3 border-l-2 border-transparent text-gray-400 hover:text-white transition-colors">Developer Tools</a>
+                    <a href="#runtime" class="sidebar-link block py-1.5 pl-3 border-l-2 border-transparent text-gray-400 hover:text-white transition-colors">Runtime Model</a>
+                </nav>
+            </aside>
+
+            <!-- Main Content -->
+            <main class="flex-1 min-w-0 pb-20 pt-6">
+                <div class="prose prose-invert max-w-none">
+
+                    <!-- Overview -->
+                    <section id="overview" class="doc-section mb-16">
+                        <h1 class="text-3xl sm:text-4xl font-bold text-white mb-2">SEVEN Language Documentation</h1>
+                        <p class="text-gray-400 mb-6">Version 0.7 &mdash; Phase 7 Complete</p>
+                        <p class="text-gray-300 leading-relaxed mb-4">SEVEN is a compiled, dynamically-typed programming language designed for <strong class="text-white">assembly-level speed with Python-level simplicity</strong>.</p>
+                        <ul class="space-y-2 text-gray-400 text-sm">
+                            <li>File extensions: <code class="text-seven-400 font-mono">.seven</code> (primary), <code class="text-gray-400 font-mono">.sev</code>, <code class="text-gray-400 font-mono">.sv7</code>, <code class="text-gray-400 font-mono">.s7</code></li>
+                            <li>Compile: <code class="text-seven-400 font-mono">seven build main.seven</code></li>
+                            <li>Run directly: <code class="text-seven-400 font-mono">seven run main.seven</code></li>
+                        </ul>
+
+                        <h3 class="text-lg font-semibold text-white mt-8 mb-3">Design Principles</h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div class="p-3 rounded-lg border border-white/5 bg-white/[0.02] text-sm"><strong class="text-white">Speed first</strong> — direct assembly, no VM, no GC</div>
+                            <div class="p-3 rounded-lg border border-white/5 bg-white/[0.02] text-sm"><strong class="text-white">Human-readable</strong> — show, ask, repeat, each</div>
+                            <div class="p-3 rounded-lg border border-white/5 bg-white/[0.02] text-sm"><strong class="text-white">Explicit blocks</strong> — <code class="font-mono text-xs">end</code> closes every block</div>
+                            <div class="p-3 rounded-lg border border-white/5 bg-white/[0.02] text-sm"><strong class="text-white">One way</strong> — no +=, no ternary, small grammar</div>
+                        </div>
+                    </section>
+
+                    <!-- Mode System -->
+                    <section id="modes" class="doc-section mb-16">
+                        <h2 class="text-2xl font-bold text-white mb-4">Mode System</h2>
+                        <p class="text-gray-400 text-sm mb-4">Declare mode on the first line. Default is <code class="font-mono text-seven-400">hybrid</code>.</p>
+                        <div class="code-block rounded-xl border border-white/5 overflow-hidden mb-4">
+                            <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code><span class="kw">mode</span> <span class="kw">hybrid</span>       <span class="cm">!! default — push(list, x)</span>
+<span class="kw">mode</span> <span class="kw">natural</span>      <span class="cm">!! English — add x to list</span></code></pre>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm border-collapse">
+                                <thead><tr class="border-b border-white/10"><th class="text-left py-2 pr-4 text-gray-400 font-medium">Operation</th><th class="text-left py-2 pr-4 text-gray-400 font-medium">mode hybrid</th><th class="text-left py-2 text-gray-400 font-medium">mode natural</th></tr></thead>
+                                <tbody class="text-gray-300">
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4">Append</td><td class="py-2 pr-4 font-mono text-xs">push(list, x)</td><td class="py-2 font-mono text-xs">add x to list</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4">Remove</td><td class="py-2 pr-4 font-mono text-xs">remove(list, i)</td><td class="py-2 font-mono text-xs">remove i from list</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4">Insert</td><td class="py-2 pr-4 font-mono text-xs">insert(list, i, x)</td><td class="py-2 font-mono text-xs">insert x at i in list</td></tr>
+                                    <tr><td class="py-2 pr-4">Pop</td><td class="py-2 pr-4 font-mono text-xs">pop(list)</td><td class="py-2 font-mono text-xs">pop from list</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+
+                    <!-- Comments -->
+                    <section id="comments" class="doc-section mb-16">
+                        <h2 class="text-2xl font-bold text-white mb-4">Comments</h2>
+                        <div class="code-block rounded-xl border border-white/5 overflow-hidden">
+                            <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code><span class="cm">!! Single-line comment</span>
+<span class="op">x</span> = <span class="num">10</span>  <span class="cm">!! Inline comment</span>
+
+<span class="cm">!!!
+   Multi-line comment
+   Can span many lines
+!!!</span></code></pre>
+                        </div>
+                    </section>
+
+                    <!-- Variables -->
+                    <section id="variables" class="doc-section mb-16">
+                        <h2 class="text-2xl font-bold text-white mb-4">Variables</h2>
+                        <p class="text-gray-400 text-sm mb-4">All variables are global. Assignment creates the variable.</p>
+                        <div class="code-block rounded-xl border border-white/5 overflow-hidden">
+                            <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code><span class="op">name</span> = <span class="str">"SEVEN"</span>
+<span class="op">age</span> = <span class="num">7</span>
+<span class="op">pi</span> = <span class="num">3.14</span>
+<span class="op">active</span> = <span class="kw">true</span>
+<span class="op">items</span> = [<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>]
+<span class="op">empty</span> = <span class="kw">null</span></code></pre>
+                        </div>
+                    </section>
+
+                    <!-- Types & Literals -->
+                    <section id="types" class="doc-section mb-16">
+                        <h2 class="text-2xl font-bold text-white mb-4">Types & Literals</h2>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm border-collapse">
+                                <thead><tr class="border-b border-white/10"><th class="text-left py-2 pr-4 text-gray-400 font-medium">Type</th><th class="text-left py-2 pr-4 text-gray-400 font-medium">Examples</th></tr></thead>
+                                <tbody class="text-gray-300 font-mono text-xs">
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-sans text-sm">Integer</td><td class="py-2">10, -5, 0xFF, 0b1010</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-sans text-sm">Float</td><td class="py-2">3.14, -2.5, 1e6</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-sans text-sm">String</td><td class="py-2">"hello", 'world', """multi\nline"""</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-sans text-sm">Boolean</td><td class="py-2">true, false</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-sans text-sm">Null</td><td class="py-2">null</td></tr>
+                                    <tr><td class="py-2 pr-4 font-sans text-sm">Array</td><td class="py-2">[1, 2, 3], ["a", "b"]</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="text-gray-500 text-sm mt-3">String interpolation: <code class="text-gray-300 font-mono text-xs">"Hello {name}"</code> auto-expands to <code class="text-gray-300 font-mono text-xs">"Hello " + name</code>.</p>
+                    </section>
+
+                    <!-- Operators -->
+                    <section id="operators" class="doc-section mb-16">
+                        <h2 class="text-2xl font-bold text-white mb-4">Operators</h2>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div class="p-4 rounded-xl border border-white/5 bg-white/[0.02]">
+                                <h4 class="text-sm font-semibold text-seven-400 mb-2">Arithmetic</h4>
+                                <p class="font-mono text-xs text-gray-400">+&nbsp;&nbsp;-&nbsp;&nbsp;*&nbsp;&nbsp;/&nbsp;&nbsp;%&nbsp;&nbsp;**</p>
+                            </div>
+                            <div class="p-4 rounded-xl border border-white/5 bg-white/[0.02]">
+                                <h4 class="text-sm font-semibold text-purple-400 mb-2">Comparison</h4>
+                                <p class="font-mono text-xs text-gray-400">is&nbsp;&nbsp;isnt&nbsp;&nbsp;above&nbsp;&nbsp;below&nbsp;&nbsp;atleast&nbsp;&nbsp;atmost</p>
+                            </div>
+                            <div class="p-4 rounded-xl border border-white/5 bg-white/[0.02]">
+                                <h4 class="text-sm font-semibold text-emerald-400 mb-2">Logic</h4>
+                                <p class="font-mono text-xs text-gray-400">and&nbsp;&nbsp;or&nbsp;&nbsp;not&nbsp;&nbsp;in&nbsp;&nbsp;not in</p>
+                            </div>
+                            <div class="p-4 rounded-xl border border-white/5 bg-white/[0.02]">
+                                <h4 class="text-sm font-semibold text-amber-400 mb-2">Bitwise</h4>
+                                <p class="font-mono text-xs text-gray-400">&amp;&nbsp;&nbsp;|&nbsp;&nbsp;^&nbsp;&nbsp;~&nbsp;&nbsp;&lt;&lt;&nbsp;&nbsp;&gt;&gt;</p>
+                            </div>
+                        </div>
+                        <p class="text-gray-500 text-sm mt-4">Precedence (low→high): or &rarr; and &rarr; compare &rarr; add &rarr; mul &rarr; unary &rarr; power &rarr; primary</p>
+                    </section>
+
+                    <!-- I/O -->
+                    <section id="io" class="doc-section mb-16">
+                        <h2 class="text-2xl font-bold text-white mb-4">Input / Output</h2>
+                        <div class="code-block rounded-xl border border-white/5 overflow-hidden">
+                            <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code><span class="io">show</span> <span class="str">"Hello!"</span>              <span class="cm">!! print + newline</span>
+<span class="io">show</span> <span class="str">"a"</span>, <span class="str">"b"</span>, <span class="str">"c"</span>         <span class="cm">!! prints: a b c</span>
+<span class="io">err</span> <span class="str">"warning!"</span>             <span class="cm">!! print to stderr</span>
+
+<span class="op">name</span> = <span class="io">ask</span> <span class="str">"Name: "</span>         <span class="cm">!! prompt + read line</span>
+<span class="op">pass</span> = <span class="io">secret</span> <span class="str">"Password: "</span>  <span class="cm">!! hidden input</span>
+
+<span class="io">write</span> <span class="str">"file.txt"</span>, <span class="op">data</span>    <span class="cm">!! write to file</span>
+<span class="op">text</span> = <span class="io">read</span> <span class="str">"file.txt"</span>     <span class="cm">!! read from file</span></code></pre>
+                        </div>
+                    </section>
+
+                    <!-- Control Flow -->
+                    <section id="control" class="doc-section mb-16">
+                        <h2 class="text-2xl font-bold text-white mb-4">Control Flow</h2>
+
+                        <h3 class="text-lg font-semibold text-white mt-6 mb-3">if / elif / else</h3>
+                        <div class="code-block rounded-xl border border-white/5 overflow-hidden mb-6">
+                            <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code><span class="kw">if</span> <span class="op">score</span> <span class="kw">atleast</span> <span class="num">90</span>
+    <span class="io">show</span> <span class="str">"A"</span>
+<span class="kw">elif</span> <span class="op">score</span> <span class="kw">atleast</span> <span class="num">80</span>
+    <span class="io">show</span> <span class="str">"B"</span>
+<span class="kw">else</span>
+    <span class="io">show</span> <span class="str">"F"</span>
+<span class="kw">end</span></code></pre>
+                        </div>
+
+                        <h3 class="text-lg font-semibold text-white mt-6 mb-3">while</h3>
+                        <div class="code-block rounded-xl border border-white/5 overflow-hidden mb-6">
+                            <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code><span class="kw">while</span> <span class="op">x</span> <span class="kw">below</span> <span class="num">10</span>
+    <span class="io">show</span> <span class="op">x</span>
+    <span class="op">x</span> = <span class="op">x</span> + <span class="num">1</span>
+<span class="kw">end</span></code></pre>
+                        </div>
+
+                        <h3 class="text-lg font-semibold text-white mt-6 mb-3">repeat</h3>
+                        <div class="code-block rounded-xl border border-white/5 overflow-hidden mb-6">
+                            <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code><span class="kw">repeat</span> <span class="num">5</span> <span class="kw">times</span>
+    <span class="io">show</span> <span class="str">"Hello"</span>
+<span class="kw">end</span>
+
+<span class="kw">repeat</span> <span class="num">10</span> <span class="kw">times</span> <span class="kw">as</span> <span class="op">i</span>
+    <span class="io">show</span> <span class="op">i</span>
+<span class="kw">end</span></code></pre>
+                        </div>
+
+                        <h3 class="text-lg font-semibold text-white mt-6 mb-3">each</h3>
+                        <div class="code-block rounded-xl border border-white/5 overflow-hidden mb-6">
+                            <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code><span class="kw">each</span> <span class="op">list</span> <span class="kw">as</span> <span class="op">item</span>         <span class="cm">!! value only</span>
+    <span class="io">show</span> <span class="op">item</span>
+<span class="kw">end</span>
+
+<span class="kw">each</span> <span class="op">list</span> <span class="kw">as</span> <span class="op">i</span>, <span class="op">item</span>      <span class="cm">!! index + value</span>
+    <span class="io">show</span> <span class="op">i</span> + <span class="str">": "</span> + <span class="op">item</span>
+<span class="kw">end</span></code></pre>
+                        </div>
+
+                        <p class="text-gray-400 text-sm"><code class="font-mono text-seven-400">skip</code> = continue, <code class="font-mono text-seven-400">stop</code> = break. <code class="font-mono text-seven-400">x in list</code> tests membership.</p>
+                    </section>
+
+                    <!-- Functions -->
+                    <section id="functions" class="doc-section mb-16">
+                        <h2 class="text-2xl font-bold text-white mb-4">Functions</h2>
+                        <div class="code-block rounded-xl border border-white/5 overflow-hidden mb-4">
+                            <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code><span class="kw">func</span> <span class="fn">greet</span>(<span class="op">name</span>)
+    <span class="io">show</span> <span class="str">"Hello, "</span> + <span class="op">name</span>
+<span class="kw">end</span>
+
+<span class="kw">func</span> <span class="fn">add</span>(<span class="op">a</span>, <span class="op">b</span>)
+    <span class="kw">return</span> <span class="op">a</span> + <span class="op">b</span>
+<span class="kw">end</span>
+
+<span class="cm">!! Variadic parameters</span>
+<span class="kw">func</span> <span class="fn">print_all</span>(<span class="kw">many</span> <span class="op">items</span>)
+    <span class="kw">each</span> <span class="op">items</span> <span class="kw">as</span> <span class="op">item</span>
+        <span class="io">show</span> <span class="op">item</span>
+    <span class="kw">end</span>
+<span class="kw">end</span></code></pre>
+                        </div>
+                        <p class="text-gray-400 text-sm"><code class="font-mono text-seven-400">many</code> collects remaining args into an array. Must be the last parameter.</p>
+                    </section>
+
+                    <!-- Strings -->
+                    <section id="strings" class="doc-section mb-16">
+                        <h2 class="text-2xl font-bold text-white mb-4">Strings</h2>
+                        <div class="code-block rounded-xl border border-white/5 overflow-hidden mb-4">
+                            <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code><span class="op">s</span> = <span class="str">"Hello, World"</span>
+<span class="io">show</span> <span class="fn">len</span>(<span class="op">s</span>)              <span class="cm">!! 12</span>
+<span class="io">show</span> <span class="fn">upper</span>(<span class="op">s</span>)            <span class="cm">!! HELLO, WORLD</span>
+<span class="io">show</span> <span class="op">s</span>.<span class="fn">lower</span>()           <span class="cm">!! hello, world</span>
+<span class="io">show</span> <span class="op">s</span>.<span class="fn">contains</span>(<span class="str">"World"</span>) <span class="cm">!! 1 (true)</span>
+<span class="io">show</span> <span class="op">s</span>.<span class="fn">split</span>(<span class="str">", "</span>)       <span class="cm">!! ["Hello", "World"]</span>
+
+<span class="cm">!! Interpolation</span>
+<span class="op">name</span> = <span class="str">"SEVEN"</span>
+<span class="io">show</span> <span class="str">"Language: {name}"</span>   <span class="cm">!! Language: SEVEN</span></code></pre>
+                        </div>
+                    </section>
+
+                    <!-- Arrays -->
+                    <section id="arrays" class="doc-section mb-16">
+                        <h2 class="text-2xl font-bold text-white mb-4">Arrays</h2>
+                        <div class="code-block rounded-xl border border-white/5 overflow-hidden mb-4">
+                            <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code><span class="op">nums</span> = [<span class="num">10</span>, <span class="num">20</span>, <span class="num">30</span>]
+<span class="io">show</span> <span class="op">nums</span>[<span class="num">0</span>]              <span class="cm">!! 10</span>
+<span class="io">show</span> <span class="op">nums</span>[<span class="num">-1</span>]             <span class="cm">!! 30 (last element)</span>
+
+<span class="fn">push</span>(<span class="op">nums</span>, <span class="num">40</span>)
+<span class="fn">sort</span>(<span class="op">nums</span>)
+<span class="io">show</span> <span class="fn">join</span>(<span class="op">nums</span>, <span class="str">", "</span>)    <span class="cm">!! 10, 20, 30, 40</span>
+<span class="io">show</span> <span class="fn">len</span>(<span class="op">nums</span>)            <span class="cm">!! 4</span></code></pre>
+                        </div>
+                    </section>
+
+                    <!-- Error Handling -->
+                    <section id="errors" class="doc-section mb-16">
+                        <h2 class="text-2xl font-bold text-white mb-4">Error Handling</h2>
+                        <div class="code-block rounded-xl border border-white/5 overflow-hidden">
+                            <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code><span class="kw">try</span>
+    <span class="op">result</span> = <span class="num">10</span> / <span class="num">0</span>
+<span class="kw">catch</span> <span class="op">e</span>
+    <span class="io">err</span> <span class="str">"Error: "</span> + <span class="op">e</span>
+<span class="kw">done</span>
+
+<span class="cm">!! Throw custom errors</span>
+<span class="kw">error</span> <span class="str">"Something went wrong"</span></code></pre>
+                        </div>
+                    </section>
+
+                    <!-- Built-in String Functions -->
+                    <section id="builtin-string" class="doc-section mb-16">
+                        <h2 class="text-2xl font-bold text-white mb-4">String Functions</h2>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm border-collapse">
+                                <thead><tr class="border-b border-white/10"><th class="text-left py-2 pr-4 text-gray-400 font-medium">Function</th><th class="text-left py-2 text-gray-400 font-medium">Description</th></tr></thead>
+                                <tbody class="text-gray-300">
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">replace(str, old, new)</td><td class="py-2">Replace all occurrences</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">upper(str)</td><td class="py-2">Convert to uppercase</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">lower(str)</td><td class="py-2">Convert to lowercase</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">trim(str)</td><td class="py-2">Strip leading/trailing whitespace</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">find(str, sub)</td><td class="py-2">Find substring index (-1 if not found)</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">count(str, sub)</td><td class="py-2">Count non-overlapping occurrences</td></tr>
+                                    <tr><td class="py-2 pr-4 font-mono text-xs text-seven-400">pad(str, width, char)</td><td class="py-2">Left-pad to width</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+
+                    <!-- Built-in Math Functions -->
+                    <section id="builtin-math" class="doc-section mb-16">
+                        <h2 class="text-2xl font-bold text-white mb-4">Math Functions</h2>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm border-collapse">
+                                <thead><tr class="border-b border-white/10"><th class="text-left py-2 pr-4 text-gray-400 font-medium">Function</th><th class="text-left py-2 text-gray-400 font-medium">Description</th></tr></thead>
+                                <tbody class="text-gray-300">
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">abs(n)</td><td class="py-2">Absolute value</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">min(a, b)</td><td class="py-2">Minimum</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">max(a, b)</td><td class="py-2">Maximum</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">sqrt(n)</td><td class="py-2">Integer square root</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">pow(base, exp)</td><td class="py-2">Integer exponentiation</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">clamp(val, lo, hi)</td><td class="py-2">Clamp value to range</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">sign(n)</td><td class="py-2">Returns -1, 0, or 1</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">gcd(a, b)</td><td class="py-2">Greatest common divisor</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">sum(arr)</td><td class="py-2">Sum of array elements</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">avg(arr)</td><td class="py-2">Average (integer division)</td></tr>
+                                    <tr><td class="py-2 pr-4 font-mono text-xs text-seven-400">random(n)</td><td class="py-2">Random integer 0..n-1</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+
+                    <!-- Built-in Array Functions -->
+                    <section id="builtin-array" class="doc-section mb-16">
+                        <h2 class="text-2xl font-bold text-white mb-4">Array Functions</h2>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm border-collapse">
+                                <thead><tr class="border-b border-white/10"><th class="text-left py-2 pr-4 text-gray-400 font-medium">Function</th><th class="text-left py-2 text-gray-400 font-medium">Description</th></tr></thead>
+                                <tbody class="text-gray-300">
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">len(arr)</td><td class="py-2">Array length</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">push(arr, val)</td><td class="py-2">Append element</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">pop(arr)</td><td class="py-2">Remove + return last</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">sort(arr)</td><td class="py-2">Sort in place</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">join(arr, sep)</td><td class="py-2">Join to string</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">range(n)</td><td class="py-2">Array [0..n-1]</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">slice(arr, start, stop)</td><td class="py-2">Sub-array</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">reverse(arr)</td><td class="py-2">Reversed copy</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">find(arr, val)</td><td class="py-2">Find index (-1 if not found)</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">fill(n, val)</td><td class="py-2">Create array of n copies</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">concat(arr1, arr2)</td><td class="py-2">Merge arrays</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">unique(arr)</td><td class="py-2">Deduplicated copy</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">insert(arr, idx, val)</td><td class="py-2">Insert at index</td></tr>
+                                    <tr><td class="py-2 pr-4 font-mono text-xs text-seven-400">remove(arr, idx)</td><td class="py-2">Remove at index</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+
+                    <!-- Conversion -->
+                    <section id="builtin-convert" class="doc-section mb-16">
+                        <h2 class="text-2xl font-bold text-white mb-4">Conversion Functions</h2>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm border-collapse">
+                                <thead><tr class="border-b border-white/10"><th class="text-left py-2 pr-4 text-gray-400 font-medium">Function</th><th class="text-left py-2 text-gray-400 font-medium">Description</th></tr></thead>
+                                <tbody class="text-gray-300">
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">str(x)</td><td class="py-2">Convert to string</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">int(x)</td><td class="py-2">Convert to integer</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">type(x)</td><td class="py-2">Returns "int", "string", or "array"</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">hex(n)</td><td class="py-2">Integer to hex string</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">bin(n)</td><td class="py-2">Integer to binary string</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">bool(val)</td><td class="py-2">Convert to 1 or 0</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">number(str)</td><td class="py-2">String to integer</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">ord(ch)</td><td class="py-2">Character to ASCII code</td></tr>
+                                    <tr><td class="py-2 pr-4 font-mono text-xs text-seven-400">chr(n)</td><td class="py-2">ASCII code to character</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+
+                    <!-- File I/O -->
+                    <section id="builtin-file" class="doc-section mb-16">
+                        <h2 class="text-2xl font-bold text-white mb-4">File I/O Functions</h2>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm border-collapse">
+                                <thead><tr class="border-b border-white/10"><th class="text-left py-2 pr-4 text-gray-400 font-medium">Function</th><th class="text-left py-2 text-gray-400 font-medium">Description</th></tr></thead>
+                                <tbody class="text-gray-300">
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">exists(path)</td><td class="py-2">Check if file exists (1/0)</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">append(path, data)</td><td class="py-2">Append data to file</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">delete(path)</td><td class="py-2">Delete file</td></tr>
+                                    <tr><td class="py-2 pr-4 font-mono text-xs text-seven-400">lines(path)</td><td class="py-2">Read as array of lines</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+
+                    <!-- OS / System -->
+                    <section id="builtin-os" class="doc-section mb-16">
+                        <h2 class="text-2xl font-bold text-white mb-4">OS / System Functions</h2>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm border-collapse">
+                                <thead><tr class="border-b border-white/10"><th class="text-left py-2 pr-4 text-gray-400 font-medium">Function</th><th class="text-left py-2 text-gray-400 font-medium">Description</th></tr></thead>
+                                <tbody class="text-gray-300">
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">time()</td><td class="py-2">Unix timestamp in seconds</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">clock()</td><td class="py-2">Monotonic nanoseconds</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">sleep(seconds)</td><td class="py-2">Pause execution</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">args()</td><td class="py-2">Command-line arguments as array</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">env(name)</td><td class="py-2">Get environment variable</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">system(cmd)</td><td class="py-2">Execute shell command, return exit code</td></tr>
+                                    <tr><td class="py-2 pr-4 font-mono text-xs text-seven-400">exit(code)</td><td class="py-2">Exit program</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+
+                    <!-- String Methods -->
+                    <section id="string-methods" class="doc-section mb-16">
+                        <h2 class="text-2xl font-bold text-white mb-4">String Methods</h2>
+                        <p class="text-gray-400 text-sm mb-4">Called with dot syntax: <code class="font-mono text-seven-400 text-xs">s.upper()</code>, <code class="font-mono text-seven-400 text-xs">s.split(",")</code></p>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm border-collapse">
+                                <thead><tr class="border-b border-white/10"><th class="text-left py-2 pr-4 text-gray-400 font-medium">Method</th><th class="text-left py-2 text-gray-400 font-medium">Description</th></tr></thead>
+                                <tbody class="text-gray-300">
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">.upper()</td><td class="py-2">Uppercase copy</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">.lower()</td><td class="py-2">Lowercase copy</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">.trim()</td><td class="py-2">Strip whitespace</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">.contains(sub)</td><td class="py-2">Substring test (bool)</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">.replace(old, new)</td><td class="py-2">Replace all</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">.len()</td><td class="py-2">String length</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">.startswith(pre)</td><td class="py-2">Prefix test</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">.endswith(suf)</td><td class="py-2">Suffix test</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">.index(sub)</td><td class="py-2">Find substring position</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">.split(sep)</td><td class="py-2">Split into array</td></tr>
+                                    <tr><td class="py-2 pr-4 font-mono text-xs text-seven-400">.repeat(n)</td><td class="py-2">Repeat n times</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+
+                    <!-- Developer Tools -->
+                    <section id="tools" class="doc-section mb-16">
+                        <h2 class="text-2xl font-bold text-white mb-4">Developer Tools</h2>
+                        <div class="space-y-4">
+                            <div class="p-5 rounded-xl border border-white/5 bg-white/[0.02]">
+                                <h3 class="font-semibold text-white mb-1">REPL <span class="text-gray-500 font-normal text-sm">— tools/repl</span></h3>
+                                <p class="text-gray-400 text-sm mb-2">Interactive shell. Commands: <code class="font-mono text-xs">.help</code> <code class="font-mono text-xs">.clear</code> <code class="font-mono text-xs">.undo</code> <code class="font-mono text-xs">.show</code> <code class="font-mono text-xs">.exit</code></p>
+                            </div>
+                            <div class="p-5 rounded-xl border border-white/5 bg-white/[0.02]">
+                                <h3 class="font-semibold text-white mb-1">Formatter <span class="text-gray-500 font-normal text-sm">— tools/fmt</span></h3>
+                                <p class="text-gray-400 text-sm">Auto-indent code. Use <code class="font-mono text-xs">--check</code> for CI (exits 1 if changes needed), <code class="font-mono text-xs">--indent N</code> for custom width.</p>
+                            </div>
+                            <div class="p-5 rounded-xl border border-white/5 bg-white/[0.02]">
+                                <h3 class="font-semibold text-white mb-1">Linter <span class="text-gray-500 font-normal text-sm">— tools/lint</span></h3>
+                                <p class="text-gray-400 text-sm">Static analysis: unmatched blocks, style issues (trailing whitespace, tabs), unused variables.</p>
+                            </div>
+                            <div class="p-5 rounded-xl border border-white/5 bg-white/[0.02]">
+                                <h3 class="font-semibold text-white mb-1">Profiler <span class="text-gray-500 font-normal text-sm">— tools/profile</span></h3>
+                                <p class="text-gray-400 text-sm">Measures compilation, assembly, and execution time over N runs. Reports min/max/avg.</p>
+                            </div>
+                            <div class="p-5 rounded-xl border border-white/5 bg-white/[0.02]">
+                                <h3 class="font-semibold text-white mb-1">VS Code Extension <span class="text-gray-500 font-normal text-sm">— editor/vscode</span></h3>
+                                <p class="text-gray-400 text-sm">Syntax highlighting for all keywords and builtins. 12 code snippets. Supports .seven, .sev, .sv7, .s7.</p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Runtime Model -->
+                    <section id="runtime" class="doc-section mb-16">
+                        <h2 class="text-2xl font-bold text-white mb-4">Runtime Model</h2>
+                        <div class="space-y-3 text-gray-400 text-sm">
+                            <div class="p-4 rounded-xl border border-white/5 bg-white/[0.02]"><strong class="text-white">No garbage collection</strong> — 16MB bump arena freed on exit</div>
+                            <div class="p-4 rounded-xl border border-white/5 bg-white/[0.02]"><strong class="text-white">Stack-based evaluation</strong> — expressions in generated assembly</div>
+                            <div class="p-4 rounded-xl border border-white/5 bg-white/[0.02]"><strong class="text-white">All variables are global</strong> — stored as BSS slots</div>
+                            <div class="p-4 rounded-xl border border-white/5 bg-white/[0.02]"><strong class="text-white">64-bit integers</strong> — strings and arrays are heap pointers</div>
+                            <div class="p-4 rounded-xl border border-white/5 bg-white/[0.02]"><strong class="text-white">Direct x86-64</strong> — compiles to NASM assembly, linked with GNU ld</div>
+                        </div>
+                    </section>
+
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="border-t border-white/5 py-10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-6 h-6 rounded-md bg-seven-600 flex items-center justify-center font-mono font-bold text-white text-xs">7</div>
+                    <span class="text-sm text-gray-500">SEVEN Language &copy; 2024 Tejas Chandivakar</span>
+                </div>
+                <div class="flex items-center gap-6">
+                    <a href="examples.html" class="text-sm text-gray-500 hover:text-gray-300 transition-colors">Examples</a>
+                    <a href="install.html" class="text-sm text-gray-500 hover:text-gray-300 transition-colors">Install</a>
+                    <a href="https://github.com/tejas-chandivakar/seven-lang" target="_blank" class="text-sm text-gray-500 hover:text-gray-300 transition-colors">GitHub</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Sidebar toggle
+        document.getElementById('sidebarToggle').addEventListener('click', function() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('hidden');
+            sidebar.classList.toggle('fixed');
+            sidebar.classList.toggle('inset-0');
+            sidebar.classList.toggle('z-40');
+            sidebar.classList.toggle('bg-[#09090b]');
+            sidebar.classList.toggle('p-6');
+            sidebar.classList.toggle('pt-20');
+        });
+
+        // Active sidebar link on scroll
+        const sections = document.querySelectorAll('.doc-section');
+        const sidebarLinks = document.querySelectorAll('.sidebar-link');
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    sidebarLinks.forEach(link => link.classList.remove('active'));
+                    const activeLink = document.querySelector(`.sidebar-link[href="#${entry.target.id}"]`);
+                    if (activeLink) activeLink.classList.add('active');
+                }
+            });
+        }, { rootMargin: '-20% 0px -70% 0px' });
+        sections.forEach(section => observer.observe(section));
+    </script>
+</body>
+</html>

@@ -27,17 +27,19 @@ MAIN_SRC    := $(SRC_DIR)/main.asm
 LEXER_SRC   := $(SRC_DIR)/lexer.asm
 CODEGEN_SRC := $(SRC_DIR)/codegen.asm
 RUNTIME_SRC := $(SRC_DIR)/runtime.asm
+INTERP_SRC  := $(SRC_DIR)/interp.asm
 
 # Object files
 MAIN_OBJ    := $(BUILD_DIR)/main.o
 LEXER_OBJ   := $(BUILD_DIR)/lexer.o
 CODEGEN_OBJ := $(BUILD_DIR)/codegen.o
 RUNTIME_OBJ := $(BUILD_DIR)/runtime.o
+INTERP_OBJ  := $(BUILD_DIR)/interp.o
 
 # Output binary
 SEVEN_BIN := $(BUILD_DIR)/seven
 
-ALL_OBJS := $(MAIN_OBJ) $(LEXER_OBJ) $(CODEGEN_OBJ) $(RUNTIME_OBJ)
+ALL_OBJS := $(MAIN_OBJ) $(LEXER_OBJ) $(CODEGEN_OBJ) $(RUNTIME_OBJ) $(INTERP_OBJ)
 
 .PHONY: all seven test test-lex clean dirs
 
@@ -58,6 +60,9 @@ $(CODEGEN_OBJ): $(CODEGEN_SRC)
 	$(NASM) $(NASMFLAGS) $< -o $@
 
 $(RUNTIME_OBJ): $(RUNTIME_SRC)
+	$(NASM) $(NASMFLAGS) $< -o $@
+
+$(INTERP_OBJ): $(INTERP_SRC)
 	$(NASM) $(NASMFLAGS) $< -o $@
 
 dirs:

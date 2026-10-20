@@ -275,117 +275,26 @@ _start:
     jmp .exit
 
 ; ============================================================
-; do_run — Compile, assemble, link, and execute
+; do_run — Interpret source directly (no compile step)
 ; ============================================================
 .do_run:
     mov qword [is_run_mode], 1
 
-    ; Print banner
-    mov rax, 1
-    mov rdi, 2
-    mov rsi, msg_banner
-    mov rdx, msg_banner_len
-    syscall
-
     ; Step 1: Lex
-    call print_msg_lexing
     call lexer_init
     mov rdi, [argv_file]
     call lexer_load_file
     cmp rax, 0
     jne .file_error
     call lexer_tokenize
-    call print_msg_done
 
-    ; Step 2: Codegen
-    call print_msg_codegen
-    call codegen_init
-    call codegen_program
-    call print_msg_done
+    ; Step 2: Interpret
+    extern interp_init, interp_program
+    call interp_init
+    call interp_program
 
-    ; Step 3: Write .asm
-    call print_msg_writing
-    call make_output_filename
-    mov rdi, out_filename
-    call codegen_write_file
-    cmp rax, 0
-    jne .write_error
-    call print_msg_done
-
-    ; Build obj and bin filenames from base
-    call make_obj_filename
-    call make_bin_filename
-    call find_runtime_path
-
-    ; Step 4: Run nasm — nasm -f elf64 -w-label-redef-late file.asm -o file.o
-    mov qword [nasm_argv + 0],  nasm_str
-    mov qword [nasm_argv + 8],  nasm_f_flag
-    mov qword [nasm_argv + 16], nasm_fmt
-    mov qword [nasm_argv + 24], nasm_w_flag
-    mov rax, out_filename
-    mov qword [nasm_argv + 32], rax
-    mov qword [nasm_argv + 40], nasm_o_flag
-    mov rax, obj_filename
-    mov qword [nasm_argv + 48], rax
-    mov qword [nasm_argv + 56], 0
-
-    mov rdi, nasm_path
-    mov rsi, nasm_argv
-    call fork_exec_wait
-    cmp rax, 0
-    jne .run_step_failed
-
-    ; Step 5: Run ld — ld file.o runtime.o -o file
-    mov qword [ld_argv + 0], ld_str
-    mov rax, obj_filename
-    mov qword [ld_argv + 8], rax
-    mov rax, runtime_path
-    mov qword [ld_argv + 16], rax
-    mov qword [ld_argv + 24], nasm_o_flag
-    mov rax, bin_filename
-    mov qword [ld_argv + 32], rax
-    mov qword [ld_argv + 40], 0
-
-    mov rdi, ld_path
-    mov rsi, ld_argv
-    call fork_exec_wait
-    cmp rax, 0
-    jne .run_step_failed
-
-    ; Step 6: Execute the binary
-    mov rax, 1
-    mov rdi, 2
-    mov rsi, msg_running
-    mov rdx, msg_running_len
-    syscall
-
-    mov rax, bin_filename
-    mov qword [bin_argv + 0], rax
-    mov qword [bin_argv + 8], 0
-
-    mov rdi, bin_filename
-    mov rsi, bin_argv
-    call fork_exec_wait
-    push rax                 ; save exit code
-
-    ; Step 7: Clean up temp files
-    mov rdi, out_filename
-    call delete_file
-    mov rdi, obj_filename
-    call delete_file
-    mov rdi, bin_filename
-    call delete_file
-
-    pop rdi                  ; exit code from binary
-    jmp .exit
-
-.run_step_failed:
-    mov rax, 1
-    mov rdi, 2
-    mov rsi, msg_run_err
-    mov rdx, msg_run_err_len
-    syscall
-    mov rdi, 1
+    ; interp_program returns exit code in rax
+    mov rdi, rax
     jmp .exit
 
 ; ============================================================

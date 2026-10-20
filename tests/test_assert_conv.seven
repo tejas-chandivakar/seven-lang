@@ -1,0 +1,40 @@
+!! Assert-based type conversion tests
+
+!! int to string
+s = str(42)
+assert(len(s) == 2, "str 42 should be 2 chars")
+
+!! string to int
+x = int("123")
+assert(x == 123, "int 123 should be 123")
+
+x = int("0")
+assert(x == 0, "int 0 should be 0")
+
+!! type detection
+x = type(42)
+assert(x == "int", "type of 42 should be int")
+
+s = "hello"
+x = type(s)
+assert(x == "string", "type of string should be string")
+
+a = [1, 2]
+x = type(a)
+assert(x == "array", "type of array should be array")
+
+!! bool
+x = bool(1)
+assert(x == 1, "bool 1 should be 1")
+
+x = bool(0)
+assert(x == 0, "bool 0 should be 0")
+
+!! hex/bin formatting
+s = hex(255)
+assert(s == "ff", "hex 255 should be ff")
+
+s = bin(5)
+assert(s == "101", "bin 5 should be 101")
+
+show "All conversion assertions passed!"

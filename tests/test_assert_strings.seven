@@ -1,0 +1,56 @@
+!! Assert-based string tests
+
+!! String length
+s = "Hello"
+assert(len(s) == 5, "len Hello should be 5")
+
+!! Upper/lower
+s = upper("hello")
+assert(s == "HELLO", "upper hello")
+
+s = lower("WORLD")
+assert(s == "world", "lower WORLD")
+
+!! Trim
+s = trim("  hi  ")
+assert(s == "hi", "trim whitespace")
+
+!! Replace
+s = replace("hello world", "world", "SEVEN")
+assert(s == "hello SEVEN", "replace world with SEVEN")
+
+!! Find
+x = find("hello world", "world")
+assert(x == 6, "find world at 6")
+
+x = find("hello", "xyz")
+assert(x == -1, "find xyz should be -1")
+
+!! Count
+x = count("banana", "an")
+assert(x == 2, "count an in banana")
+
+!! Dot methods
+s = "hello world"
+assert(s.startswith("hello"), "startswith hello")
+assert(s.endswith("world"), "endswith world")
+
+x = s.index("world")
+assert(x == 6, "index of world should be 6")
+
+!! Repeat (method syntax)
+s = "ab".repeat(3)
+assert(s == "ababab", "repeat ab 3")
+
+!! ord/chr
+x = ord("A")
+assert(x == 65, "ord A should be 65")
+
+s = chr(65)
+assert(s == "A", "chr 65 should be A")
+
+!! substr
+s = substr("hello", 1, 3)
+assert(s == "ell", "substr hello 1 3")
+
+show "All string assertions passed!"

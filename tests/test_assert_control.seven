@@ -1,0 +1,56 @@
+!! Assert-based control flow tests
+
+!! If/else
+x = 10
+if x > 5
+    y = 1
+else
+    y = 0
+end
+assert(y == 1, "if x>5 should set y=1")
+
+if x < 5
+    y = 0
+else
+    y = 2
+end
+assert(y == 2, "else branch should set y=2")
+
+!! Repeat loop
+total = 0
+repeat 5 times as i
+    total = total + i
+end
+assert(total == 10, "sum 0..4 should be 10")
+
+!! While loop
+count = 0
+n = 10
+while n > 0
+    count = count + 1
+    n = n - 2
+end
+assert(count == 5, "while loop should count 5")
+
+!! Each loop
+arr = [10, 20, 30]
+total = 0
+each arr as item
+    total = total + item
+end
+assert(total == 60, "each sum should be 60")
+
+!! Nested if
+x = 15
+if x > 10
+    if x > 20
+        y = 3
+    else
+        y = 2
+    end
+else
+    y = 1
+end
+assert(y == 2, "nested if should set y=2")
+
+show "All control flow assertions passed!"

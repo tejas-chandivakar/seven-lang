@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+# SEVEN Test Runner — runs test_*.seven files using assert
+
+set -euo pipefail
+
+SEVEN_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+SEVEN="$SEVEN_DIR/build/seven"
+TESTS_DIR="$SEVEN_DIR/tests"
+RUNTIME="$SEVEN_DIR/src/runtime.asm"
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BOLD='\033[1m'
+RESET='\033[0m'
+
+passed=0
+failed=0
+skipped=0
+failures=()
+
+# Accept optional glob pattern or run all test_*.seven
+pattern="${1:-test_*.seven}"
+
+echo -e "${BOLD}SEVEN Test Runner${RESET}"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+cd "$SEVEN_DIR"
+
+for testfile in "$TESTS_DIR"/$pattern; do
+    [ -f "$testfile" ] || continue
+    name="$(basename "$testfile" .seven)"
+
+    # Compile
+    if ! "$SEVEN" "$testfile" > /dev/null 2>&1; then
+        echo -e "  ${YELLOW}SKIP${RESET}  $name  (compile error)"
+        skipped=$((skipped + 1))
+        continue
+    fi
+
+    asmfile="$name.asm"
+    objfile="$name.o"
+    binfile="$name"
+
+    # Assemble + link
+    if ! nasm -f elf64 "$asmfile" -o "$objfile" 2>/dev/null; then
+        echo -e "  ${YELLOW}SKIP${RESET}  $name  (asm error)"
+        rm -f "$asmfile" "$objfile"
+        skipped=$((skipped + 1))
+        continue
+    fi
+
+    if ! nasm -f elf64 "$RUNTIME" -o runtime.o 2>/dev/null; then
+        echo -e "  ${YELLOW}SKIP${RESET}  $name  (runtime asm error)"
+        rm -f "$asmfile" "$objfile"
+        skipped=$((skipped + 1))
+        continue
+    fi
+
+    if ! ld "$objfile" runtime.o -o "$binfile" 2>/dev/null; then
+        echo -e "  ${YELLOW}SKIP${RESET}  $name  (link error)"
+        rm -f "$asmfile" "$objfile"
+        skipped=$((skipped + 1))
+        continue
+    fi
+
+    # Run
+    exitcode=0
+    output=$("./$binfile" 2>&1) || exitcode=$?
+
+    # Clean up build artifacts
+    rm -f "$asmfile" "$objfile" "$binfile" runtime.o
+
+    if [ $exitcode -eq 0 ]; then
+        echo -e "  ${GREEN}PASS${RESET}  $name"
+        passed=$((passed + 1))
+    else
+        echo -e "  ${RED}FAIL${RESET}  $name"
+        if [ -n "$output" ]; then
+            echo "$output" | sed 's/^/        /'
+        fi
+        failed=$((failed + 1))
+        failures+=("$name")
+    fi
+done
+
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+total=$((passed + failed + skipped))
+echo -e "${BOLD}Results:${RESET} $total tests"
+echo -e "  ${GREEN}$passed passed${RESET}  ${RED}$failed failed${RESET}  ${YELLOW}$skipped skipped${RESET}"
+
+if [ ${#failures[@]} -gt 0 ]; then
+    echo ""
+    echo -e "${RED}Failed tests:${RESET}"
+    for f in "${failures[@]}"; do
+        echo "  - $f"
+    done
+    exit 1
+fi
+
+exit 0

@@ -1,0 +1,56 @@
+!! Assert-based function tests
+
+!! Basic function
+func double(x)
+    return x * 2
+end
+
+x = double(5)
+assert(x == 10, "double 5 should be 10")
+
+x = double(0)
+assert(x == 0, "double 0 should be 0")
+
+!! Function with multiple args
+func add(a, b)
+    return a + b
+end
+
+x = add(3, 7)
+assert(x == 10, "add 3 7 should be 10")
+
+!! Function calling function
+func quad(x)
+    return double(double(x))
+end
+
+x = quad(3)
+assert(x == 12, "quad 3 should be 12")
+
+!! Recursive function
+func factorial(n)
+    if n <= 1
+        return 1
+    end
+    return n * factorial(n - 1)
+end
+
+x = factorial(5)
+assert(x == 120, "factorial 5 should be 120")
+
+x = factorial(1)
+assert(x == 1, "factorial 1 should be 1")
+
+!! Variadic function
+func sum_all(many nums)
+    total = 0
+    each nums as n
+        total = total + n
+    end
+    return total
+end
+
+x = sum_all(1, 2, 3, 4, 5)
+assert(x == 15, "sum_all 1..5 should be 15")
+
+show "All function assertions passed!"

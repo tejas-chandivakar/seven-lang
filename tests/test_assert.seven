@@ -1,0 +1,4 @@
+!! Test assert builtin
+assert(1, "one should be truthy")
+assert(42, "forty-two should be truthy")
+show "All assertions passed!"

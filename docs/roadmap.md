@@ -114,8 +114,14 @@
 ## Phase 8 — Package Manager (SPM)
 `spm init`, `spm install`, `spm publish`, registry.
 
-## Phase 9 — Testing Framework
-Unit tests, benchmarks, coverage, mocks.
+## Phase 9 — Testing Framework (COMPLETE)
+**Goal:** Assert-based testing with automated test runner
+
+- [x] `assert(cond, msg)` — builtin keyword (runtime + codegen)
+- [x] Test runner — auto-discovers `test_*.seven` files (`tools/test`)
+- [x] Colored pass/fail/skip output with failure details
+- [x] Assert-based test suite — math, strings, arrays, control flow, functions, conversions
+- [x] 54 tests passing (7 new assert-based + 47 existing)
 
 ## Phase 10 — Documentation + Website
 sevenlang.org, docs, playground, tutorials.

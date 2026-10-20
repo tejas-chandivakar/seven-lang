@@ -1,8 +1,8 @@
 # SEVEN Language Specification
 
-**Version:** 0.7 (Phase 7 — Developer Tools)
+**Version:** 0.9 (Phase 9 — Testing Framework)
 **Author:** Tejas Chandivakar
-**Status:** Phase 7 complete — Developer Tools
+**Status:** Phase 9 complete — Testing Framework
 
 ---
 
@@ -329,6 +329,7 @@ index_expr  = expression ;    (* negative allowed *)
 | `args()` | Command-line arguments as array |
 | `env(name)` | Get environment variable |
 | `system(cmd)` | Execute shell command, return exit code |
+| `assert(cond, msg)` | Assert condition is truthy; prints message to stderr and exits with code 1 on failure |
 
 ### String Methods
 Called on string values with dot syntax: `s.upper()`, `s.lower()`, etc.
@@ -363,6 +364,7 @@ Called on string values with dot syntax: `s.upper()`, `s.lower()`, etc.
 | Formatter | `tools/fmt file.seven` | Auto-indent (4 spaces default), `--check` mode |
 | Linter | `tools/lint file.seven` | Block matching, style checks, unused variables |
 | Profiler | `tools/profile file.seven [N]` | Compile/asm/execution timing over N runs |
+| Test Runner | `tools/test [pattern]` | Auto-discover and run test_*.seven files with assert |
 | VS Code | `editor/vscode/` | Syntax highlighting, snippets (v0.2.0) |
 
 ## 10. Reserved for Later Phases

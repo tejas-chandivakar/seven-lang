@@ -3493,6 +3493,64 @@ section .rodata
 section .text
 
 ; ============================================================
+; rt_assert — Assert condition is truthy
+; rdi = condition value, rsi = message string ptr (0 if none)
+; If condition is 0, prints message to stderr and exits with 1
+; ============================================================
+global rt_assert
+rt_assert:
+    test rdi, rdi
+    jnz .pass
+    ; assertion failed
+    push rsi
+    ; print "Assertion failed"
+    mov rax, 1          ; write
+    mov rdi, 2          ; stderr
+    lea rsi, [rel .assert_prefix]
+    mov rdx, 19
+    syscall
+    pop rsi
+    ; print message if provided
+    test rsi, rsi
+    jz .no_msg
+    cmp rsi, 0x400000
+    jb .no_msg
+    ; find length
+    push rsi
+    xor rcx, rcx
+.msg_len:
+    cmp byte [rsi+rcx], 0
+    je .msg_done
+    inc rcx
+    jmp .msg_len
+.msg_done:
+    mov rdx, rcx
+    pop rsi
+    mov rax, 1
+    mov rdi, 2
+    syscall
+.no_msg:
+    ; print newline
+    mov rax, 1
+    mov rdi, 2
+    lea rsi, [rel .assert_nl]
+    mov rdx, 1
+    syscall
+    ; exit with code 1
+    mov rdi, 1
+    mov rax, 60
+    syscall
+.pass:
+    mov rax, 1
+    ret
+
+section .rodata
+.assert_prefix: db "Assertion failed: "
+.assert_nl:     db 10
+
+section .text
+
+; ============================================================
 ; rt_exit — Exit with code in rdi
 ; ============================================================
 global rt_exit

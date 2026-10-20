@@ -112,6 +112,7 @@ section .data
                     db "extern rt_file_append, rt_file_lines", 10
                     db "extern rt_time, rt_clock, rt_sleep", 10
                     db "extern rt_args, rt_env, rt_system", 10
+                    db "extern rt_assert", 10
                     db "extern saved_rsp", 10, 10, 0
     frag_sect_data  db "section .data", 10, 0
     frag_sect_bss   db 10, "section .bss", 10, 0
@@ -400,6 +401,7 @@ section .data
     frag_call_args   db "    call rt_args", 10, 0
     frag_call_env    db "    call rt_env", 10, 0
     frag_call_system db "    call rt_system", 10, 0
+    frag_call_assert db "    call rt_assert", 10, 0
 
     ; Function argument register names (SysV AMD64 ABI order)
     frag_reg_rdi    db "rdi", 0
@@ -2978,6 +2980,29 @@ codegen_stmt:
     ret
 .stmt_not_system:
 
+    ; Check "assert" (6 chars)
+    cmp ecx, 6
+    jne .stmt_not_assert
+    cmp byte [rsi], 'a'
+    jne .stmt_not_assert
+    cmp byte [rsi+1], 's'
+    jne .stmt_not_assert
+    cmp byte [rsi+2], 's'
+    jne .stmt_not_assert
+    cmp byte [rsi+3], 'e'
+    jne .stmt_not_assert
+    cmp byte [rsi+4], 'r'
+    jne .stmt_not_assert
+    cmp byte [rsi+5], 't'
+    jne .stmt_not_assert
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_assert
+    call out_str
+    pop rbp
+    ret
+.stmt_not_assert:
+
     ; Generic user function call
     xor r14, r14             ; arg count
     call codegen_call_args   ; eval args, pop into regs
@@ -4605,6 +4630,24 @@ cg_expr_primary:
     jmp .builtin_system
 .not_builtin_system:
 
+    ; Check "assert" (6 chars)
+    cmp ecx, 6
+    jne .not_builtin_assert
+    cmp byte [rsi], 'a'
+    jne .not_builtin_assert
+    cmp byte [rsi+1], 's'
+    jne .not_builtin_assert
+    cmp byte [rsi+2], 's'
+    jne .not_builtin_assert
+    cmp byte [rsi+3], 'e'
+    jne .not_builtin_assert
+    cmp byte [rsi+4], 'r'
+    jne .not_builtin_assert
+    cmp byte [rsi+5], 't'
+    jne .not_builtin_assert
+    jmp .builtin_assert
+.not_builtin_assert:
+
     ; Generic user function call
     xor r14, r14
     call codegen_call_args   ; eval args, pop into regs
@@ -4618,6 +4661,18 @@ cg_expr_primary:
     call out_func_name
     call out_str_newline
     ; Push return value
+    mov rdi, frag_push_rax
+    call out_str
+    pop rsi
+    pop rcx
+    ret
+
+; ---- Built-in: assert(cond, msg) ----
+.builtin_assert:
+    xor r14, r14
+    call codegen_call_args
+    mov rdi, frag_call_assert
+    call out_str
     mov rdi, frag_push_rax
     call out_str
     pop rsi

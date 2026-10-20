@@ -46,20 +46,6 @@ E:\SEVEN language\
 └── README.md
 ```
 
-## Current Status
-
-**Phase 1 — Bootstrap Compiler (in progress)**
-
-- [x] Language design complete
-- [x] Project scaffold
-- [ ] Lexer (tokenizer) — scaffolded
-- [ ] Parser — scaffolded
-- [ ] Code generator — scaffolded
-- [ ] Runtime helpers
-- [ ] First `.seven → .exe` compile
-
-See `docs/roadmap.md` for the 10-phase plan.
-
 ## Building the Compiler (Linux / WSL)
 
 ```bash

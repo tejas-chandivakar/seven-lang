@@ -3033,12 +3033,10 @@ rt_hex:
     mov rdi, 20
     call rt_alloc
     mov r13, rax             ; result ptr
-    mov byte [r13], '0'
-    mov byte [r13 + 1], 'x'
     cmp r12, 0
     jne .hex_nonzero
-    mov byte [r13 + 2], '0'
-    mov byte [r13 + 3], 0
+    mov byte [r13], '0'
+    mov byte [r13 + 1], 0
     mov rax, r13
     pop r13
     pop r12
@@ -3069,7 +3067,7 @@ rt_hex:
     shr rdi, 4
     jmp .hex_loop
 .hex_write:
-    lea rsi, [r13 + 2]
+    lea rsi, [r13]
     xor r8, r8
 .hex_rev:
     cmp r8, rcx
@@ -3104,12 +3102,10 @@ rt_bin:
     mov rdi, 70
     call rt_alloc
     mov r13, rax             ; result ptr
-    mov byte [r13], '0'
-    mov byte [r13 + 1], 'b'
     cmp r12, 0
     jne .bin_nonzero
-    mov byte [r13 + 2], '0'
-    mov byte [r13 + 3], 0
+    mov byte [r13], '0'
+    mov byte [r13 + 1], 0
     mov rax, r13
     pop r13
     pop r12
@@ -3133,7 +3129,7 @@ rt_bin:
     shr rdi, 1
     jmp .bin_loop
 .bin_write:
-    lea rsi, [r13 + 2]
+    lea rsi, [r13]
     xor r8, r8
 .bin_rev:
     cmp r8, rcx

@@ -96,6 +96,7 @@ section .bss
     func_param_counts resq 128  ; number of parameters
     func_param_names  resq 1024 ; parameter names (8 per func * 128)
     func_param_nlens  resq 1024 ; parameter name lengths
+    func_variadic     resq 128  ; 1 if last param is variadic (many)
     func_count  resq 1
 
     ; Call stack for function args — max depth 32, 8 args each
@@ -131,6 +132,13 @@ section .bss
 
     ; Exit code
     interp_exit_code resq 1
+
+    ; Builtin found flag (set by interp_try_builtin)
+    builtin_found resq 1
+
+    ; Temp save for interp_call
+    call_save_r12 resq 1
+    call_save_r13 resq 1
 
 section .text
     extern lexer_get_token, lexer_token_count
@@ -1413,7 +1421,7 @@ interp_stmt:
     cmp rax, 1
     jne .func_regular_param
     call ip_advance          ; skip 'many'
-    ; Next token is the variadic param name
+    mov qword [func_variadic + r14 * 8], 1
 .func_regular_param:
     call ip_peek
     mov rdi, [rax + 8]       ; param name ptr
@@ -1528,21 +1536,46 @@ interp_stmt:
     ret
 
 ; ============================================================
-; push arr, val
+; push arr, val  OR  push(arr, val)
 ; ============================================================
 .do_push_stmt:
     call ip_advance          ; skip 'push'
+    ; Check for '(' — function-call syntax
+    xor r14, r14             ; r14 = 0 means no parens
+    call ip_tok_type
+    cmp al, TOK_PUNCT
+    jne .push_no_lparen
+    call ip_tok_sub
+    cmp al, PUNCT_LPAREN
+    jne .push_no_lparen
+    call ip_advance          ; skip '('
+    mov r14, 1               ; have parens
+.push_no_lparen:
     call interp_expr         ; array
     push rax
     ; Expect ','
     call ip_tok_type
     cmp al, TOK_PUNCT
     jne .push_done
+    call ip_tok_sub
+    cmp al, PUNCT_COMMA
+    jne .push_done
     call ip_advance          ; skip ','
     call interp_expr         ; value
     mov rsi, rax
     pop rdi
     call rt_arr_push
+    ; Skip trailing ')' if function-call syntax
+    cmp r14, 1
+    jne .push_ret
+    call ip_tok_type
+    cmp al, TOK_PUNCT
+    jne .push_ret
+    call ip_tok_sub
+    cmp al, PUNCT_RPAREN
+    jne .push_ret
+    call ip_advance          ; skip ')'
+.push_ret:
     pop rbp
     ret
 .push_done:
@@ -1557,8 +1590,16 @@ interp_stmt:
     call ip_advance          ; skip 'write'
     call interp_expr         ; path
     push rax
-    ; Expect expression (data)
-    call interp_expr
+    ; Skip comma if present
+    call ip_tok_type
+    cmp al, TOK_PUNCT
+    jne .write_no_comma
+    call ip_tok_sub
+    cmp al, PUNCT_COMMA
+    jne .write_no_comma
+    call ip_advance          ; skip ','
+.write_no_comma:
+    call interp_expr         ; data
     mov rsi, rax             ; data
     pop rdi                  ; path
     extern rt_file_write_str
@@ -1914,21 +1955,25 @@ interp_call:
 .call_args_done:
     call ip_advance          ; skip ')'
 
-    ; Check for builtin functions first
+    ; Check user functions first (so user can override builtins)
+    mov rdi, r12
+    mov rsi, r13
+    call func_find
+    cmp rax, -1
+    jne .call_user_func
+
+    ; Not a user function — try builtin
     mov rdi, r12
     mov rsi, r13
     mov rdx, r14             ; arg count
     lea rcx, [rsp]           ; args array pointer
     call interp_try_builtin
-    cmp rax, -1
-    jne .call_return_builtin
+    cmp qword [builtin_found], 1
+    je .call_return_builtin
 
-    ; Find user function
-    mov rdi, r12
-    mov rsi, r13
-    call func_find
-    cmp rax, -1
-    je .call_not_found
+    jmp .call_not_found
+
+.call_user_func:
 
     mov r15, rax             ; func index
 
@@ -1940,6 +1985,16 @@ interp_call:
 .call_set_params:
     cmp rcx, [func_param_counts + r15 * 8]
     jge .call_set_done
+
+    ; Check if this is the last param AND function is variadic
+    mov rax, rcx
+    inc rax
+    cmp rax, [func_param_counts + r15 * 8]
+    jne .call_regular_param
+    cmp qword [func_variadic + r15 * 8], 1
+    je .call_variadic_param
+
+.call_regular_param:
     ; Get param name
     mov rax, r15
     shl rax, 3
@@ -1950,11 +2005,57 @@ interp_call:
     ; Get arg value
     pop rcx
     push rcx
-    mov rdx, [rsp + 8 + rcx * 8 + 8]  ; +8 for pushed ip_pos, +8 for rbp shift
+    mov rdx, [rsp + 8 + rcx * 8 + 8]  ; +8 for pushed ip_pos, +8 for pushed rcx
     call var_set
     pop rcx
     inc rcx
     jmp .call_set_params
+
+.call_variadic_param:
+    ; Collect remaining args (r14 - rcx) into an array
+    ; rcx = param index where variadic starts
+    ; r14 = total arg count
+    ; Args on stack at [rsp + 8 + i*8] (rsp+8 = ip_pos, rsp+16 = arg[0], ...)
+    mov rax, r14             ; total arg count
+    sub rax, rcx             ; remaining count for variadic
+    push rcx                 ; save param_start_index
+    push rax                 ; save variadic_count
+    ; Create array: rt_alloc(16 + count * 8)
+    mov rdi, rax
+    shl rdi, 3
+    add rdi, 16
+    extern rt_alloc
+    call rt_alloc
+    ; rax = array ptr
+    mov rcx, [rsp]           ; variadic_count
+    mov qword [rax], rcx     ; set count
+    mov qword [rax + 8], rcx ; set capacity
+    ; Fill: rax=array, [rsp]=variadic_count, [rsp+8]=param_start_idx
+    ; Args base is at rsp+24 (2 pushes + ip_pos push = 24 bytes above args)
+    mov rcx, [rsp + 8]       ; param_start_idx
+    xor rdx, rdx
+.call_variadic_fill:
+    cmp rdx, [rax]
+    jge .call_variadic_fill_done
+    lea rdi, [rcx + rdx]     ; arg index
+    shl rdi, 3               ; * 8
+    add rdi, rsp
+    mov rdi, [rdi + 24]      ; get arg value
+    mov [rax + 16 + rdx * 8], rdi
+    inc rdx
+    jmp .call_variadic_fill
+.call_variadic_fill_done:
+    add rsp, 16              ; pop variadic_count and param_start_idx
+    ; rax = array ptr, set as variadic param value
+    mov rdx, rax
+    mov rax, r15
+    shl rax, 3
+    mov rcx, [func_param_counts + r15 * 8]
+    dec rcx
+    add rax, rcx
+    mov rdi, [func_param_names + rax * 8]
+    mov rsi, [func_param_nlens + rax * 8]
+    call var_set
 .call_set_done:
 
     ; Jump to function body
@@ -2726,6 +2827,12 @@ interp_expr_primary:
     call ip_is_kw
     cmp rax, 1
     je .prim_ask
+    ; Check for 'read' (file read in expression)
+    lea rdi, [kw_read]
+    mov rsi, 4
+    call ip_is_kw
+    cmp rax, 1
+    je .prim_read
     ; Unknown keyword in expression — return 0
     call ip_advance
     xor rax, rax
@@ -2751,6 +2858,14 @@ interp_expr_primary:
     call rt_prompt
     jmp .prim_postfix
 
+.prim_read:
+    call ip_advance          ; skip 'read'
+    call interp_expr         ; path
+    mov rdi, rax
+    extern rt_file_read_str
+    call rt_file_read_str
+    jmp .prim_postfix
+
 .prim_paren:
     call ip_advance          ; skip '('
     call interp_expr
@@ -2758,6 +2873,9 @@ interp_expr_primary:
     ; Expect ')'
     call ip_tok_type
     cmp al, TOK_PUNCT
+    jne .prim_paren_done
+    call ip_tok_sub
+    cmp al, PUNCT_RPAREN
     jne .prim_paren_done
     call ip_advance          ; skip ')'
 .prim_paren_done:
@@ -2832,11 +2950,10 @@ interp_expr_primary:
 .postfix_bracket_done:
     pop rsi                  ; index
     mov rdi, r12             ; array
-    ; Check if it's a string or array
     cmp r12, 0x400000
     jb .postfix_done
-    ; Check first byte to decide
-    call rt_arr_get
+    extern rt_subscript
+    call rt_subscript
     mov r12, rax
     jmp .postfix_loop
 
@@ -2931,6 +3048,8 @@ interp_try_builtin:
     mov r14, rdx             ; argc
     mov r15, rcx             ; args
 
+    mov qword [builtin_found], 0
+
     ; Check each builtin name
     ; len
     cmp r13, 3
@@ -2969,7 +3088,7 @@ interp_try_builtin:
     jne .not_int
     cmp byte [r12 + 2], 't'
     jne .not_int
-    mov rdi, [r15]
+    mov rsi, [r15]
     call rt_str_to_int
     jmp .builtin_ret
 .not_int:
@@ -3106,7 +3225,7 @@ interp_try_builtin:
     jmp .builtin_ret
 .not_replace:
 
-    ; find
+    ; find (works for strings and arrays)
     cmp r13, 4
     jne .not_find
     cmp byte [r12], 'f'
@@ -3119,6 +3238,21 @@ interp_try_builtin:
     jne .not_find
     mov rdi, [r15]
     mov rsi, [r15 + 8]
+    ; Check if first arg is an array (heuristic: ptr > 0x400000 with valid header)
+    cmp rdi, 0x400000
+    jb .find_string
+    mov rax, [rdi]           ; potential count
+    mov rcx, [rdi + 8]       ; potential capacity
+    cmp rcx, 0
+    je .find_string
+    cmp rcx, 16777216
+    ja .find_string
+    cmp rax, rcx
+    ja .find_string
+    extern rt_arr_find
+    call rt_arr_find
+    jmp .builtin_ret
+.find_string:
     call rt_str_index
     jmp .builtin_ret
 .not_find:
@@ -3130,8 +3264,13 @@ interp_try_builtin:
     jne .not_count
     cmp byte [r12 + 1], 'o'
     jne .not_count
-    ; Use rt_str_index in a loop? For now skip
-    jmp .not_count
+    cmp byte [r12 + 4], 't'
+    jne .not_count
+    extern rt_str_count
+    mov rdi, [r15]
+    mov rsi, [r15 + 8]
+    call rt_str_count
+    jmp .builtin_ret
 .not_count:
 
     ; sort
@@ -3261,7 +3400,7 @@ interp_try_builtin:
     jmp .builtin_ret
 .not_remove:
 
-    ; range
+    ; range(end) or range(start, end)
     cmp r13, 5
     jne .not_range
     cmp byte [r12], 'r'
@@ -3270,8 +3409,15 @@ interp_try_builtin:
     jne .not_range
     cmp byte [r12 + 2], 'n'
     jne .not_range
-    mov rdi, [r15]
-    mov rsi, [r15 + 8]
+    cmp r14, 1
+    jne .range_two_args
+    xor rdi, rdi             ; start = 0
+    mov rsi, [r15]           ; end = first arg
+    jmp .range_call
+.range_two_args:
+    mov rdi, [r15]           ; start
+    mov rsi, [r15 + 8]       ; end
+.range_call:
     call rt_range
     jmp .builtin_ret
 .not_range:
@@ -3399,7 +3545,7 @@ interp_try_builtin:
     jne .not_number
     cmp byte [r12 + 2], 'm'
     jne .not_number
-    mov rdi, [r15]
+    mov rsi, [r15]
     call rt_str_to_int
     jmp .builtin_ret
 .not_number:
@@ -3446,7 +3592,8 @@ interp_try_builtin:
     extern rt_substr
     mov rdi, [r15]
     mov rsi, [r15 + 8]
-    mov rdx, [r15 + 16]
+    mov rdx, [r15 + 8]
+    add rdx, [r15 + 16]     ; end = start + count
     call rt_substr
     jmp .builtin_ret
 .not_substr:
@@ -3468,8 +3615,291 @@ interp_try_builtin:
     jmp .builtin_ret
 .not_push_builtin:
 
+    ; clamp(val, lo, hi)
+    cmp r13, 5
+    jne .not_clamp
+    cmp byte [r12], 'c'
+    jne .not_clamp
+    cmp byte [r12 + 1], 'l'
+    jne .not_clamp
+    cmp byte [r12 + 4], 'p'
+    jne .not_clamp
+    extern rt_clamp
+    mov rdi, [r15]
+    mov rsi, [r15 + 8]
+    mov rdx, [r15 + 16]
+    call rt_clamp
+    jmp .builtin_ret
+.not_clamp:
+
+    ; sign(n)
+    cmp r13, 4
+    jne .not_sign
+    cmp byte [r12], 's'
+    jne .not_sign
+    cmp byte [r12 + 1], 'i'
+    jne .not_sign
+    cmp byte [r12 + 2], 'g'
+    jne .not_sign
+    cmp byte [r12 + 3], 'n'
+    jne .not_sign
+    extern rt_sign
+    mov rdi, [r15]
+    call rt_sign
+    jmp .builtin_ret
+.not_sign:
+
+    ; gcd(a, b)
+    cmp r13, 3
+    jne .not_gcd
+    cmp byte [r12], 'g'
+    jne .not_gcd
+    cmp byte [r12 + 1], 'c'
+    jne .not_gcd
+    cmp byte [r12 + 2], 'd'
+    jne .not_gcd
+    extern rt_gcd
+    mov rdi, [r15]
+    mov rsi, [r15 + 8]
+    call rt_gcd
+    jmp .builtin_ret
+.not_gcd:
+
+    ; sum(arr)
+    cmp r13, 3
+    jne .not_sum
+    cmp byte [r12], 's'
+    jne .not_sum
+    cmp byte [r12 + 1], 'u'
+    jne .not_sum
+    cmp byte [r12 + 2], 'm'
+    jne .not_sum
+    extern rt_arr_sum
+    mov rdi, [r15]
+    call rt_arr_sum
+    jmp .builtin_ret
+.not_sum:
+
+    ; avg(arr)
+    cmp r13, 3
+    jne .not_avg
+    cmp byte [r12], 'a'
+    jne .not_avg
+    cmp byte [r12 + 1], 'v'
+    jne .not_avg
+    cmp byte [r12 + 2], 'g'
+    jne .not_avg
+    extern rt_arr_avg
+    mov rdi, [r15]
+    call rt_arr_avg
+    jmp .builtin_ret
+.not_avg:
+
+    ; pow(base, exp)
+    cmp r13, 3
+    jne .not_pow
+    cmp byte [r12], 'p'
+    jne .not_pow
+    cmp byte [r12 + 1], 'o'
+    jne .not_pow
+    cmp byte [r12 + 2], 'w'
+    jne .not_pow
+    extern rt_pow
+    mov rdi, [r15]
+    mov rsi, [r15 + 8]
+    call rt_pow
+    jmp .builtin_ret
+.not_pow:
+
+    ; slice(arr, start, end)
+    cmp r13, 5
+    jne .not_slice
+    cmp byte [r12], 's'
+    jne .not_slice
+    cmp byte [r12 + 1], 'l'
+    jne .not_slice
+    cmp byte [r12 + 4], 'e'
+    jne .not_slice
+    extern rt_arr_slice
+    mov rdi, [r15]
+    mov rsi, [r15 + 8]
+    mov rdx, [r15 + 16]
+    call rt_arr_slice
+    jmp .builtin_ret
+.not_slice:
+
+    ; exists(path)
+    cmp r13, 6
+    jne .not_exists
+    cmp byte [r12], 'e'
+    jne .not_exists
+    cmp byte [r12 + 1], 'x'
+    jne .not_exists
+    cmp byte [r12 + 5], 's'
+    jne .not_exists
+    extern rt_file_exists
+    mov rdi, [r15]
+    call rt_file_exists
+    jmp .builtin_ret
+.not_exists:
+
+    ; append(path, data)
+    cmp r13, 6
+    jne .not_append
+    cmp byte [r12], 'a'
+    jne .not_append
+    cmp byte [r12 + 1], 'p'
+    jne .not_append
+    cmp byte [r12 + 5], 'd'
+    jne .not_append
+    extern rt_file_append
+    mov rdi, [r15]
+    mov rsi, [r15 + 8]
+    call rt_file_append
+    jmp .builtin_ret
+.not_append:
+
+    ; delete(path)
+    cmp r13, 6
+    jne .not_delete
+    cmp byte [r12], 'd'
+    jne .not_delete
+    cmp byte [r12 + 1], 'e'
+    jne .not_delete
+    cmp byte [r12 + 5], 'e'
+    jne .not_delete
+    extern rt_file_delete
+    mov rdi, [r15]
+    call rt_file_delete
+    jmp .builtin_ret
+.not_delete:
+
+    ; lines(path)
+    cmp r13, 5
+    jne .not_lines
+    cmp byte [r12], 'l'
+    jne .not_lines
+    cmp byte [r12 + 1], 'i'
+    jne .not_lines
+    cmp byte [r12 + 4], 's'
+    jne .not_lines
+    extern rt_file_lines
+    mov rdi, [r15]
+    call rt_file_lines
+    jmp .builtin_ret
+.not_lines:
+
+    ; time()
+    cmp r13, 4
+    jne .not_time
+    cmp byte [r12], 't'
+    jne .not_time
+    cmp byte [r12 + 1], 'i'
+    jne .not_time
+    cmp byte [r12 + 2], 'm'
+    jne .not_time
+    cmp byte [r12 + 3], 'e'
+    jne .not_time
+    extern rt_time
+    call rt_time
+    jmp .builtin_ret
+.not_time:
+
+    ; clock()
+    cmp r13, 5
+    jne .not_clock
+    cmp byte [r12], 'c'
+    jne .not_clock
+    cmp byte [r12 + 1], 'l'
+    jne .not_clock
+    cmp byte [r12 + 4], 'k'
+    jne .not_clock
+    extern rt_clock
+    call rt_clock
+    jmp .builtin_ret
+.not_clock:
+
+    ; sleep(seconds)
+    cmp r13, 5
+    jne .not_sleep
+    cmp byte [r12], 's'
+    jne .not_sleep
+    cmp byte [r12 + 1], 'l'
+    jne .not_sleep
+    cmp byte [r12 + 4], 'p'
+    jne .not_sleep
+    extern rt_sleep
+    mov rdi, [r15]
+    call rt_sleep
+    jmp .builtin_ret
+.not_sleep:
+
+    ; args()
+    cmp r13, 4
+    jne .not_args
+    cmp byte [r12], 'a'
+    jne .not_args
+    cmp byte [r12 + 1], 'r'
+    jne .not_args
+    cmp byte [r12 + 2], 'g'
+    jne .not_args
+    cmp byte [r12 + 3], 's'
+    jne .not_args
+    extern rt_args
+    call rt_args
+    jmp .builtin_ret
+.not_args:
+
+    ; env(name)
+    cmp r13, 3
+    jne .not_env
+    cmp byte [r12], 'e'
+    jne .not_env
+    cmp byte [r12 + 1], 'n'
+    jne .not_env
+    cmp byte [r12 + 2], 'v'
+    jne .not_env
+    extern rt_env
+    mov rdi, [r15]
+    call rt_env
+    jmp .builtin_ret
+.not_env:
+
+    ; system(cmd)
+    cmp r13, 6
+    jne .not_system
+    cmp byte [r12], 's'
+    jne .not_system
+    cmp byte [r12 + 1], 'y'
+    jne .not_system
+    cmp byte [r12 + 5], 'm'
+    jne .not_system
+    extern rt_system
+    mov rdi, [r15]
+    call rt_system
+    jmp .builtin_ret
+.not_system:
+
+    ; pad(str, width, char)
+    cmp r13, 3
+    jne .not_pad
+    cmp byte [r12], 'p'
+    jne .not_pad
+    cmp byte [r12 + 1], 'a'
+    jne .not_pad
+    cmp byte [r12 + 2], 'd'
+    jne .not_pad
+    extern rt_str_pad
+    mov rdi, [r15]
+    mov rsi, [r15 + 8]
+    mov rdx, [r15 + 16]
+    call rt_str_pad
+    jmp .builtin_ret
+.not_pad:
+
     ; Not a builtin
-    mov rax, -1
+    mov qword [builtin_found], 0
+    mov rax, 0
     pop r15
     pop r14
     pop r13
@@ -3478,6 +3908,7 @@ interp_try_builtin:
     ret
 
 .builtin_ret:
+    mov qword [builtin_found], 1
     pop r15
     pop r14
     pop r13

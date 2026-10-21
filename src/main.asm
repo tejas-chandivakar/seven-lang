@@ -133,6 +133,10 @@ section .text
 ; _start — Entry point
 ; ============================================================
 _start:
+    ; Save initial rsp for args()/env() access
+    extern saved_rsp
+    mov [saved_rsp], rsp
+
     ; Get argc
     mov rax, [rsp]
     mov [argc], rax

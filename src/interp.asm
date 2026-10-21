@@ -63,6 +63,7 @@ section .data
     interp_err_var_len equ $ - interp_err_var
     interp_err_func db "Error: Undefined function: ", 0
     interp_err_func_len equ $ - interp_err_func
+    str_divzero db "Division by zero", 0
     interp_newline db 10, 0
 
     ; Boolean string constants
@@ -140,6 +141,11 @@ section .bss
     call_save_r12 resq 1
     call_save_r13 resq 1
 
+    ; Error handling
+    error_flag  resq 1
+    error_msg   resq 1
+    try_depth   resq 1
+
 section .text
     extern lexer_get_token, lexer_token_count
     extern kw_show, kw_err, kw_if, kw_elif, kw_else, kw_end
@@ -148,7 +154,7 @@ section .text
     extern kw_true, kw_false, kw_null
     extern kw_and, kw_or, kw_not
     extern kw_in, kw_is, kw_isnt, kw_above, kw_below, kw_atleast, kw_atmost
-    extern kw_try, kw_catch, kw_error, kw_push
+    extern kw_try, kw_catch, kw_error, kw_done, kw_push
     extern kw_ask, kw_write, kw_read, kw_many, kw_match, kw_case
     extern kw_mode
     extern rt_init
@@ -633,6 +639,119 @@ ip_skip_block:
     ret
 
 ; ============================================================
+; ip_skip_try_body — Skip tokens in try block to catch/done/end
+; Tracks nesting of block-opening keywords
+; Returns: rax = 0 (catch), 1 (done), 2 (end), 3 (EOF)
+; Does NOT advance past the found keyword
+; ============================================================
+ip_skip_try_body:
+    push rbp
+    mov rbp, rsp
+    push r14
+    xor r14, r14             ; nesting depth
+.stb_loop:
+    call ip_skip_nl
+    call ip_tok_type
+    cmp al, TOK_EOF
+    je .stb_eof
+    cmp al, TOK_KEYWORD
+    jne .stb_adv
+
+    ; At depth 0, check for catch/done/end
+    cmp r14, 0
+    jne .stb_check_nest
+
+    lea rdi, [kw_catch]
+    mov rsi, 5
+    call ip_is_kw
+    cmp rax, 1
+    je .stb_found_catch
+
+    lea rdi, [kw_done]
+    mov rsi, 4
+    call ip_is_kw
+    cmp rax, 1
+    je .stb_found_done
+
+    lea rdi, [kw_end]
+    mov rsi, 3
+    call ip_is_kw
+    cmp rax, 1
+    je .stb_found_end
+
+.stb_check_nest:
+    ; Check for 'end' (decrement depth)
+    lea rdi, [kw_end]
+    mov rsi, 3
+    call ip_is_kw
+    cmp rax, 1
+    je .stb_dec
+
+    ; Check block-opening keywords (increment depth)
+    lea rdi, [kw_if]
+    mov rsi, 2
+    call ip_is_kw
+    cmp rax, 1
+    je .stb_inc
+    lea rdi, [kw_while]
+    mov rsi, 5
+    call ip_is_kw
+    cmp rax, 1
+    je .stb_inc
+    lea rdi, [kw_repeat]
+    mov rsi, 6
+    call ip_is_kw
+    cmp rax, 1
+    je .stb_inc
+    lea rdi, [kw_each]
+    mov rsi, 4
+    call ip_is_kw
+    cmp rax, 1
+    je .stb_inc
+    lea rdi, [kw_func]
+    mov rsi, 4
+    call ip_is_kw
+    cmp rax, 1
+    je .stb_inc
+    lea rdi, [kw_try]
+    mov rsi, 3
+    call ip_is_kw
+    cmp rax, 1
+    je .stb_inc
+    lea rdi, [kw_match]
+    mov rsi, 5
+    call ip_is_kw
+    cmp rax, 1
+    je .stb_inc
+    jmp .stb_adv
+
+.stb_inc:
+    inc r14
+    jmp .stb_adv
+.stb_dec:
+    dec r14
+    jmp .stb_adv
+.stb_adv:
+    call ip_advance
+    jmp .stb_loop
+
+.stb_found_catch:
+    xor rax, rax             ; 0 = catch
+    jmp .stb_ret
+.stb_found_done:
+    mov rax, 1               ; 1 = done
+    jmp .stb_ret
+.stb_found_end:
+    mov rax, 2               ; 2 = end
+    jmp .stb_ret
+.stb_eof:
+    mov rax, 3               ; 3 = EOF
+.stb_ret:
+    pop r14
+    pop rbp
+    ret
+
+; ============================================================
 ; interp_stmt — Execute one statement
 ; ============================================================
 interp_stmt:
@@ -645,6 +764,8 @@ interp_stmt:
     cmp qword [loop_stop_flag], 1
     je .skip_stmt
     cmp qword [loop_skip_flag], 1
+    je .skip_stmt
+    cmp qword [error_flag], 1
     je .skip_stmt
 
     call ip_skip_nl
@@ -780,6 +901,12 @@ interp_stmt:
     cmp rax, 1
     je .do_match
 
+    lea rdi, [kw_error]
+    mov rsi, 5
+    call ip_is_kw
+    cmp rax, 1
+    je .do_error
+
     ; Unknown keyword — skip it
     call ip_advance
     pop rbp
@@ -797,9 +924,12 @@ interp_stmt:
     je .show_check_raw
 
     call interp_expr
+    cmp qword [error_flag], 1
+    je .show_done
     mov rdi, rax
     call rt_print_val
     call rt_print_newline
+.show_done:
     pop rbp
     ret
 
@@ -917,10 +1047,12 @@ interp_stmt:
     je .if_hit_end
 
     call interp_stmt
-    ; Check if return/break was triggered
+    ; Check if return/break/error was triggered
     cmp qword [return_flag], 1
     je .if_skip_rest
     cmp qword [loop_stop_flag], 1
+    je .if_skip_rest
+    cmp qword [error_flag], 1
     je .if_skip_rest
     jmp .if_body
 
@@ -1139,6 +1271,8 @@ interp_stmt:
     je .repeat_stop
     cmp qword [return_flag], 1
     je .repeat_stop
+    cmp qword [error_flag], 1
+    je .repeat_stop
 
     call interp_stmt
     jmp .repeat_body
@@ -1200,6 +1334,8 @@ interp_stmt:
     cmp qword [loop_stop_flag], 1
     je .while_stop
     cmp qword [return_flag], 1
+    je .while_stop
+    cmp qword [error_flag], 1
     je .while_stop
 
     call interp_stmt
@@ -1330,6 +1466,8 @@ interp_stmt:
     cmp qword [loop_stop_flag], 1
     je .each_stop
     cmp qword [return_flag], 1
+    je .each_stop
+    cmp qword [error_flag], 1
     je .each_stop
 
     call interp_stmt
@@ -1489,6 +1627,17 @@ interp_stmt:
     ret
 
 ; ============================================================
+; error expr — Raise an error
+; ============================================================
+.do_error:
+    call ip_advance          ; skip 'error'
+    call interp_expr         ; evaluate error message
+    mov [error_msg], rax
+    mov qword [error_flag], 1
+    pop rbp
+    ret
+
+; ============================================================
 ; end — should not reach here (handled by block owners)
 ; ============================================================
 .do_end:
@@ -1497,41 +1646,195 @@ interp_stmt:
     ret
 
 ; ============================================================
-; try/catch/done — Error handling
+; try/catch/done/end — Error handling
 ; ============================================================
 .do_try:
     call ip_advance          ; skip 'try'
-    ; Execute body, catch errors (simplified: just execute)
+    inc qword [try_depth]
+    mov qword [error_flag], 0
+
+    ; Execute try body
 .try_body:
     call ip_skip_nl
     call ip_tok_type
     cmp al, TOK_EOF
-    je .try_done
+    je .try_cleanup
+
+    ; Check for section boundaries
+    cmp al, TOK_KEYWORD
+    jne .try_body_exec
 
     lea rdi, [kw_catch]
     mov rsi, 5
     call ip_is_kw
     cmp rax, 1
-    je .try_skip_catch
+    je .try_body_ok
+
+    lea rdi, [kw_done]
+    mov rsi, 4
+    call ip_is_kw
+    cmp rax, 1
+    je .try_body_ok
 
     lea rdi, [kw_end]
     mov rsi, 3
     call ip_is_kw
     cmp rax, 1
-    je .try_end
+    je .try_body_ok
+
+.try_body_exec:
+    ; Check if error occurred
+    cmp qword [error_flag], 1
+    je .try_body_error
 
     call interp_stmt
+    ; Check error after statement
+    cmp qword [error_flag], 1
+    je .try_body_error
     jmp .try_body
 
-.try_skip_catch:
-    call ip_advance          ; skip 'catch'
-    call ip_skip_block       ; skip to matching 'end'
-    pop rbp
-    ret
+.try_body_error:
+    ; Error in try body — skip rest to catch/done/end
+    call ip_skip_try_body    ; rax: 0=catch, 1=done, 2=end, 3=eof
+    cmp rax, 0
+    je .try_exec_catch
+    cmp rax, 1
+    je .try_exec_done
+    jmp .try_hit_end         ; end or eof
 
-.try_end:
+.try_body_ok:
+    ; Try body completed without error — skip catch blocks
+    mov qword [error_flag], 0
+.try_skip_catches:
+    call ip_skip_nl
+    call ip_tok_type
+    cmp al, TOK_EOF
+    je .try_cleanup
+    cmp al, TOK_KEYWORD
+    jne .try_cleanup
+
+    lea rdi, [kw_catch]
+    mov rsi, 5
+    call ip_is_kw
+    cmp rax, 1
+    jne .try_check_done_ok
+
+    ; Skip this catch block
+    call ip_advance          ; skip 'catch'
+    ; Skip optional variable/type name after catch
+    call ip_tok_type
+    cmp al, TOK_NEWLINE
+    je .try_skip_catch_body
+    cmp al, TOK_EOF
+    je .try_cleanup
+    cmp al, TOK_IDENT
+    jne .try_skip_catch_body
+    call ip_advance          ; skip var/type name
+.try_skip_catch_body:
+    call ip_skip_try_body    ; skip to next catch/done/end
+    jmp .try_skip_catches
+
+.try_check_done_ok:
+    lea rdi, [kw_done]
+    mov rsi, 4
+    call ip_is_kw
+    cmp rax, 1
+    je .try_exec_done
+
+    lea rdi, [kw_end]
+    mov rsi, 3
+    call ip_is_kw
+    cmp rax, 1
+    je .try_hit_end
+    jmp .try_cleanup
+
+.try_exec_catch:
+    ; Execute catch block
+    call ip_advance          ; skip 'catch'
+    mov qword [error_flag], 0
+
+    ; Check for variable name after catch
+    call ip_tok_type
+    cmp al, TOK_IDENT
+    jne .try_catch_body
+    ; Check if identifier (variable to bind error message)
+    call ip_peek
+    mov rdi, [rax + 8]      ; name ptr
+    mov ecx, [rax + 4]
+    mov rsi, rcx             ; name len
+    mov rdx, [error_msg]
+    call var_set
+    call ip_advance          ; skip variable name
+
+.try_catch_body:
+    call ip_skip_nl
+    call ip_tok_type
+    cmp al, TOK_EOF
+    je .try_cleanup
+
+    cmp al, TOK_KEYWORD
+    jne .try_catch_exec
+
+    lea rdi, [kw_catch]
+    mov rsi, 5
+    call ip_is_kw
+    cmp rax, 1
+    je .try_catch_done
+
+    lea rdi, [kw_done]
+    mov rsi, 4
+    call ip_is_kw
+    cmp rax, 1
+    je .try_catch_done
+
+    lea rdi, [kw_end]
+    mov rsi, 3
+    call ip_is_kw
+    cmp rax, 1
+    je .try_hit_end
+
+.try_catch_exec:
+    call interp_stmt
+    jmp .try_catch_body
+
+.try_catch_done:
+    ; After catch body, skip remaining catches to done/end
+    call ip_skip_try_body    ; rax: 0=catch, 1=done, 2=end
+    cmp rax, 0
+    je .try_catch_done       ; skip another catch
+    cmp rax, 1
+    je .try_exec_done
+    jmp .try_hit_end
+
+.try_exec_done:
+    ; Execute done (finally) block
+    call ip_advance          ; skip 'done'
+    mov qword [error_flag], 0
+
+.try_done_body:
+    call ip_skip_nl
+    call ip_tok_type
+    cmp al, TOK_EOF
+    je .try_cleanup
+
+    cmp al, TOK_KEYWORD
+    jne .try_done_exec
+
+    lea rdi, [kw_end]
+    mov rsi, 3
+    call ip_is_kw
+    cmp rax, 1
+    je .try_hit_end
+
+.try_done_exec:
+    call interp_stmt
+    jmp .try_done_body
+
+.try_hit_end:
     call ip_advance          ; skip 'end'
-.try_done:
+.try_cleanup:
+    dec qword [try_depth]
+    mov qword [error_flag], 0
     pop rbp
     ret
 
@@ -1688,6 +1991,8 @@ interp_stmt:
     call ip_is_kw
     cmp rax, 1
     je .match_end
+    cmp qword [error_flag], 1
+    je .match_skip_rest
     call interp_stmt
     jmp .match_case_body
 
@@ -2077,6 +2382,8 @@ interp_call:
     je .call_hit_end
 
     cmp qword [return_flag], 1
+    je .call_skip_to_end
+    cmp qword [error_flag], 1
     je .call_skip_to_end
 
     call interp_stmt
@@ -2619,6 +2926,17 @@ interp_expr_mul:
     jmp .mul_loop
 
 .mul_divzero:
+    cmp qword [try_depth], 0
+    je .mul_divzero_fatal
+    ; Inside try — raise error
+    mov qword [error_flag], 1
+    lea rax, [str_divzero]
+    mov [error_msg], rax
+    xor rax, rax             ; return 0
+    pop r12
+    pop rbp
+    ret
+.mul_divzero_fatal:
     mov rax, 1
     mov rdi, 2
     mov rsi, interp_err_divzero

@@ -1,4 +1,11 @@
 !! Test division by zero
 show 10 / 2
-show 10 / 0
-show "should not reach here"
+
+try
+    show 10 / 0
+    show "should not reach here"
+catch e
+    show "caught division by zero"
+end
+
+show "test passed"

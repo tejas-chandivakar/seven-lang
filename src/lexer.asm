@@ -23,7 +23,7 @@ section .data
     global kw_skip, kw_stop, kw_true, kw_false, kw_null
     global kw_and, kw_or, kw_not, kw_in, kw_is
     global kw_equals, kw_isnt, kw_above, kw_below, kw_atleast, kw_atmost
-    global kw_try, kw_catch, kw_error
+    global kw_try, kw_catch, kw_error, kw_done
     global kw_many, kw_mode, kw_push
     global kw_match, kw_case
 
@@ -65,6 +65,7 @@ section .data
     kw_try      db "try", 0
     kw_catch    db "catch", 0
     kw_error    db "error", 0
+    kw_done     db "done", 0
     kw_many     db "many", 0
     kw_mode     db "mode", 0
     kw_push     db "push", 0
@@ -112,6 +113,7 @@ section .data
     dq kw_try, 3
     dq kw_catch, 5
     dq kw_error, 5
+    dq kw_done, 4
     dq kw_many, 4
     dq kw_mode, 4
     dq kw_push, 4

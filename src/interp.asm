@@ -149,6 +149,11 @@ section .bss
     error_msg   resq 1
     try_depth   resq 1
 
+    ; Call scope save/restore (recursion correctness)
+    scope_stack  resq 65536     ; backed-up var values across nested calls
+    scope_sp     resq 1         ; stack pointer into scope_stack
+    scope_counts resq 1024      ; saved var_count per call depth (-1 = skipped)
+
 section .text
     extern lexer_get_token, lexer_token_count
     extern kw_show, kw_err, kw_if, kw_elif, kw_else, kw_end
@@ -2422,6 +2427,37 @@ interp_call:
     ; Save current position
     push qword [ip_pos]
 
+    ; --- Save caller variable scope (recursion correctness) ---
+    mov r10, [call_depth]
+    cmp r10, 1024
+    jae .call_scope_save_skip
+    mov r8, [var_count]              ; N = number of live vars
+    mov r9, [scope_sp]
+    lea rax, [r9 + r8]
+    cmp rax, 65536
+    ja .call_scope_save_oflow
+    mov [scope_counts + r10 * 8], r8
+    xor rcx, rcx
+.call_scope_save_loop:
+    cmp rcx, r8
+    jge .call_scope_save_fin
+    mov rax, [var_vals + rcx * 8]
+    mov [scope_stack + r9 * 8], rax
+    inc r9
+    inc rcx
+    jmp .call_scope_save_loop
+.call_scope_save_fin:
+    mov [scope_sp], r9
+    inc qword [call_depth]
+    jmp .call_scope_save_done
+.call_scope_save_oflow:
+    mov qword [scope_counts + r10 * 8], -1   ; signal restore to skip
+    inc qword [call_depth]
+    jmp .call_scope_save_done
+.call_scope_save_skip:
+    inc qword [call_depth]
+.call_scope_save_done:
+
     ; Set parameters as variables
     xor rcx, rcx
 .call_set_params:
@@ -2531,6 +2567,33 @@ interp_call:
 .call_body_done:
     mov rax, [return_val]
     mov qword [return_flag], 0
+
+    ; --- Restore caller variable scope (recursion correctness) ---
+    push rax                         ; preserve return value
+    dec qword [call_depth]
+    mov r10, [call_depth]
+    cmp r10, 1024
+    jae .call_scope_restore_done
+    mov r8, [scope_counts + r10 * 8] ; N (or -1 if skipped)
+    cmp r8, 0
+    jl .call_scope_restore_done
+    mov [var_count], r8              ; drop params/locals added in call
+    mov r9, [scope_sp]
+    sub r9, r8                       ; base index of this frame's saved values
+    xor rcx, rcx
+.call_scope_restore_loop:
+    cmp rcx, r8
+    jge .call_scope_restore_fin
+    mov rdx, r9
+    add rdx, rcx
+    mov rax, [scope_stack + rdx * 8]
+    mov [var_vals + rcx * 8], rax
+    inc rcx
+    jmp .call_scope_restore_loop
+.call_scope_restore_fin:
+    mov [scope_sp], r9
+.call_scope_restore_done:
+    pop rax                          ; restore return value
 
     ; Restore position
     pop qword [ip_pos]

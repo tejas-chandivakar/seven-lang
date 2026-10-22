@@ -1,0 +1,28 @@
+!! Recursion — functions that call themselves
+
+func factorial(n)
+    if n <= 1
+        return 1
+    end
+    return n * factorial(n - 1)
+end
+
+func fib(n)
+    if n < 2
+        return n
+    end
+    return fib(n - 1) + fib(n - 2)
+end
+
+show "factorials:"
+repeat 6 times as i
+    k = i + 1
+    f = factorial(k)
+    show "{k}! = {f}"
+end
+
+show "fibonacci:"
+repeat 10 times as i
+    f = fib(i)
+    show "fib({i}) = {f}"
+end

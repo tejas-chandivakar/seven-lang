@@ -46,13 +46,32 @@ E:\SEVEN language\
 └── README.md
 ```
 
-## Building the Compiler (Linux / WSL)
+## Install (Linux / WSL — no build tools needed)
+
+One line — downloads a prebuilt static binary (~53 KB), no NASM required:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/tejas-chandivakar/seven-lang/main/install.sh | sh
+```
+
+Then run a program:
+
+```bash
+echo 'show "Hello from SEVEN!"' > hello.seven
+seven run hello.seven
+```
+
+Options: `SEVEN_BIN_DIR=/usr/local/bin` to change the install directory,
+`SEVEN_VERSION=v1.0.0` to pin a version.
+
+## Building from source (Linux / WSL)
 
 ```bash
 sudo apt install nasm
 cd "/mnt/e/SEVEN language"
-make
-./build/seven-lexer examples/hello.seven
+make            # builds build/seven
+make dist       # packages dist/seven + tarball + checksums
+./build/seven run examples/hello.seven
 ```
 
 ## Documentation

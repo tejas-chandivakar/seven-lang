@@ -1,0 +1,51 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g. v1.0.0)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install NASM
+        run: sudo apt-get update && sudo apt-get install -y nasm
+
+      - name: Build SEVEN
+        run: make clean && make
+
+      - name: Smoke test
+        run: |
+          echo 'show "SEVEN release build OK"' > /tmp/smoke.seven
+          ./build/seven run /tmp/smoke.seven
+
+      - name: Package binary
+        run: |
+          mkdir -p dist
+          cp build/seven dist/seven
+          strip dist/seven || true
+          chmod +x dist/seven
+          cd dist
+          tar -czf seven-linux-x86_64.tar.gz seven
+          sha256sum seven seven-linux-x86_64.tar.gz > checksums.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          name: SEVEN ${{ github.event.inputs.tag || github.ref_name }}
+          generate_release_notes: true
+          files: |
+            dist/seven
+            dist/seven-linux-x86_64.tar.gz
+            dist/checksums.txt

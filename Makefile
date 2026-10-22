@@ -41,7 +41,7 @@ SEVEN_BIN := $(BUILD_DIR)/seven
 
 ALL_OBJS := $(MAIN_OBJ) $(LEXER_OBJ) $(CODEGEN_OBJ) $(RUNTIME_OBJ) $(INTERP_OBJ)
 
-.PHONY: all seven test test-lex clean dirs
+.PHONY: all seven test test-lex clean dirs dist
 
 all: seven
 
@@ -102,3 +102,14 @@ test-run: seven
 
 clean:
 	rm -rf $(BUILD_DIR)
+
+# Package a release binary + tarball into dist/
+DIST_DIR := dist
+dist: seven
+	@mkdir -p $(DIST_DIR)
+	@cp $(SEVEN_BIN) $(DIST_DIR)/seven
+	@strip $(DIST_DIR)/seven || true
+	@chmod +x $(DIST_DIR)/seven
+	@cd $(DIST_DIR) && tar -czf seven-linux-x86_64.tar.gz seven && \
+		sha256sum seven seven-linux-x86_64.tar.gz > checksums.txt
+	@echo "Packaged -> $(DIST_DIR)/ (seven, seven-linux-x86_64.tar.gz, checksums.txt)"

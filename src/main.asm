@@ -17,12 +17,12 @@
 
 section .data
     ; ---- Messages ----
-    msg_banner  db "SEVEN Compiler v0.4", 10, 0
+    msg_banner  db "SEVEN Compiler v1.0", 10, 0
     msg_banner_len equ $ - msg_banner
 
     msg_version db "SEVEN Language Compiler", 10
-                db "  Version:  0.4.0", 10
-                db "  Phase:    4 (Developer Tools)", 10
+                db "  Version:  1.0.0", 10
+                db "  Phase:    10 (Error Handling)", 10
                 db "  Target:   x86-64 Linux (ELF64)", 10
                 db "  Author:   Tejas Chandivakar", 10
                 db "  Tagline:  Fast as Assembly. Simple as Python.", 10, 0

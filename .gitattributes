@@ -1,0 +1,6 @@
+# Shell scripts must always use LF, or they break on Linux/WSL
+*.sh text eol=lf
+install.sh text eol=lf
+
+# SEVEN source and tests use LF
+*.seven text eol=lf

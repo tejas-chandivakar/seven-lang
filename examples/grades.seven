@@ -1,0 +1,18 @@
+!! Classify exam scores into letter grades
+
+scores = [95, 82, 71, 58, 88]
+
+each scores as s
+    if s >= 90
+        grade = "A"
+    elif s >= 80
+        grade = "B"
+    elif s >= 70
+        grade = "C"
+    elif s >= 60
+        grade = "D"
+    else
+        grade = "F"
+    end
+    show "score {s} -> grade {grade}"
+end

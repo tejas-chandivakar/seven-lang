@@ -125,6 +125,9 @@ section .bss
     ; String scratch buffer for building strings
     str_scratch resb 4096
 
+    ; Buffer for string interpolation output
+    interp_buf  resb 8192
+
     ; Array storage — max 64 arrays, each up to 256 elements
     arr_storage resq 16384      ; 64 * 256 elements
     arr_lengths resq 64         ; length of each array
@@ -498,6 +501,140 @@ var_get:
     xor rax, rax
     pop r13
     pop r12
+    ret
+
+; ============================================================
+; ip_interpolate — Expand {var} placeholders in a string
+; rdi = source string (null-terminated)
+; Returns rax = interpolated string (new heap) or source if no '{'
+; Only variable names are substituted: {name} -> value of name.
+; Unknown/unterminated braces are left literal.
+; ============================================================
+ip_interpolate:
+    push rbp
+    mov rbp, rsp
+    push rbx
+    push r12
+    push r13
+    push r14
+    push r15
+    sub rsp, 8               ; align to 16 for calls
+    mov r12, rdi             ; source ptr
+
+    ; Fast path: scan for '{'
+    xor rcx, rcx
+.il_scan:
+    movzx eax, byte [r12 + rcx]
+    test al, al
+    jz .il_nointerp
+    cmp al, '{'
+    je .il_has
+    inc rcx
+    jmp .il_scan
+.il_nointerp:
+    mov rax, r12
+    jmp .il_ret
+
+.il_has:
+    xor r13, r13             ; dest index into interp_buf
+    xor r14, r14             ; source index
+.il_build:
+    movzx eax, byte [r12 + r14]
+    test al, al
+    jz .il_done
+    cmp al, '{'
+    je .il_brace
+    cmp r13, 8190
+    jae .il_adv1
+    mov [interp_buf + r13], al
+    inc r13
+.il_adv1:
+    inc r14
+    jmp .il_build
+
+.il_brace:
+    inc r14                  ; skip '{'
+    mov r15, r14             ; name start index
+    xor rbx, rbx             ; name length
+.il_name:
+    movzx eax, byte [r12 + r14]
+    test al, al
+    jz .il_unterm
+    cmp al, '}'
+    je .il_namedone
+    inc r14
+    inc rbx
+    jmp .il_name
+.il_unterm:
+    ; No closing brace: emit '{' and reprocess name chars literally
+    cmp r13, 8190
+    jae .il_unterm_reset
+    mov byte [interp_buf + r13], '{'
+    inc r13
+.il_unterm_reset:
+    mov r14, r15
+    jmp .il_build
+.il_namedone:
+    inc r14                  ; skip '}'
+    ; lookup variable: ptr = r12 + r15, len = rbx
+    mov rdi, r12
+    add rdi, r15
+    mov rsi, rbx
+    call var_get             ; rax = value
+    ; value -> string
+    cmp rax, 0
+    jl .il_int
+    cmp rax, 0x400000
+    jb .il_int
+    movzx edx, byte [rax]
+    test dl, dl
+    jz .il_build             ; empty string
+    cmp dl, 127
+    ja .il_int
+    mov rsi, rax             ; string pointer
+    jmp .il_append
+.il_int:
+    mov rdi, rax
+    call rt_int_to_str       ; rax = string ptr
+    mov rsi, rax
+.il_append:
+    movzx eax, byte [rsi]
+    test al, al
+    jz .il_build
+    cmp r13, 8190
+    jae .il_build
+    mov [interp_buf + r13], al
+    inc r13
+    inc rsi
+    jmp .il_append
+
+.il_done:
+    mov byte [interp_buf + r13], 0
+    mov rcx, r13             ; length
+    lea rdi, [rcx + 1]
+    push rcx
+    call rt_alloc            ; rax = new buffer
+    pop rcx
+    mov rdi, rax
+    xor r8, r8
+.il_copy:
+    cmp r8, rcx
+    jge .il_copydone
+    movzx edx, byte [interp_buf + r8]
+    mov [rdi + r8], dl
+    inc r8
+    jmp .il_copy
+.il_copydone:
+    mov byte [rdi + rcx], 0
+    ; rax still = new buffer
+.il_ret:
+    add rsp, 8
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop rbx
+    pop rbp
     ret
 
 ; ============================================================
@@ -3119,6 +3256,10 @@ interp_expr_primary:
     jmp .prim_str_copy
 .prim_str_done:
     mov byte [rdi + r13], 0  ; null terminate
+    ; Expand {var} placeholders
+    mov rdi, r12
+    call ip_interpolate
+    mov r12, rax
     call ip_advance
     mov rax, r12
     jmp .prim_postfix

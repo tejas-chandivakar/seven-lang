@@ -1,0 +1,19 @@
+!! Print prime numbers up to a limit
+
+limit = 30
+n = 2
+while n <= limit
+    is_prime = 1
+    d = 2
+    while d * d <= n
+        if n % d == 0
+            is_prime = 0
+            stop
+        end
+        d = d + 1
+    end
+    if is_prime == 1
+        show "{n} is prime"
+    end
+    n = n + 1
+end

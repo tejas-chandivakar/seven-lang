@@ -1,0 +1,10 @@
+!! Fibonacci sequence (iterative)
+
+a = 0
+b = 1
+repeat 10 times as i
+    show "fib({i}) = {a}"
+    next = a + b
+    a = b
+    b = next
+end

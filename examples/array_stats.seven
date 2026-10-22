@@ -1,0 +1,25 @@
+!! Statistics over an array (computed with an each loop)
+
+nums = [42, 17, 99, 8, 23, 64]
+
+total = 0
+biggest = 0
+smallest = 999999
+each nums as x
+    total = total + x
+    if x > biggest
+        biggest = x
+    end
+    if x < smallest
+        smallest = x
+    end
+end
+
+count = len(nums)
+average = total / count
+
+show "count:   {count}"
+show "sum:     {total}"
+show "min:     {smallest}"
+show "max:     {biggest}"
+show "average: {average}"

@@ -1,0 +1,15 @@
+!! FizzBuzz — the classic
+!! Multiples of 3 -> Fizz, of 5 -> Buzz, of both -> FizzBuzz
+
+repeat 15 times as n
+    num = n + 1
+    if num % 15 == 0
+        show "FizzBuzz"
+    elif num % 3 == 0
+        show "Fizz"
+    elif num % 5 == 0
+        show "Buzz"
+    else
+        show "{num}"
+    end
+end

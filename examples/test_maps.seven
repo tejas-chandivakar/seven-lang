@@ -1,0 +1,52 @@
+!! Test: Map data structure
+
+!! Create a map
+m = map_new()
+show "created map"
+
+!! Set values
+m = map_set(m, "name", "SEVEN")
+m = map_set(m, "version", "1.0")
+m = map_set(m, "type", "language")
+show "set 3 keys"
+
+!! Get values
+name = map_get(m, "name")
+show name
+
+ver = map_get(m, "version")
+show ver
+
+!! Has check
+h = map_has(m, "name")
+show h
+
+h2 = map_has(m, "missing")
+show h2
+
+!! Count
+c = map_count(m)
+show c
+
+!! Keys
+k = keys(m)
+show len(k)
+
+!! Update existing key
+m = map_set(m, "version", "2.0")
+ver2 = map_get(m, "version")
+show ver2
+
+!! Count should still be 3
+c2 = map_count(m)
+show c2
+
+!! Delete
+map_delete(m, "type")
+c3 = map_count(m)
+show c3
+
+h3 = map_has(m, "type")
+show h3
+
+show "all map tests done"

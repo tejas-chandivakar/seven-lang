@@ -1,0 +1,320 @@
+!! ============================================================
+!! SEVEN Self-Hosted Lexer
+!! Reads .seven source code and produces parallel token arrays
+!!   tok_types[i] = type constant
+!!   tok_vals[i]  = value string
+!!   tok_lines[i] = line number
+!! ============================================================
+
+!! Token type constants
+TOK_IDENT   = 1
+TOK_INT     = 2
+TOK_FLOAT   = 3
+TOK_STRING  = 4
+TOK_KEYWORD = 5
+TOK_OP      = 6
+TOK_PUNCT   = 7
+TOK_NEWLINE = 8
+TOK_EOF     = 9
+
+!! Build keyword set
+kw = map_new()
+kw = map_set(kw, "show", 1)
+kw = map_set(kw, "ask", 1)
+kw = map_set(kw, "if", 1)
+kw = map_set(kw, "elif", 1)
+kw = map_set(kw, "else", 1)
+kw = map_set(kw, "end", 1)
+kw = map_set(kw, "while", 1)
+kw = map_set(kw, "repeat", 1)
+kw = map_set(kw, "times", 1)
+kw = map_set(kw, "as", 1)
+kw = map_set(kw, "func", 1)
+kw = map_set(kw, "return", 1)
+kw = map_set(kw, "each", 1)
+kw = map_set(kw, "match", 1)
+kw = map_set(kw, "case", 1)
+kw = map_set(kw, "above", 1)
+kw = map_set(kw, "below", 1)
+kw = map_set(kw, "and", 1)
+kw = map_set(kw, "or", 1)
+kw = map_set(kw, "not", 1)
+kw = map_set(kw, "true", 1)
+kw = map_set(kw, "false", 1)
+kw = map_set(kw, "null", 1)
+kw = map_set(kw, "try", 1)
+kw = map_set(kw, "catch", 1)
+kw = map_set(kw, "done", 1)
+kw = map_set(kw, "error", 1)
+kw = map_set(kw, "read", 1)
+kw = map_set(kw, "write", 1)
+kw = map_set(kw, "many", 1)
+kw = map_set(kw, "err", 1)
+kw = map_set(kw, "assert", 1)
+kw = map_set(kw, "asm", 1)
+
+!! ============================================================
+!! Helpers
+!! ============================================================
+func is_alpha(c)
+    a = ord(c)
+    if a >= 65 and a <= 90
+        return 1
+    end
+    if a >= 97 and a <= 122
+        return 1
+    end
+    if a == 95
+        return 1
+    end
+    return 0
+end
+
+func is_digit(c)
+    a = ord(c)
+    if a >= 48 and a <= 57
+        return 1
+    end
+    return 0
+end
+
+func is_alnum(c)
+    if is_alpha(c) == 1
+        return 1
+    end
+    if is_digit(c) == 1
+        return 1
+    end
+    return 0
+end
+
+func is_space(c)
+    a = ord(c)
+    if a == 32 or a == 9 or a == 13
+        return 1
+    end
+    return 0
+end
+
+!! ============================================================
+!! lex(source) — Tokenize source, stores into global arrays
+!! Call: set lex_src = source, call lex_run()
+!! Result: tok_types, tok_vals, tok_lines arrays
+!! ============================================================
+
+!! Global token storage (parallel arrays)
+tok_types = []
+tok_vals  = []
+tok_lines = []
+
+func lex_emit(typ, val, ln)
+    push(tok_types, typ)
+    push(tok_vals, val)
+    push(tok_lines, ln)
+end
+
+func lex_run(source)
+    pos = 0
+    line = 1
+    slen = len(source)
+
+    while pos < slen
+        c = char_at(source, pos)
+        a = ord(c)
+
+        !! Skip whitespace (not newlines)
+        if is_space(c) == 1
+            pos = pos + 1
+
+        !! Newline
+        elif a == 10
+            lex_emit(TOK_NEWLINE, "NL", line)
+            pos = pos + 1
+            line = line + 1
+
+        !! Comment: !! to end of line
+        elif a == 33 and pos + 1 < slen and ord(char_at(source, pos + 1)) == 33
+            while pos < slen and ord(char_at(source, pos)) != 10
+                pos = pos + 1
+            end
+
+        !! String literal
+        elif a == 34
+            pos = pos + 1
+            start = pos
+            while pos < slen and ord(char_at(source, pos)) != 34 and ord(char_at(source, pos)) != 10
+                pos = pos + 1
+            end
+            sval = substr(source, start, pos - start)
+            lex_emit(TOK_STRING, sval, line)
+            if pos < slen and ord(char_at(source, pos)) == 34
+                pos = pos + 1
+            end
+
+        !! Number
+        elif is_digit(c) == 1
+            start = pos
+            pos = pos + 1
+            has_dot = 0
+            brk = 0
+            while pos < slen and brk == 0
+                nc = char_at(source, pos)
+                na = ord(nc)
+                if na >= 48 and na <= 57
+                    pos = pos + 1
+                elif na == 46 and has_dot == 0
+                    has_dot = 1
+                    pos = pos + 1
+                else
+                    brk = 1
+                end
+            end
+            nval = substr(source, start, pos - start)
+            if has_dot == 1
+                lex_emit(TOK_FLOAT, nval, line)
+            else
+                lex_emit(TOK_INT, nval, line)
+            end
+
+        !! Identifier or keyword
+        elif is_alpha(c) == 1
+            start = pos
+            pos = pos + 1
+            brk = 0
+            while pos < slen and brk == 0
+                ic = char_at(source, pos)
+                if is_alnum(ic) == 1
+                    pos = pos + 1
+                else
+                    brk = 1
+                end
+            end
+            word = substr(source, start, pos - start)
+            if map_has(kw, word) == 1
+                lex_emit(TOK_KEYWORD, word, line)
+            else
+                lex_emit(TOK_IDENT, word, line)
+            end
+
+        !! Two-char operators
+        elif a == 61 and pos + 1 < slen and ord(char_at(source, pos + 1)) == 61
+            lex_emit(TOK_OP, "==", line)
+            pos = pos + 2
+        elif a == 33 and pos + 1 < slen and ord(char_at(source, pos + 1)) == 61
+            lex_emit(TOK_OP, "!=", line)
+            pos = pos + 2
+        elif a == 60 and pos + 1 < slen and ord(char_at(source, pos + 1)) == 61
+            lex_emit(TOK_OP, "<=", line)
+            pos = pos + 2
+        elif a == 62 and pos + 1 < slen and ord(char_at(source, pos + 1)) == 61
+            lex_emit(TOK_OP, ">=", line)
+            pos = pos + 2
+
+        !! Single-char operators
+        elif a == 61
+            lex_emit(TOK_OP, "=", line)
+            pos = pos + 1
+        elif a == 43
+            lex_emit(TOK_OP, "+", line)
+            pos = pos + 1
+        elif a == 45
+            lex_emit(TOK_OP, "-", line)
+            pos = pos + 1
+        elif a == 42
+            lex_emit(TOK_OP, "*", line)
+            pos = pos + 1
+        elif a == 47
+            lex_emit(TOK_OP, "/", line)
+            pos = pos + 1
+        elif a == 37
+            lex_emit(TOK_OP, "%", line)
+            pos = pos + 1
+        elif a == 60
+            lex_emit(TOK_OP, "<", line)
+            pos = pos + 1
+        elif a == 62
+            lex_emit(TOK_OP, ">", line)
+            pos = pos + 1
+
+        !! Punctuation
+        elif a == 40
+            lex_emit(TOK_PUNCT, "(", line)
+            pos = pos + 1
+        elif a == 41
+            lex_emit(TOK_PUNCT, ")", line)
+            pos = pos + 1
+        elif a == 91
+            lex_emit(TOK_PUNCT, "[", line)
+            pos = pos + 1
+        elif a == 93
+            lex_emit(TOK_PUNCT, "]", line)
+            pos = pos + 1
+        elif a == 44
+            lex_emit(TOK_PUNCT, ",", line)
+            pos = pos + 1
+        elif a == 46
+            lex_emit(TOK_PUNCT, ".", line)
+            pos = pos + 1
+        elif a == 58
+            lex_emit(TOK_PUNCT, ":", line)
+            pos = pos + 1
+        else
+            !! Unknown — skip
+            pos = pos + 1
+        end
+    end
+
+    lex_emit(TOK_EOF, "", line)
+end
+
+!! ============================================================
+!! Token access helpers
+!! ============================================================
+func tok_count()
+    return len(tok_types)
+end
+
+func tok_type_at(i)
+    return tok_types[i]
+end
+
+func tok_val_at(i)
+    return tok_vals[i]
+end
+
+func tok_line_at(i)
+    return tok_lines[i]
+end
+
+!! ============================================================
+!! print_tokens() — Debug: print all tokens
+!! ============================================================
+func print_tokens()
+    n = len(tok_types)
+    i = 0
+    while i < n
+        t = tok_types[i]
+        v = tok_vals[i]
+        ln = tok_lines[i]
+        if t == TOK_KEYWORD
+            show "  KW: {v}"
+        elif t == TOK_IDENT
+            show "  ID: {v}"
+        elif t == TOK_INT
+            show " INT: {v}"
+        elif t == TOK_FLOAT
+            show " FLT: {v}"
+        elif t == TOK_STRING
+            show " STR: {v}"
+        elif t == TOK_OP
+            show "  OP: {v}"
+        elif t == TOK_PUNCT
+            show "   P: {v}"
+        elif t == TOK_NEWLINE
+            i = i  !! skip newlines in output
+        elif t == TOK_EOF
+            show " EOF"
+        end
+        i = i + 1
+    end
+end

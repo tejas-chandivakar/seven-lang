@@ -1,0 +1,44 @@
+!! Test: char_at and string operations for lexer support
+
+text = "hello"
+
+!! Get characters
+c = char_at(text, 0)
+show c
+
+c2 = char_at(text, 4)
+show c2
+
+!! ASCII codes
+a = ord("A")
+show a
+
+z = ord("z")
+show z
+
+zero = ord("0")
+show zero
+
+!! chr
+ch = chr(65)
+show ch
+
+!! substr
+s = substr("hello world", 6, 5)
+show s
+
+!! Combine for lexer-like work
+code = "x = 42 + y"
+i = 0
+each range(len(code)) as i
+    ch = char_at(code, i)
+    a = ord(ch)
+    if a >= 48 and a <= 57
+        show "digit: {ch}"
+    end
+    if a >= 97 and a <= 122
+        show "letter: {ch}"
+    end
+end
+
+show "char_at tests done"

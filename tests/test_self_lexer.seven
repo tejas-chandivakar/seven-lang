@@ -1,0 +1,365 @@
+!! Test: Self-hosted lexer from src/self/lexer.seven
+!! Includes lexer inline (no module system yet)
+
+!! Token type constants
+TOK_IDENT   = 1
+TOK_INT     = 2
+TOK_FLOAT   = 3
+TOK_STRING  = 4
+TOK_KEYWORD = 5
+TOK_OP      = 6
+TOK_PUNCT   = 7
+TOK_NEWLINE = 8
+TOK_EOF     = 9
+
+!! Keywords
+kw = map_new()
+kw = map_set(kw, "show", 1)
+kw = map_set(kw, "ask", 1)
+kw = map_set(kw, "if", 1)
+kw = map_set(kw, "elif", 1)
+kw = map_set(kw, "else", 1)
+kw = map_set(kw, "end", 1)
+kw = map_set(kw, "while", 1)
+kw = map_set(kw, "repeat", 1)
+kw = map_set(kw, "times", 1)
+kw = map_set(kw, "as", 1)
+kw = map_set(kw, "func", 1)
+kw = map_set(kw, "return", 1)
+kw = map_set(kw, "each", 1)
+kw = map_set(kw, "match", 1)
+kw = map_set(kw, "case", 1)
+kw = map_set(kw, "above", 1)
+kw = map_set(kw, "below", 1)
+kw = map_set(kw, "and", 1)
+kw = map_set(kw, "or", 1)
+kw = map_set(kw, "not", 1)
+kw = map_set(kw, "true", 1)
+kw = map_set(kw, "false", 1)
+kw = map_set(kw, "null", 1)
+kw = map_set(kw, "try", 1)
+kw = map_set(kw, "catch", 1)
+kw = map_set(kw, "done", 1)
+kw = map_set(kw, "error", 1)
+kw = map_set(kw, "read", 1)
+kw = map_set(kw, "write", 1)
+kw = map_set(kw, "many", 1)
+kw = map_set(kw, "err", 1)
+kw = map_set(kw, "assert", 1)
+kw = map_set(kw, "asm", 1)
+
+func is_alpha(c)
+    a = ord(c)
+    if a >= 65 and a <= 90
+        return 1
+    end
+    if a >= 97 and a <= 122
+        return 1
+    end
+    if a == 95
+        return 1
+    end
+    return 0
+end
+
+func is_digit(c)
+    a = ord(c)
+    if a >= 48 and a <= 57
+        return 1
+    end
+    return 0
+end
+
+func is_alnum(c)
+    if is_alpha(c) == 1
+        return 1
+    end
+    if is_digit(c) == 1
+        return 1
+    end
+    return 0
+end
+
+func is_space(c)
+    a = ord(c)
+    if a == 32 or a == 9 or a == 13
+        return 1
+    end
+    return 0
+end
+
+tok_types = []
+tok_vals  = []
+tok_lines = []
+
+func lex_emit(typ, val, ln)
+    push(tok_types, typ)
+    push(tok_vals, val)
+    push(tok_lines, ln)
+end
+
+func lex_run(source)
+    pos = 0
+    line = 1
+    slen = len(source)
+
+    while pos < slen
+        c = char_at(source, pos)
+        a = ord(c)
+
+        if is_space(c) == 1
+            pos = pos + 1
+
+        elif a == 10
+            lex_emit(TOK_NEWLINE, "NL", line)
+            pos = pos + 1
+            line = line + 1
+
+        elif a == 33 and pos + 1 < slen and ord(char_at(source, pos + 1)) == 33
+            while pos < slen and ord(char_at(source, pos)) != 10
+                pos = pos + 1
+            end
+
+        elif a == 34
+            pos = pos + 1
+            start = pos
+            while pos < slen and ord(char_at(source, pos)) != 34 and ord(char_at(source, pos)) != 10
+                pos = pos + 1
+            end
+            sval = substr(source, start, pos - start)
+            lex_emit(TOK_STRING, sval, line)
+            if pos < slen and ord(char_at(source, pos)) == 34
+                pos = pos + 1
+            end
+
+        elif is_digit(c) == 1
+            start = pos
+            pos = pos + 1
+            while pos < slen and is_digit(char_at(source, pos)) == 1
+                pos = pos + 1
+            end
+            nval = substr(source, start, pos - start)
+            lex_emit(TOK_INT, nval, line)
+
+        elif is_alpha(c) == 1
+            start = pos
+            pos = pos + 1
+            brk = 0
+            while pos < slen and brk == 0
+                ic = char_at(source, pos)
+                if is_alnum(ic) == 1
+                    pos = pos + 1
+                else
+                    brk = 1
+                end
+            end
+            word = substr(source, start, pos - start)
+            if map_has(kw, word) == 1
+                lex_emit(TOK_KEYWORD, word, line)
+            else
+                lex_emit(TOK_IDENT, word, line)
+            end
+
+        elif a == 61 and pos + 1 < slen and ord(char_at(source, pos + 1)) == 61
+            lex_emit(TOK_OP, "==", line)
+            pos = pos + 2
+        elif a == 33 and pos + 1 < slen and ord(char_at(source, pos + 1)) == 61
+            lex_emit(TOK_OP, "!=", line)
+            pos = pos + 2
+        elif a == 60 and pos + 1 < slen and ord(char_at(source, pos + 1)) == 61
+            lex_emit(TOK_OP, "<=", line)
+            pos = pos + 2
+        elif a == 62 and pos + 1 < slen and ord(char_at(source, pos + 1)) == 61
+            lex_emit(TOK_OP, ">=", line)
+            pos = pos + 2
+
+        elif a == 61
+            lex_emit(TOK_OP, "=", line)
+            pos = pos + 1
+        elif a == 43
+            lex_emit(TOK_OP, "+", line)
+            pos = pos + 1
+        elif a == 45
+            lex_emit(TOK_OP, "-", line)
+            pos = pos + 1
+        elif a == 42
+            lex_emit(TOK_OP, "*", line)
+            pos = pos + 1
+        elif a == 47
+            lex_emit(TOK_OP, "/", line)
+            pos = pos + 1
+        elif a == 37
+            lex_emit(TOK_OP, "%", line)
+            pos = pos + 1
+        elif a == 60
+            lex_emit(TOK_OP, "<", line)
+            pos = pos + 1
+        elif a == 62
+            lex_emit(TOK_OP, ">", line)
+            pos = pos + 1
+
+        elif a == 40
+            lex_emit(TOK_PUNCT, "(", line)
+            pos = pos + 1
+        elif a == 41
+            lex_emit(TOK_PUNCT, ")", line)
+            pos = pos + 1
+        elif a == 91
+            lex_emit(TOK_PUNCT, "[", line)
+            pos = pos + 1
+        elif a == 93
+            lex_emit(TOK_PUNCT, "]", line)
+            pos = pos + 1
+        elif a == 44
+            lex_emit(TOK_PUNCT, ",", line)
+            pos = pos + 1
+        elif a == 46
+            lex_emit(TOK_PUNCT, ".", line)
+            pos = pos + 1
+        elif a == 58
+            lex_emit(TOK_PUNCT, ":", line)
+            pos = pos + 1
+        else
+            pos = pos + 1
+        end
+    end
+
+    lex_emit(TOK_EOF, "", line)
+end
+
+!! ============================================================
+!! TEST 1: Simple assignment
+!! ============================================================
+show "=== test 1: x = 42 ==="
+lex_run("x = 42")
+assert len(tok_types) == 4
+assert tok_types[0] == TOK_IDENT
+assert tok_vals[0] == "x"
+assert tok_types[1] == TOK_OP
+assert tok_vals[1] == "="
+assert tok_types[2] == TOK_INT
+assert tok_vals[2] == "42"
+assert tok_types[3] == TOK_EOF
+show "PASS"
+
+!! Reset
+tok_types = []
+tok_vals = []
+tok_lines = []
+
+!! ============================================================
+!! TEST 2: Multi-line function definition
+!! ============================================================
+show "=== test 2: function ==="
+nl = chr(10)
+code2 = "func add(a, b)" + nl + "    return a + b" + nl + "end"
+lex_run(code2)
+n = len(tok_types)
+i = 0
+while i < n
+    t = tok_types[i]
+    v = tok_vals[i]
+    if t == TOK_KEYWORD
+        show "KW: {v}"
+    elif t == TOK_IDENT
+        show "ID: {v}"
+    elif t == TOK_OP
+        show "OP: {v}"
+    elif t == TOK_PUNCT
+        show "P: {v}"
+    elif t == TOK_NEWLINE
+        show "NL"
+    elif t == TOK_EOF
+        show "EOF"
+    end
+    i = i + 1
+end
+assert tok_types[0] == TOK_KEYWORD
+assert tok_vals[0] == "func"
+assert tok_types[2] == TOK_PUNCT
+assert tok_vals[2] == "("
+show "PASS"
+
+!! Reset
+tok_types = []
+tok_vals = []
+tok_lines = []
+
+!! ============================================================
+!! TEST 3: Comparison operators
+!! ============================================================
+show "=== test 3: operators ==="
+lex_run("if x >= 10 and y != 0")
+assert tok_types[0] == TOK_KEYWORD
+assert tok_vals[0] == "if"
+assert tok_types[3] == TOK_OP
+assert tok_vals[3] == ">="
+assert tok_types[5] == TOK_KEYWORD
+assert tok_vals[5] == "and"
+assert tok_types[7] == TOK_OP
+assert tok_vals[7] == "!="
+show "PASS"
+
+!! Reset
+tok_types = []
+tok_vals = []
+tok_lines = []
+
+!! ============================================================
+!! TEST 4: String literal
+!! ============================================================
+show "=== test 4: string ==="
+code4 = "show " + chr(34) + "hello" + chr(34)
+lex_run(code4)
+assert tok_types[0] == TOK_KEYWORD
+assert tok_vals[0] == "show"
+assert tok_types[1] == TOK_STRING
+assert tok_vals[1] == "hello"
+show "PASS"
+
+!! Reset
+tok_types = []
+tok_vals = []
+tok_lines = []
+
+!! ============================================================
+!! TEST 5: Comment skipping
+!! ============================================================
+show "=== test 5: comments ==="
+code5 = "x = 1 !! this is a comment" + nl + "y = 2"
+lex_run(code5)
+i = 0
+n = len(tok_types)
+while i < n
+    t = tok_types[i]
+    v = tok_vals[i]
+    if t != TOK_NEWLINE and t != TOK_EOF
+        show "{t}: {v}"
+    end
+    i = i + 1
+end
+assert tok_vals[0] == "x"
+assert tok_vals[2] == "1"
+show "PASS"
+
+!! Reset
+tok_types = []
+tok_vals = []
+tok_lines = []
+
+!! ============================================================
+!! TEST 6: Array access and mixed
+!! ============================================================
+show "=== test 6: mixed ==="
+lex_run("arr[0] = val + 3")
+assert tok_types[0] == TOK_IDENT
+assert tok_vals[0] == "arr"
+assert tok_types[1] == TOK_PUNCT
+assert tok_vals[1] == "["
+assert tok_types[2] == TOK_INT
+assert tok_vals[2] == "0"
+assert tok_types[3] == TOK_PUNCT
+assert tok_vals[3] == "]"
+show "PASS"
+
+show "all self-hosted lexer tests passed!"

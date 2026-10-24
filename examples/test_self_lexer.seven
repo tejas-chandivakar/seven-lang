@@ -1,0 +1,260 @@
+!! Test: Self-hosted lexer
+!! Includes lexer.seven inline (no modules yet)
+
+!! Token type constants
+TOK_IDENT   = 1
+TOK_INT     = 2
+TOK_FLOAT   = 3
+TOK_STRING  = 4
+TOK_KEYWORD = 5
+TOK_OP      = 6
+TOK_PUNCT   = 7
+TOK_NEWLINE = 8
+TOK_EOF     = 9
+
+!! Keywords
+kw = map_new()
+kw = map_set(kw, "show", 1)
+kw = map_set(kw, "if", 1)
+kw = map_set(kw, "elif", 1)
+kw = map_set(kw, "else", 1)
+kw = map_set(kw, "end", 1)
+kw = map_set(kw, "while", 1)
+kw = map_set(kw, "func", 1)
+kw = map_set(kw, "return", 1)
+kw = map_set(kw, "each", 1)
+kw = map_set(kw, "as", 1)
+kw = map_set(kw, "and", 1)
+kw = map_set(kw, "or", 1)
+kw = map_set(kw, "not", 1)
+kw = map_set(kw, "true", 1)
+kw = map_set(kw, "false", 1)
+
+func is_alpha(c)
+    a = ord(c)
+    if a >= 65 and a <= 90
+        return 1
+    end
+    if a >= 97 and a <= 122
+        return 1
+    end
+    if a == 95
+        return 1
+    end
+    return 0
+end
+
+func is_digit(c)
+    a = ord(c)
+    if a >= 48 and a <= 57
+        return 1
+    end
+    return 0
+end
+
+func is_alnum(c)
+    if is_alpha(c) == 1
+        return 1
+    end
+    return 0
+end
+
+func is_space(c)
+    a = ord(c)
+    if a == 32 or a == 9 or a == 13
+        return 1
+    end
+    return 0
+end
+
+!! Token storage
+tok_types = []
+tok_vals = []
+
+func emit(typ, val)
+    push(tok_types, typ)
+    push(tok_vals, val)
+end
+
+func lex(source)
+    pos = 0
+    line = 1
+    slen = len(source)
+
+    while pos < slen
+        c = char_at(source, pos)
+        a = ord(c)
+
+        if is_space(c) == 1
+            pos = pos + 1
+
+        elif a == 10
+            emit(TOK_NEWLINE, "NL")
+            pos = pos + 1
+            line = line + 1
+
+        !! Comment
+        elif a == 33 and pos + 1 < slen and ord(char_at(source, pos + 1)) == 33
+            while pos < slen and ord(char_at(source, pos)) != 10
+                pos = pos + 1
+            end
+
+        !! String
+        elif a == 34
+            pos = pos + 1
+            start = pos
+            while pos < slen and ord(char_at(source, pos)) != 34
+                pos = pos + 1
+            end
+            sval = substr(source, start, pos - start)
+            emit(TOK_STRING, sval)
+            if pos < slen
+                pos = pos + 1
+            end
+
+        !! Number
+        elif is_digit(c) == 1
+            start = pos
+            pos = pos + 1
+            while pos < slen and is_digit(char_at(source, pos)) == 1
+                pos = pos + 1
+            end
+            nval = substr(source, start, pos - start)
+            emit(TOK_INT, nval)
+
+        !! Identifier/keyword
+        elif is_alpha(c) == 1
+            start = pos
+            pos = pos + 1
+            brk = 0
+            while pos < slen and brk == 0
+                ic = char_at(source, pos)
+                if is_alpha(ic) == 1 or is_digit(ic) == 1
+                    pos = pos + 1
+                else
+                    brk = 1
+                end
+            end
+            word = substr(source, start, pos - start)
+            if map_has(kw, word) == 1
+                emit(TOK_KEYWORD, word)
+            else
+                emit(TOK_IDENT, word)
+            end
+
+        !! Two-char ops
+        elif a == 61 and pos + 1 < slen and ord(char_at(source, pos + 1)) == 61
+            emit(TOK_OP, "==")
+            pos = pos + 2
+        elif a == 33 and pos + 1 < slen and ord(char_at(source, pos + 1)) == 61
+            emit(TOK_OP, "!=")
+            pos = pos + 2
+        elif a == 60 and pos + 1 < slen and ord(char_at(source, pos + 1)) == 61
+            emit(TOK_OP, "<=")
+            pos = pos + 2
+        elif a == 62 and pos + 1 < slen and ord(char_at(source, pos + 1)) == 61
+            emit(TOK_OP, ">=")
+            pos = pos + 2
+
+        !! Single-char ops
+        elif a == 61 or a == 43 or a == 45 or a == 42 or a == 47 or a == 37 or a == 60 or a == 62
+            emit(TOK_OP, c)
+            pos = pos + 1
+
+        !! Punctuation
+        elif a == 40 or a == 41 or a == 91 or a == 93 or a == 44 or a == 46 or a == 58
+            emit(TOK_PUNCT, c)
+            pos = pos + 1
+
+        else
+            pos = pos + 1
+        end
+    end
+
+    emit(TOK_EOF, "")
+end
+
+!! ============================================================
+!! TEST 1: Simple assignment
+!! ============================================================
+show "=== test 1: x = 42 ==="
+lex("x = 42")
+n = len(tok_types)
+show n
+i = 0
+while i < n
+    t = tok_types[i]
+    v = tok_vals[i]
+    if t == TOK_IDENT
+        show "ID: {v}"
+    elif t == TOK_INT
+        show "INT: {v}"
+    elif t == TOK_OP
+        show "OP: {v}"
+    elif t == TOK_EOF
+        show "EOF"
+    end
+    i = i + 1
+end
+
+!! Clear for next test
+tok_types = []
+tok_vals = []
+
+!! ============================================================
+!! TEST 2: Function definition
+!! ============================================================
+show "=== test 2: function ==="
+nl = chr(10)
+code2 = "func add(a, b)" + nl + "    return a + b" + nl + "end"
+lex(code2)
+n = len(tok_types)
+show n
+i = 0
+while i < n
+    t = tok_types[i]
+    v = tok_vals[i]
+    if t == TOK_KEYWORD
+        show "KW: {v}"
+    elif t == TOK_IDENT
+        show "ID: {v}"
+    elif t == TOK_OP
+        show "OP: {v}"
+    elif t == TOK_PUNCT
+        show "P: {v}"
+    elif t == TOK_EOF
+        show "EOF"
+    end
+    i = i + 1
+end
+
+!! Clear
+tok_types = []
+tok_vals = []
+
+!! ============================================================
+!! TEST 3: String + comparison
+!! ============================================================
+show "=== test 3: comparison ==="
+lex("if x >= 10 and y != 0")
+n = len(tok_types)
+show n
+i = 0
+while i < n
+    t = tok_types[i]
+    v = tok_vals[i]
+    if t == TOK_KEYWORD
+        show "KW: {v}"
+    elif t == TOK_IDENT
+        show "ID: {v}"
+    elif t == TOK_INT
+        show "INT: {v}"
+    elif t == TOK_OP
+        show "OP: {v}"
+    elif t == TOK_EOF
+        show "EOF"
+    end
+    i = i + 1
+end
+
+show "all lexer tests done!"

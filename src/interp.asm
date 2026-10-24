@@ -1211,16 +1211,10 @@ interp_stmt:
     call ip_tok_type
     cmp al, TOK_EOF
     je .if_skip_done_pop
+    cmp al, TOK_KEYWORD
+    jne .if_skip_other
 
-    lea rdi, [kw_if]
-    mov rsi, 2
-    call ip_is_kw
-    cmp rax, 1
-    jne .if_skip_not_if
-    inc r14
-    call ip_advance
-    jmp .if_skip_loop
-.if_skip_not_if:
+    ; Check for 'end' — close nesting
     lea rdi, [kw_end]
     mov rsi, 3
     call ip_is_kw
@@ -1232,8 +1226,9 @@ interp_stmt:
     call ip_advance
     jmp .if_skip_loop
 .if_skip_not_end:
+    ; At top-level nesting, check for elif/else
     cmp r14, 1
-    jne .if_skip_other
+    jne .if_skip_check_nest
     lea rdi, [kw_elif]
     mov rsi, 4
     call ip_is_kw
@@ -1244,6 +1239,46 @@ interp_stmt:
     call ip_is_kw
     cmp rax, 1
     je .if_skip_do_else
+.if_skip_check_nest:
+    ; Check ALL block-opening keywords for nesting
+    lea rdi, [kw_if]
+    mov rsi, 2
+    call ip_is_kw
+    cmp rax, 1
+    je .if_skip_nest
+    lea rdi, [kw_while]
+    mov rsi, 5
+    call ip_is_kw
+    cmp rax, 1
+    je .if_skip_nest
+    lea rdi, [kw_repeat]
+    mov rsi, 6
+    call ip_is_kw
+    cmp rax, 1
+    je .if_skip_nest
+    lea rdi, [kw_each]
+    mov rsi, 4
+    call ip_is_kw
+    cmp rax, 1
+    je .if_skip_nest
+    lea rdi, [kw_func]
+    mov rsi, 4
+    call ip_is_kw
+    cmp rax, 1
+    je .if_skip_nest
+    lea rdi, [kw_try]
+    mov rsi, 3
+    call ip_is_kw
+    cmp rax, 1
+    je .if_skip_nest
+    lea rdi, [kw_match]
+    mov rsi, 5
+    call ip_is_kw
+    cmp rax, 1
+    je .if_skip_nest
+    jmp .if_skip_other
+.if_skip_nest:
+    inc r14
 .if_skip_other:
     call ip_advance
     jmp .if_skip_loop
@@ -1291,25 +1326,59 @@ interp_stmt:
     call ip_tok_type
     cmp al, TOK_EOF
     je .if_sr_done
-    lea rdi, [kw_if]
-    mov rsi, 2
-    call ip_is_kw
-    cmp rax, 1
-    jne .if_sr_not_if
-    inc r14
-    call ip_advance
-    jmp .if_skip_rest_loop
-.if_sr_not_if:
+    cmp al, TOK_KEYWORD
+    jne .if_sr_other
+    ; Check for 'end' — close nesting
     lea rdi, [kw_end]
     mov rsi, 3
     call ip_is_kw
     cmp rax, 1
-    jne .if_sr_other
+    jne .if_sr_not_end
     dec r14
     cmp r14, 0
     je .if_sr_hit_end
     call ip_advance
     jmp .if_skip_rest_loop
+.if_sr_not_end:
+    ; Check ALL block-opening keywords for nesting
+    lea rdi, [kw_if]
+    mov rsi, 2
+    call ip_is_kw
+    cmp rax, 1
+    je .if_sr_nest
+    lea rdi, [kw_while]
+    mov rsi, 5
+    call ip_is_kw
+    cmp rax, 1
+    je .if_sr_nest
+    lea rdi, [kw_repeat]
+    mov rsi, 6
+    call ip_is_kw
+    cmp rax, 1
+    je .if_sr_nest
+    lea rdi, [kw_each]
+    mov rsi, 4
+    call ip_is_kw
+    cmp rax, 1
+    je .if_sr_nest
+    lea rdi, [kw_func]
+    mov rsi, 4
+    call ip_is_kw
+    cmp rax, 1
+    je .if_sr_nest
+    lea rdi, [kw_try]
+    mov rsi, 3
+    call ip_is_kw
+    cmp rax, 1
+    je .if_sr_nest
+    lea rdi, [kw_match]
+    mov rsi, 5
+    call ip_is_kw
+    cmp rax, 1
+    je .if_sr_nest
+    jmp .if_sr_other
+.if_sr_nest:
+    inc r14
 .if_sr_other:
     call ip_advance
     jmp .if_skip_rest_loop
@@ -4120,6 +4189,30 @@ interp_try_builtin:
     jmp .builtin_ret
 .not_substr:
 
+    ; char_at(str, idx)
+    cmp r13, 7
+    jne .not_char_at
+    cmp byte [r12], 'c'
+    jne .not_char_at
+    cmp byte [r12 + 1], 'h'
+    jne .not_char_at
+    cmp byte [r12 + 2], 'a'
+    jne .not_char_at
+    cmp byte [r12 + 3], 'r'
+    jne .not_char_at
+    cmp byte [r12 + 4], '_'
+    jne .not_char_at
+    cmp byte [r12 + 5], 'a'
+    jne .not_char_at
+    cmp byte [r12 + 6], 't'
+    jne .not_char_at
+    extern rt_str_char_at
+    mov rdi, [r15]
+    mov rsi, [r15 + 8]
+    call rt_str_char_at
+    jmp .builtin_ret
+.not_char_at:
+
     ; push
     cmp r13, 4
     jne .not_push_builtin
@@ -4418,6 +4511,172 @@ interp_try_builtin:
     call rt_str_pad
     jmp .builtin_ret
 .not_pad:
+
+    ; ---- MAP BUILTINS ----
+
+    ; map_new() or map_new(capacity)
+    cmp r13, 7
+    jne .not_map_new
+    cmp byte [r12], 'm'
+    jne .not_map_new
+    cmp byte [r12 + 1], 'a'
+    jne .not_map_new
+    cmp byte [r12 + 2], 'p'
+    jne .not_map_new
+    cmp byte [r12 + 3], '_'
+    jne .not_map_new
+    cmp byte [r12 + 4], 'n'
+    jne .not_map_new
+    cmp byte [r12 + 5], 'e'
+    jne .not_map_new
+    cmp byte [r12 + 6], 'w'
+    jne .not_map_new
+    extern rt_map_new
+    cmp r14, 0
+    je .map_new_default
+    mov rdi, [r15]
+    jmp .map_new_call
+.map_new_default:
+    xor rdi, rdi
+.map_new_call:
+    call rt_map_new
+    jmp .builtin_ret
+.not_map_new:
+
+    ; map_set(map, key, value)
+    cmp r13, 7
+    jne .not_map_set
+    cmp byte [r12], 'm'
+    jne .not_map_set
+    cmp byte [r12 + 1], 'a'
+    jne .not_map_set
+    cmp byte [r12 + 2], 'p'
+    jne .not_map_set
+    cmp byte [r12 + 3], '_'
+    jne .not_map_set
+    cmp byte [r12 + 4], 's'
+    jne .not_map_set
+    cmp byte [r12 + 5], 'e'
+    jne .not_map_set
+    cmp byte [r12 + 6], 't'
+    jne .not_map_set
+    extern rt_map_set
+    mov rdi, [r15]
+    mov rsi, [r15 + 8]
+    mov rdx, [r15 + 16]
+    call rt_map_set
+    jmp .builtin_ret
+.not_map_set:
+
+    ; map_get(map, key)
+    cmp r13, 7
+    jne .not_map_get
+    cmp byte [r12], 'm'
+    jne .not_map_get
+    cmp byte [r12 + 1], 'a'
+    jne .not_map_get
+    cmp byte [r12 + 2], 'p'
+    jne .not_map_get
+    cmp byte [r12 + 3], '_'
+    jne .not_map_get
+    cmp byte [r12 + 4], 'g'
+    jne .not_map_get
+    cmp byte [r12 + 5], 'e'
+    jne .not_map_get
+    cmp byte [r12 + 6], 't'
+    jne .not_map_get
+    extern rt_map_get
+    mov rdi, [r15]
+    mov rsi, [r15 + 8]
+    call rt_map_get
+    jmp .builtin_ret
+.not_map_get:
+
+    ; map_has(map, key)
+    cmp r13, 7
+    jne .not_map_has
+    cmp byte [r12], 'm'
+    jne .not_map_has
+    cmp byte [r12 + 1], 'a'
+    jne .not_map_has
+    cmp byte [r12 + 2], 'p'
+    jne .not_map_has
+    cmp byte [r12 + 3], '_'
+    jne .not_map_has
+    cmp byte [r12 + 4], 'h'
+    jne .not_map_has
+    cmp byte [r12 + 5], 'a'
+    jne .not_map_has
+    cmp byte [r12 + 6], 's'
+    jne .not_map_has
+    extern rt_map_has
+    mov rdi, [r15]
+    mov rsi, [r15 + 8]
+    call rt_map_has
+    jmp .builtin_ret
+.not_map_has:
+
+    ; keys(map)
+    cmp r13, 4
+    jne .not_keys
+    cmp byte [r12], 'k'
+    jne .not_keys
+    cmp byte [r12 + 1], 'e'
+    jne .not_keys
+    cmp byte [r12 + 2], 'y'
+    jne .not_keys
+    cmp byte [r12 + 3], 's'
+    jne .not_keys
+    extern rt_map_keys
+    mov rdi, [r15]
+    call rt_map_keys
+    jmp .builtin_ret
+.not_keys:
+
+    ; map_delete(map, key)
+    cmp r13, 10
+    jne .not_map_delete
+    cmp byte [r12], 'm'
+    jne .not_map_delete
+    cmp byte [r12 + 1], 'a'
+    jne .not_map_delete
+    cmp byte [r12 + 2], 'p'
+    jne .not_map_delete
+    cmp byte [r12 + 3], '_'
+    jne .not_map_delete
+    cmp byte [r12 + 4], 'd'
+    jne .not_map_delete
+    cmp byte [r12 + 5], 'e'
+    jne .not_map_delete
+    cmp byte [r12 + 6], 'l'
+    jne .not_map_delete
+    extern rt_map_delete
+    mov rdi, [r15]
+    mov rsi, [r15 + 8]
+    call rt_map_delete
+    jmp .builtin_ret
+.not_map_delete:
+
+    ; map_count(map)
+    cmp r13, 9
+    jne .not_map_count
+    cmp byte [r12], 'm'
+    jne .not_map_count
+    cmp byte [r12 + 1], 'a'
+    jne .not_map_count
+    cmp byte [r12 + 2], 'p'
+    jne .not_map_count
+    cmp byte [r12 + 3], '_'
+    jne .not_map_count
+    cmp byte [r12 + 4], 'c'
+    jne .not_map_count
+    cmp byte [r12 + 5], 'o'
+    jne .not_map_count
+    extern rt_map_count
+    mov rdi, [r15]
+    call rt_map_count
+    jmp .builtin_ret
+.not_map_count:
 
     ; Not a builtin
     mov qword [builtin_found], 0

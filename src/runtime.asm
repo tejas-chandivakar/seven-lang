@@ -3553,3 +3553,419 @@ global rt_exit
 rt_exit:
     mov rax, 60
     syscall
+
+; ============================================================
+; MAP DATA STRUCTURE
+; Layout: [count:8][capacity:8][entry0_key_ptr:8][entry0_key_len:8][entry0_value:8]...
+; Each entry = 24 bytes (key_ptr, key_len, value)
+; Total size = 16 + capacity * 24
+; Uses linear scan (fast enough for compiler symbol tables < 10k entries)
+; ============================================================
+
+; ============================================================
+; rt_map_new — Create a new empty map
+; rdi = initial capacity (0 = default 64)
+; Returns: rax = map pointer
+; ============================================================
+global rt_map_new
+rt_map_new:
+    push rbp
+    mov rbp, rsp
+    push r12
+    cmp rdi, 0
+    jne .has_cap
+    mov rdi, 64
+.has_cap:
+    mov r12, rdi              ; save capacity
+    ; allocate: 16 (header) + capacity * 24 (entries)
+    imul rdi, 24
+    add rdi, 16
+    call rt_alloc
+    mov qword [rax], 0        ; count = 0
+    mov [rax + 8], r12         ; capacity
+    ; zero out all entries (key_ptr=0 means empty)
+    xor rcx, rcx
+.zero_loop:
+    cmp rcx, r12
+    jge .zero_done
+    lea rdx, [rax + 16]
+    imul r8, rcx, 24
+    mov qword [rdx + r8], 0        ; key_ptr = 0
+    mov qword [rdx + r8 + 8], 0    ; key_len = 0
+    mov qword [rdx + r8 + 16], 0   ; value = 0
+    inc rcx
+    jmp .zero_loop
+.zero_done:
+    pop r12
+    pop rbp
+    ret
+
+; ============================================================
+; rt_map_find_slot — Internal: find entry index for key
+; rdi = map ptr, rsi = key ptr, rdx = key len
+; Returns: rax = entry index (0-based), or -1 if not found
+; ============================================================
+rt_map_find_slot:
+    push rbp
+    mov rbp, rsp
+    push r12
+    push r13
+    push r14
+    push r15
+    mov r12, rdi              ; map
+    mov r13, rsi              ; key ptr
+    mov r14, rdx              ; key len
+    mov r15, [r12]            ; count
+    xor rcx, rcx              ; index
+.find_loop:
+    cmp rcx, r15
+    jge .find_notfound
+    lea rax, [r12 + 16]       ; entries base
+    imul r8, rcx, 24
+    mov rdi, [rax + r8]       ; entry key_ptr
+    test rdi, rdi
+    jz .find_next             ; empty slot
+    mov rsi, [rax + r8 + 8]   ; entry key_len
+    cmp rsi, r14
+    jne .find_next            ; different length
+    ; Compare key bytes
+    push rcx
+    mov rsi, r13              ; our key
+    mov rdx, r14              ; length
+    ; rdi = entry key (already set)
+    ; rsi = search key
+    ; rdx = length
+    xor rcx, rcx
+.cmp_loop:
+    cmp rcx, rdx
+    je .cmp_match
+    movzx r8, byte [rdi + rcx]
+    movzx r9, byte [rsi + rcx]
+    cmp r8, r9
+    jne .cmp_no
+    inc rcx
+    jmp .cmp_loop
+.cmp_match:
+    pop rcx
+    mov rax, rcx              ; found at index
+    jmp .find_done
+.cmp_no:
+    pop rcx
+.find_next:
+    inc rcx
+    jmp .find_loop
+.find_notfound:
+    mov rax, -1
+.find_done:
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop rbp
+    ret
+
+; ============================================================
+; rt_map_set — Set key-value pair in map
+; rdi = map ptr, rsi = key ptr (string), rdx = value
+; Returns: rax = map ptr (may be new if grown)
+; ============================================================
+global rt_map_set
+rt_map_set:
+    push rbp
+    mov rbp, rsp
+    push r12
+    push r13
+    push r14
+    push r15
+    mov r12, rdi              ; map
+    mov r14, rdx              ; value
+    ; Get key length
+    mov r13, rsi              ; key ptr
+    push r14
+    mov rdi, rsi
+    call rt_str_len
+    mov r15, rax              ; key len
+    pop r14
+    ; Find existing slot
+    mov rdi, r12
+    mov rsi, r13
+    mov rdx, r15
+    call rt_map_find_slot
+    cmp rax, -1
+    je .set_new
+    ; Update existing entry
+    lea rdx, [r12 + 16]
+    imul rax, 24
+    mov [rdx + rax + 16], r14 ; update value
+    mov rax, r12
+    jmp .set_done
+.set_new:
+    ; Check if need to grow
+    mov rcx, [r12]            ; count
+    mov rdx, [r12 + 8]        ; capacity
+    cmp rcx, rdx
+    jl .set_append
+    ; Grow: allocate new map with 2x capacity
+    push r13
+    push r14
+    push r15
+    shl rdx, 1                ; new capacity
+    mov rdi, rdx
+    push rdx
+    imul rdi, 24
+    add rdi, 16
+    call rt_alloc
+    pop rdx
+    mov qword [rax], 0        ; count = 0
+    mov [rax + 8], rdx         ; new capacity
+    ; Zero new entries
+    xor rcx, rcx
+.grow_zero:
+    cmp rcx, rdx
+    jge .grow_copy
+    lea r8, [rax + 16]
+    imul r9, rcx, 24
+    mov qword [r8 + r9], 0
+    mov qword [r8 + r9 + 8], 0
+    mov qword [r8 + r9 + 16], 0
+    inc rcx
+    jmp .grow_zero
+.grow_copy:
+    ; Copy old entries
+    mov rcx, [r12]            ; old count
+    xor r8, r8
+.copy_entries:
+    cmp r8, rcx
+    jge .copy_done
+    lea r9, [r12 + 16]
+    imul r10, r8, 24
+    lea r11, [rax + 16]
+    ; Copy 24 bytes
+    mov rdi, [r9 + r10]
+    mov [r11 + r10], rdi
+    mov rdi, [r9 + r10 + 8]
+    mov [r11 + r10 + 8], rdi
+    mov rdi, [r9 + r10 + 16]
+    mov [r11 + r10 + 16], rdi
+    inc r8
+    jmp .copy_entries
+.copy_done:
+    mov [rax], rcx            ; restore count
+    mov r12, rax              ; use new map
+    pop r15
+    pop r14
+    pop r13
+.set_append:
+    ; Append new entry at count position
+    mov rcx, [r12]            ; count
+    lea rdx, [r12 + 16]
+    imul rax, rcx, 24
+    mov [rdx + rax], r13      ; key_ptr
+    mov [rdx + rax + 8], r15  ; key_len
+    mov [rdx + rax + 16], r14 ; value
+    inc qword [r12]           ; count++
+    mov rax, r12
+.set_done:
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop rbp
+    ret
+
+; ============================================================
+; rt_map_get — Get value by key from map
+; rdi = map ptr, rsi = key ptr (string)
+; Returns: rax = value, or 0 if not found
+; ============================================================
+global rt_map_get
+rt_map_get:
+    push rbp
+    mov rbp, rsp
+    push r12
+    mov r12, rdi              ; map
+    ; Get key length
+    mov rdi, rsi
+    push rsi
+    call rt_str_len
+    pop rsi
+    mov rdx, rax              ; key len
+    mov rdi, r12
+    ; rsi = key ptr (already)
+    call rt_map_find_slot
+    cmp rax, -1
+    je .get_notfound
+    lea rdx, [r12 + 16]
+    imul rax, 24
+    mov rax, [rdx + rax + 16] ; return value
+    jmp .get_done
+.get_notfound:
+    xor rax, rax              ; return 0
+.get_done:
+    pop r12
+    pop rbp
+    ret
+
+; ============================================================
+; rt_map_has — Check if key exists in map
+; rdi = map ptr, rsi = key ptr (string)
+; Returns: rax = 1 if found, 0 if not
+; ============================================================
+global rt_map_has
+rt_map_has:
+    push rbp
+    mov rbp, rsp
+    push r12
+    mov r12, rdi              ; map
+    mov rdi, rsi
+    push rsi
+    call rt_str_len
+    pop rsi
+    mov rdx, rax              ; key len
+    mov rdi, r12
+    call rt_map_find_slot
+    cmp rax, -1
+    je .has_no
+    mov rax, 1
+    jmp .has_done
+.has_no:
+    xor rax, rax
+.has_done:
+    pop r12
+    pop rbp
+    ret
+
+; ============================================================
+; rt_map_keys — Get all keys as an array of strings
+; rdi = map ptr
+; Returns: rax = array ptr (SEVEN array)
+; ============================================================
+global rt_map_keys
+rt_map_keys:
+    push rbp
+    mov rbp, rsp
+    push r12
+    push r13
+    push r14
+    mov r12, rdi              ; map
+    mov r13, [r12]            ; count
+    ; Create array with capacity = count
+    mov rdi, r13
+    cmp rdi, 0
+    jne .keys_has_cap
+    mov rdi, 1
+.keys_has_cap:
+    call rt_arr_new
+    mov r14, rax              ; array
+    ; Add each key
+    xor rcx, rcx
+.keys_loop:
+    cmp rcx, r13
+    jge .keys_done
+    push rcx
+    lea rdx, [r12 + 16]
+    imul rax, rcx, 24
+    mov rdi, [rdx + rax]      ; key_ptr
+    test rdi, rdi
+    jz .keys_skip
+    ; Copy key to new string (so it's a proper heap string)
+    mov rsi, [rdx + rax + 8]  ; key_len
+    push rsi
+    push rdi
+    mov rdi, rsi
+    add rdi, 1                ; +1 for null terminator
+    call rt_alloc
+    pop rsi                   ; original key_ptr
+    pop rdx                   ; key_len
+    push rax                  ; save new string ptr
+    ; Copy bytes
+    xor rcx, rcx
+.keys_copy:
+    cmp rcx, rdx
+    jge .keys_copy_done
+    movzx r8, byte [rsi + rcx]
+    mov [rax + rcx], r8b
+    inc rcx
+    jmp .keys_copy
+.keys_copy_done:
+    mov byte [rax + rdx], 0   ; null terminate
+    pop rsi                   ; new string ptr = value to push
+    mov rdi, r14              ; array
+    call rt_arr_push
+    mov r14, rax              ; arr_push may return new array
+    jmp .keys_next
+.keys_skip:
+.keys_next:
+    pop rcx
+    inc rcx
+    jmp .keys_loop
+.keys_done:
+    mov rax, r14
+    pop r14
+    pop r13
+    pop r12
+    pop rbp
+    ret
+
+; ============================================================
+; rt_map_delete — Remove a key from map
+; rdi = map ptr, rsi = key ptr (string)
+; Returns: rax = 1 if deleted, 0 if not found
+; ============================================================
+global rt_map_delete
+rt_map_delete:
+    push rbp
+    mov rbp, rsp
+    push r12
+    push r13
+    mov r12, rdi              ; map
+    mov rdi, rsi
+    push rsi
+    call rt_str_len
+    pop rsi
+    mov rdx, rax              ; key len
+    mov rdi, r12
+    call rt_map_find_slot
+    cmp rax, -1
+    je .del_notfound
+    ; Found — shift remaining entries down
+    mov r13, rax              ; slot to remove
+    lea rdx, [r12 + 16]       ; entries base
+    mov rcx, [r12]            ; count
+    dec rcx
+.del_shift:
+    cmp r13, rcx
+    jge .del_shift_done
+    ; entry[r13] = entry[r13+1]
+    imul r8, r13, 24
+    lea r9, [r13 + 1]
+    imul r9, 24
+    mov rax, [rdx + r9]
+    mov [rdx + r8], rax
+    mov rax, [rdx + r9 + 8]
+    mov [rdx + r8 + 8], rax
+    mov rax, [rdx + r9 + 16]
+    mov [rdx + r8 + 16], rax
+    inc r13
+    jmp .del_shift
+.del_shift_done:
+    dec qword [r12]           ; count--
+    mov rax, 1
+    jmp .del_done
+.del_notfound:
+    xor rax, rax
+.del_done:
+    pop r13
+    pop r12
+    pop rbp
+    ret
+
+; ============================================================
+; rt_map_count — Get number of entries in map
+; rdi = map ptr
+; Returns: rax = count
+; ============================================================
+global rt_map_count
+rt_map_count:
+    mov rax, [rdi]
+    ret

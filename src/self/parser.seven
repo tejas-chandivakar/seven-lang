@@ -1,0 +1,808 @@
+!! ============================================================
+!! SEVEN Self-Hosted Parser
+!! Reads token arrays (from lexer) and produces AST
+!! AST nodes are maps with "type" field + type-specific fields
+!!
+!! IMPORTANT: p_pos and p_len use array "boxes" [val] because
+!! SEVEN creates local variables on assignment inside functions.
+!! Array index mutation (arr[0] = x) modifies the global array.
+!! ============================================================
+
+!! AST node types (strings for readability)
+!! "program"    — top-level: stmts[]
+!! "assign"     — target, value (+ optional "index" for arr[i]=v)
+!! "show"       — value
+!! "ask"        — target
+!! "if"         — cond, body[], elifs[], else_body[]
+!! "while"      — cond, body[]
+!! "repeat"     — count, var, body[]
+!! "each"       — iter, var, body[]
+!! "func"       — name, params[], body[]
+!! "return"     — value (or 0)
+!! "call"       — name, args[]
+!! "binop"      — op, left, right
+!! "unaryop"    — op, expr
+!! "number"     — value
+!! "string"     — value
+!! "ident"      — name
+!! "index"      — object, index
+!! "array"      — elems[]
+!! "match"      — expr, cases[], above, below
+!! "trycatch"   — try_body[], catch_var, catch_body[]
+!! "push"       — target, value
+!! "assert"     — expr
+
+!! ============================================================
+!! Parser state — mutable via array boxes
+!! Set p_types/p_vals to token arrays, p_pos[0]=0, p_len[0]=count
+!! ============================================================
+p_types = []
+p_vals  = []
+p_lines = []
+p_pos   = [0]
+p_len   = [0]
+
+!! ============================================================
+!! Helpers
+!! ============================================================
+func p_at_end()
+    if p_pos[0] >= p_len[0]
+        return 1
+    end
+    return 0
+end
+
+func p_cur_type()
+    if p_pos[0] >= p_len[0]
+        return TOK_EOF
+    end
+    return p_types[p_pos[0]]
+end
+
+func p_cur_val()
+    if p_pos[0] >= p_len[0]
+        return ""
+    end
+    return p_vals[p_pos[0]]
+end
+
+func p_advance()
+    p_pos[0] = p_pos[0] + 1
+end
+
+func p_skip_newlines()
+    while p_pos[0] < p_len[0] and p_types[p_pos[0]] == TOK_NEWLINE
+        p_pos[0] = p_pos[0] + 1
+    end
+end
+
+func p_expect_val(val)
+    if p_cur_val() != val
+        pos = p_pos[0]
+        show "parse error: expected {val} got {p_cur_val()} at pos {pos}"
+        return 0
+    end
+    p_advance()
+    return 1
+end
+
+func p_match_kw(kwname)
+    if p_cur_type() == TOK_KEYWORD and p_cur_val() == kwname
+        return 1
+    end
+    return 0
+end
+
+func p_match_op(op)
+    if p_cur_type() == TOK_OP and p_cur_val() == op
+        return 1
+    end
+    return 0
+end
+
+func p_match_punct(ch)
+    if p_cur_type() == TOK_PUNCT and p_cur_val() == ch
+        return 1
+    end
+    return 0
+end
+
+!! ============================================================
+!! AST node constructors
+!! ============================================================
+func make_node(typ)
+    n = map_new()
+    n = map_set(n, "type", typ)
+    return n
+end
+
+func make_number(val)
+    n = make_node("number")
+    n = map_set(n, "value", val)
+    return n
+end
+
+func make_string(val)
+    n = make_node("string")
+    n = map_set(n, "value", val)
+    return n
+end
+
+func make_ident(name)
+    n = make_node("ident")
+    n = map_set(n, "name", name)
+    return n
+end
+
+func make_binop(op, left, right)
+    n = make_node("binop")
+    n = map_set(n, "op", op)
+    n = map_set(n, "left", left)
+    n = map_set(n, "right", right)
+    return n
+end
+
+func make_unary(op, expr)
+    n = make_node("unaryop")
+    n = map_set(n, "op", op)
+    n = map_set(n, "expr", expr)
+    return n
+end
+
+func make_call(name, args)
+    n = make_node("call")
+    n = map_set(n, "name", name)
+    n = map_set(n, "args", args)
+    return n
+end
+
+func make_index(obj, idx)
+    n = make_node("index")
+    n = map_set(n, "object", obj)
+    n = map_set(n, "index", idx)
+    return n
+end
+
+!! ============================================================
+!! Expression parsing (recursive descent)
+!! ============================================================
+
+func parse_primary()
+    t = p_cur_type()
+    v = p_cur_val()
+
+    if t == TOK_INT or t == TOK_FLOAT
+        p_advance()
+        return make_number(v)
+    end
+
+    if t == TOK_STRING
+        p_advance()
+        return make_string(v)
+    end
+
+    if t == TOK_KEYWORD and v == "true"
+        p_advance()
+        return make_number(1)
+    end
+
+    if t == TOK_KEYWORD and v == "false"
+        p_advance()
+        return make_number(0)
+    end
+
+    if t == TOK_KEYWORD and v == "null"
+        p_advance()
+        return make_number(0)
+    end
+
+    if t == TOK_KEYWORD and v == "not"
+        p_advance()
+        expr = parse_primary()
+        return make_unary("not", expr)
+    end
+
+    if t == TOK_OP and v == "-"
+        p_advance()
+        expr = parse_primary()
+        return make_unary("-", expr)
+    end
+
+    if t == TOK_PUNCT and v == "["
+        p_advance()
+        elems = []
+        if p_match_punct("]") == 0
+            el = parse_expr()
+            push(elems, el)
+            while p_match_punct(",") == 1
+                p_advance()
+                el = parse_expr()
+                push(elems, el)
+            end
+        end
+        p_expect_val("]")
+        n = make_node("array")
+        n = map_set(n, "elems", elems)
+        return n
+    end
+
+    if t == TOK_PUNCT and v == "("
+        p_advance()
+        expr = parse_expr()
+        p_expect_val(")")
+        return expr
+    end
+
+    if t == TOK_IDENT
+        name = v
+        p_advance()
+
+        if p_match_punct("(") == 1
+            p_advance()
+            args = []
+            if p_match_punct(")") == 0
+                arg = parse_expr()
+                push(args, arg)
+                while p_match_punct(",") == 1
+                    p_advance()
+                    arg = parse_expr()
+                    push(args, arg)
+                end
+            end
+            p_expect_val(")")
+            return make_call(name, args)
+        end
+
+        if p_match_punct("[") == 1
+            p_advance()
+            idx = parse_expr()
+            p_expect_val("]")
+            return make_index(make_ident(name), idx)
+        end
+
+        return make_ident(name)
+    end
+
+    pos = p_pos[0]
+    show "parse error: unexpected token type={t} val={v} at pos {pos}"
+    p_advance()
+    return make_number(0)
+end
+
+func parse_mul()
+    left = parse_primary()
+    while p_match_op("*") == 1 or p_match_op("/") == 1 or p_match_op("%") == 1
+        op = p_cur_val()
+        p_advance()
+        right = parse_primary()
+        left = make_binop(op, left, right)
+    end
+    return left
+end
+
+func parse_add()
+    left = parse_mul()
+    while p_match_op("+") == 1 or p_match_op("-") == 1
+        op = p_cur_val()
+        p_advance()
+        right = parse_mul()
+        left = make_binop(op, left, right)
+    end
+    return left
+end
+
+func parse_cmp()
+    left = parse_add()
+    if p_match_op("==") == 1 or p_match_op("!=") == 1 or p_match_op("<") == 1 or p_match_op(">") == 1 or p_match_op("<=") == 1 or p_match_op(">=") == 1
+        op = p_cur_val()
+        p_advance()
+        right = parse_add()
+        left = make_binop(op, left, right)
+    end
+    return left
+end
+
+func parse_and()
+    left = parse_cmp()
+    while p_match_kw("and") == 1
+        p_advance()
+        right = parse_cmp()
+        left = make_binop("and", left, right)
+    end
+    return left
+end
+
+func parse_or()
+    left = parse_and()
+    while p_match_kw("or") == 1
+        p_advance()
+        right = parse_and()
+        left = make_binop("or", left, right)
+    end
+    return left
+end
+
+func parse_expr()
+    return parse_or()
+end
+
+!! ============================================================
+!! Statement parsing
+!! ============================================================
+
+func parse_block()
+    stmts = []
+    p_skip_newlines()
+    while p_at_end() == 0
+        if p_match_kw("end") == 1
+            return stmts
+        end
+        if p_match_kw("elif") == 1
+            return stmts
+        end
+        if p_match_kw("else") == 1
+            return stmts
+        end
+        if p_match_kw("catch") == 1
+            return stmts
+        end
+        if p_match_kw("done") == 1
+            return stmts
+        end
+        if p_match_kw("case") == 1
+            return stmts
+        end
+        if p_match_kw("above") == 1
+            return stmts
+        end
+        if p_match_kw("below") == 1
+            return stmts
+        end
+        s = parse_stmt()
+        if s != 0
+            push(stmts, s)
+        end
+        p_skip_newlines()
+    end
+    return stmts
+end
+
+func parse_stmt()
+    p_skip_newlines()
+    if p_at_end() == 1
+        return 0
+    end
+
+    t = p_cur_type()
+    v = p_cur_val()
+
+    if t == TOK_KEYWORD and v == "show"
+        p_advance()
+        val = parse_expr()
+        n = make_node("show")
+        n = map_set(n, "value", val)
+        return n
+    end
+
+    if t == TOK_KEYWORD and v == "ask"
+        p_advance()
+        target = p_cur_val()
+        p_advance()
+        n = make_node("ask")
+        n = map_set(n, "target", target)
+        return n
+    end
+
+    if t == TOK_KEYWORD and v == "return"
+        p_advance()
+        n = make_node("return")
+        if p_cur_type() != TOK_NEWLINE and p_cur_type() != TOK_EOF and p_match_kw("end") == 0
+            val = parse_expr()
+            n = map_set(n, "value", val)
+        else
+            n = map_set(n, "value", 0)
+        end
+        return n
+    end
+
+    if t == TOK_KEYWORD and v == "assert"
+        p_advance()
+        expr = parse_expr()
+        n = make_node("assert")
+        n = map_set(n, "expr", expr)
+        return n
+    end
+
+    if t == TOK_KEYWORD and v == "if"
+        p_advance()
+        cond = parse_expr()
+        p_skip_newlines()
+        body = parse_block()
+
+        elifs = []
+        while p_match_kw("elif") == 1
+            p_advance()
+            econd = parse_expr()
+            p_skip_newlines()
+            ebody = parse_block()
+            enode = map_new()
+            enode = map_set(enode, "cond", econd)
+            enode = map_set(enode, "body", ebody)
+            push(elifs, enode)
+        end
+
+        else_body = []
+        if p_match_kw("else") == 1
+            p_advance()
+            p_skip_newlines()
+            else_body = parse_block()
+        end
+
+        p_expect_val("end")
+
+        n = make_node("if")
+        n = map_set(n, "cond", cond)
+        n = map_set(n, "body", body)
+        n = map_set(n, "elifs", elifs)
+        n = map_set(n, "else_body", else_body)
+        return n
+    end
+
+    if t == TOK_KEYWORD and v == "while"
+        p_advance()
+        cond = parse_expr()
+        p_skip_newlines()
+        body = parse_block()
+        p_expect_val("end")
+
+        n = make_node("while")
+        n = map_set(n, "cond", cond)
+        n = map_set(n, "body", body)
+        return n
+    end
+
+    if t == TOK_KEYWORD and v == "repeat"
+        p_advance()
+        count = parse_expr()
+        p_expect_val("times")
+        vname = ""
+        if p_match_kw("as") == 1
+            p_advance()
+            vname = p_cur_val()
+            p_advance()
+        end
+        p_skip_newlines()
+        body = parse_block()
+        p_expect_val("end")
+
+        n = make_node("repeat")
+        n = map_set(n, "count", count)
+        n = map_set(n, "var", vname)
+        n = map_set(n, "body", body)
+        return n
+    end
+
+    if t == TOK_KEYWORD and v == "each"
+        p_advance()
+        iter = parse_expr()
+        p_expect_val("as")
+        vname = p_cur_val()
+        p_advance()
+        p_skip_newlines()
+        body = parse_block()
+        p_expect_val("end")
+
+        n = make_node("each")
+        n = map_set(n, "iter", iter)
+        n = map_set(n, "var", vname)
+        n = map_set(n, "body", body)
+        return n
+    end
+
+    if t == TOK_KEYWORD and v == "func"
+        p_advance()
+        fname = p_cur_val()
+        p_advance()
+        p_expect_val("(")
+        params = []
+        if p_match_punct(")") == 0
+            pname = p_cur_val()
+            push(params, pname)
+            p_advance()
+            while p_match_punct(",") == 1
+                p_advance()
+                pname = p_cur_val()
+                push(params, pname)
+                p_advance()
+            end
+        end
+        p_expect_val(")")
+        p_skip_newlines()
+        body = parse_block()
+        p_expect_val("end")
+
+        n = make_node("func")
+        n = map_set(n, "name", fname)
+        n = map_set(n, "params", params)
+        n = map_set(n, "body", body)
+        return n
+    end
+
+    if t == TOK_KEYWORD and v == "try"
+        p_advance()
+        p_skip_newlines()
+        try_body = parse_block()
+        p_expect_val("catch")
+        catch_var = ""
+        if p_cur_type() == TOK_IDENT
+            catch_var = p_cur_val()
+            p_advance()
+        end
+        p_skip_newlines()
+        catch_body = parse_block()
+        p_expect_val("done")
+
+        n = make_node("trycatch")
+        n = map_set(n, "try_body", try_body)
+        n = map_set(n, "catch_var", catch_var)
+        n = map_set(n, "catch_body", catch_body)
+        return n
+    end
+
+    if t == TOK_KEYWORD and v == "match"
+        p_advance()
+        mexpr = parse_expr()
+        p_skip_newlines()
+        cases = []
+        abv = []
+        blw = []
+        brk = 0
+        while brk == 0
+            p_skip_newlines()
+            if p_match_kw("case") == 1
+                p_advance()
+                cval = parse_expr()
+                p_skip_newlines()
+                cbody = parse_block()
+                cnode = map_new()
+                cnode = map_set(cnode, "value", cval)
+                cnode = map_set(cnode, "body", cbody)
+                push(cases, cnode)
+            elif p_match_kw("above") == 1
+                p_advance()
+                p_skip_newlines()
+                abv = parse_block()
+            elif p_match_kw("below") == 1
+                p_advance()
+                p_skip_newlines()
+                blw = parse_block()
+            else
+                brk = 1
+            end
+        end
+        p_expect_val("end")
+
+        n = make_node("match")
+        n = map_set(n, "expr", mexpr)
+        n = map_set(n, "cases", cases)
+        n = map_set(n, "above", abv)
+        n = map_set(n, "below", blw)
+        return n
+    end
+
+    if t == TOK_KEYWORD and v == "push"
+        p_advance()
+        p_expect_val("(")
+        target = parse_expr()
+        p_expect_val(",")
+        val = parse_expr()
+        p_expect_val(")")
+        n = make_node("push")
+        n = map_set(n, "target", target)
+        n = map_set(n, "value", val)
+        return n
+    end
+
+    if t == TOK_IDENT
+        name = v
+        p_advance()
+
+        if p_match_op("=") == 1
+            p_advance()
+            val = parse_expr()
+            n = make_node("assign")
+            n = map_set(n, "target", name)
+            n = map_set(n, "value", val)
+            return n
+        end
+
+        if p_match_punct("[") == 1
+            p_advance()
+            idx = parse_expr()
+            p_expect_val("]")
+            if p_match_op("=") == 1
+                p_advance()
+                val = parse_expr()
+                n = make_node("assign")
+                n = map_set(n, "target", name)
+                n = map_set(n, "index", idx)
+                n = map_set(n, "value", val)
+                return n
+            end
+            return make_index(make_ident(name), idx)
+        end
+
+        if p_match_punct("(") == 1
+            p_advance()
+            args = []
+            if p_match_punct(")") == 0
+                arg = parse_expr()
+                push(args, arg)
+                while p_match_punct(",") == 1
+                    p_advance()
+                    arg = parse_expr()
+                    push(args, arg)
+                end
+            end
+            p_expect_val(")")
+            return make_call(name, args)
+        end
+
+        return make_ident(name)
+    end
+
+    show "parse error: unexpected statement token type={t} val={v}"
+    p_advance()
+    return 0
+end
+
+!! ============================================================
+!! Token access helpers
+!! ============================================================
+func tok_count()
+    return len(tok_types)
+end
+
+func tok_type_at(i)
+    return tok_types[i]
+end
+
+func tok_val_at(i)
+    return tok_vals[i]
+end
+
+!! ============================================================
+!! AST printer (for debugging)
+!! ============================================================
+func ast_print(node, indent)
+    if node == 0
+        return 0
+    end
+    typ = map_get(node, "type")
+    pad = ""
+    i = 0
+    while i < indent
+        pad = pad + "  "
+        i = i + 1
+    end
+
+    if typ == "program"
+        show "{pad}PROGRAM"
+        stmts = map_get(node, "stmts")
+        i = 0
+        while i < len(stmts)
+            ast_print(stmts[i], indent + 1)
+            i = i + 1
+        end
+    elif typ == "number"
+        v = map_get(node, "value")
+        show "{pad}NUM({v})"
+    elif typ == "string"
+        v = map_get(node, "value")
+        show "{pad}STR({v})"
+    elif typ == "ident"
+        nm = map_get(node, "name")
+        show "{pad}ID({nm})"
+    elif typ == "binop"
+        op = map_get(node, "op")
+        show "{pad}BINOP({op})"
+        ast_print(map_get(node, "left"), indent + 1)
+        ast_print(map_get(node, "right"), indent + 1)
+    elif typ == "unaryop"
+        op = map_get(node, "op")
+        show "{pad}UNARY({op})"
+        ast_print(map_get(node, "expr"), indent + 1)
+    elif typ == "call"
+        nm = map_get(node, "name")
+        show "{pad}CALL({nm})"
+        args = map_get(node, "args")
+        i = 0
+        while i < len(args)
+            ast_print(args[i], indent + 1)
+            i = i + 1
+        end
+    elif typ == "index"
+        show "{pad}INDEX"
+        ast_print(map_get(node, "object"), indent + 1)
+        ast_print(map_get(node, "index"), indent + 1)
+    elif typ == "array"
+        show "{pad}ARRAY"
+        elems = map_get(node, "elems")
+        i = 0
+        while i < len(elems)
+            ast_print(elems[i], indent + 1)
+            i = i + 1
+        end
+    elif typ == "assign"
+        tgt = map_get(node, "target")
+        show "{pad}ASSIGN({tgt})"
+        ast_print(map_get(node, "value"), indent + 1)
+    elif typ == "show"
+        show "{pad}SHOW"
+        ast_print(map_get(node, "value"), indent + 1)
+    elif typ == "return"
+        show "{pad}RETURN"
+        ast_print(map_get(node, "value"), indent + 1)
+    elif typ == "if"
+        show "{pad}IF"
+        ast_print(map_get(node, "cond"), indent + 1)
+        body = map_get(node, "body")
+        i = 0
+        while i < len(body)
+            ast_print(body[i], indent + 1)
+            i = i + 1
+        end
+    elif typ == "while"
+        show "{pad}WHILE"
+        ast_print(map_get(node, "cond"), indent + 1)
+        body = map_get(node, "body")
+        i = 0
+        while i < len(body)
+            ast_print(body[i], indent + 1)
+            i = i + 1
+        end
+    elif typ == "func"
+        nm = map_get(node, "name")
+        show "{pad}FUNC({nm})"
+        body = map_get(node, "body")
+        i = 0
+        while i < len(body)
+            ast_print(body[i], indent + 1)
+            i = i + 1
+        end
+    elif typ == "push"
+        show "{pad}PUSH"
+        ast_print(map_get(node, "target"), indent + 1)
+        ast_print(map_get(node, "value"), indent + 1)
+    elif typ == "assert"
+        show "{pad}ASSERT"
+        ast_print(map_get(node, "expr"), indent + 1)
+    elif typ == "trycatch"
+        show "{pad}TRY/CATCH"
+        try_body = map_get(node, "try_body")
+        i = 0
+        while i < len(try_body)
+            ast_print(try_body[i], indent + 1)
+            i = i + 1
+        end
+        catch_body = map_get(node, "catch_body")
+        i = 0
+        while i < len(catch_body)
+            ast_print(catch_body[i], indent + 1)
+            i = i + 1
+        end
+    elif typ == "match"
+        show "{pad}MATCH"
+    elif typ == "each"
+        vr = map_get(node, "var")
+        show "{pad}EACH({vr})"
+    elif typ == "repeat"
+        show "{pad}REPEAT"
+    elif typ == "ask"
+        tgt = map_get(node, "target")
+        show "{pad}ASK({tgt})"
+    else
+        show "{pad}UNKNOWN({typ})"
+    end
+    return 0
+end

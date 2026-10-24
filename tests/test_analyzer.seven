@@ -1,0 +1,470 @@
+!! Test semantic analyzer
+!! Build AST nodes manually with maps, then analyze
+
+!! ============================================================
+!! Include analyzer (inline the needed parts)
+!! ============================================================
+
+sym_funcs   = map_new()
+sym_globals = map_new()
+errors      = []
+ana_scope   = [0]
+ana_locals  = map_new()
+ana_in_loop = [0]
+
+!! Built-ins
+sym_funcs = map_set(sym_funcs, "len", 1)
+sym_funcs = map_set(sym_funcs, "str", 1)
+sym_funcs = map_set(sym_funcs, "int", 1)
+sym_funcs = map_set(sym_funcs, "chr", 1)
+sym_funcs = map_set(sym_funcs, "ord", 1)
+sym_funcs = map_set(sym_funcs, "char_at", 2)
+sym_funcs = map_set(sym_funcs, "map_new", 0)
+sym_funcs = map_set(sym_funcs, "map_set", 3)
+sym_funcs = map_set(sym_funcs, "map_get", 2)
+sym_funcs = map_set(sym_funcs, "map_has", 2)
+sym_funcs = map_set(sym_funcs, "type", 1)
+sym_funcs = map_set(sym_funcs, "show", -1)
+sym_funcs = map_set(sym_funcs, "error", 1)
+sym_funcs = map_set(sym_funcs, "range", -1)
+
+func ana_error(msg)
+    push(errors, msg)
+end
+
+func ana_register_funcs(stmts)
+    i = 0
+    while i < len(stmts)
+        node = stmts[i]
+        typ = map_get(node, "type")
+        if typ == "func"
+            fname = map_get(node, "name")
+            if map_has(sym_funcs, fname) == 1
+                ana_error("duplicate function: " + fname)
+            else
+                params = map_get(node, "params")
+                sym_funcs = map_set(sym_funcs, fname, len(params))
+            end
+        end
+        i = i + 1
+    end
+end
+
+func ana_is_defined(name)
+    if ana_scope[0] == 1
+        if map_has(ana_locals, name) == 1
+            return 1
+        end
+    end
+    if map_has(sym_globals, name) == 1
+        return 1
+    end
+    if map_has(sym_funcs, name) == 1
+        return 1
+    end
+    return 0
+end
+
+func ana_expr(node)
+    if node == 0
+        return 0
+    end
+    typ = map_get(node, "type")
+
+    if typ == "number" or typ == "string"
+        return 0
+    end
+
+    if typ == "ident"
+        name = map_get(node, "name")
+        if ana_is_defined(name) == 0
+            ana_error("undefined variable: " + name)
+        end
+        return 0
+    end
+
+    if typ == "binop"
+        ana_expr(map_get(node, "left"))
+        ana_expr(map_get(node, "right"))
+        return 0
+    end
+
+    if typ == "unaryop"
+        ana_expr(map_get(node, "expr"))
+        return 0
+    end
+
+    if typ == "call"
+        fname = map_get(node, "name")
+        args = map_get(node, "args")
+        if map_has(sym_funcs, fname) == 0
+            ana_error("undefined function: " + fname)
+        else
+            expected = map_get(sym_funcs, fname)
+            if expected != -1 and len(args) != expected
+                e = expected
+                a = len(args)
+                ana_error(fname + " expects " + str(e) + " args, got " + str(a))
+            end
+        end
+        i = 0
+        while i < len(args)
+            ana_expr(args[i])
+            i = i + 1
+        end
+        return 0
+    end
+
+    if typ == "index"
+        ana_expr(map_get(node, "object"))
+        ana_expr(map_get(node, "index"))
+        return 0
+    end
+
+    if typ == "array"
+        elems = map_get(node, "elems")
+        i = 0
+        while i < len(elems)
+            ana_expr(elems[i])
+            i = i + 1
+        end
+        return 0
+    end
+
+    return 0
+end
+
+func ana_stmt(node)
+    if node == 0
+        return 0
+    end
+    typ = map_get(node, "type")
+
+    if typ == "assign"
+        ana_expr(map_get(node, "value"))
+        if map_has(node, "index") == 1
+            ana_expr(map_get(node, "index"))
+        end
+        tgt = map_get(node, "target")
+        if ana_scope[0] == 0
+            sym_globals = map_set(sym_globals, tgt, 1)
+        else
+            ana_locals = map_set(ana_locals, tgt, 1)
+        end
+        return 0
+    end
+
+    if typ == "show"
+        ana_expr(map_get(node, "value"))
+        return 0
+    end
+
+    if typ == "return"
+        if ana_scope[0] == 0
+            ana_error("return outside function")
+        end
+        val = map_get(node, "value")
+        if val != 0
+            ana_expr(val)
+        end
+        return 0
+    end
+
+    if typ == "assert"
+        ana_expr(map_get(node, "expr"))
+        return 0
+    end
+
+    if typ == "if"
+        ana_expr(map_get(node, "cond"))
+        ana_block(map_get(node, "body"))
+        elifs = map_get(node, "elifs")
+        i = 0
+        while i < len(elifs)
+            enode = elifs[i]
+            ana_expr(map_get(enode, "cond"))
+            ana_block(map_get(enode, "body"))
+            i = i + 1
+        end
+        else_body = map_get(node, "else_body")
+        if len(else_body) > 0
+            ana_block(else_body)
+        end
+        return 0
+    end
+
+    if typ == "while"
+        ana_expr(map_get(node, "cond"))
+        ana_block(map_get(node, "body"))
+        return 0
+    end
+
+    if typ == "func"
+        params = map_get(node, "params")
+        old_scope = ana_scope[0]
+        old_locals = ana_locals
+        ana_scope[0] = 1
+        ana_locals = map_new()
+        i = 0
+        while i < len(params)
+            ana_locals = map_set(ana_locals, params[i], 1)
+            i = i + 1
+        end
+        ana_block(map_get(node, "body"))
+        ana_scope[0] = old_scope
+        ana_locals = old_locals
+        return 0
+    end
+
+    if typ == "call"
+        ana_expr(node)
+        return 0
+    end
+
+    if typ == "ident"
+        ana_expr(node)
+        return 0
+    end
+
+    return 0
+end
+
+func ana_block(stmts)
+    i = 0
+    while i < len(stmts)
+        ana_stmt(stmts[i])
+        i = i + 1
+    end
+end
+
+func analyze(stmts)
+    errors = []
+    sym_globals = map_new()
+    ana_scope[0] = 0
+    ana_in_loop[0] = 0
+    ana_register_funcs(stmts)
+    ana_block(stmts)
+    return errors
+end
+
+!! ============================================================
+!! Helper: build AST nodes
+!! ============================================================
+func mk(typ)
+    n = map_new()
+    n = map_set(n, "type", typ)
+    return n
+end
+
+func mk_num(v)
+    n = mk("number")
+    n = map_set(n, "value", v)
+    return n
+end
+
+func mk_id(name)
+    n = mk("ident")
+    n = map_set(n, "name", name)
+    return n
+end
+
+func mk_assign(name, val)
+    n = mk("assign")
+    n = map_set(n, "target", name)
+    n = map_set(n, "value", val)
+    return n
+end
+
+func mk_show(val)
+    n = mk("show")
+    n = map_set(n, "value", val)
+    return n
+end
+
+func mk_call(name, args)
+    n = mk("call")
+    n = map_set(n, "name", name)
+    n = map_set(n, "args", args)
+    return n
+end
+
+func mk_binop(op, left, right)
+    n = mk("binop")
+    n = map_set(n, "op", op)
+    n = map_set(n, "left", left)
+    n = map_set(n, "right", right)
+    return n
+end
+
+func mk_func(name, params, body)
+    n = mk("func")
+    n = map_set(n, "name", name)
+    n = map_set(n, "params", params)
+    n = map_set(n, "body", body)
+    return n
+end
+
+func mk_return(val)
+    n = mk("return")
+    n = map_set(n, "value", val)
+    return n
+end
+
+!! ============================================================
+!! Check helper
+!! ============================================================
+pass_count = [0]
+fail_count = [0]
+
+func check(name, cond)
+    if cond == 1
+        show "PASS: {name}"
+        pass_count[0] = pass_count[0] + 1
+    else
+        show "FAIL: {name}"
+        fail_count[0] = fail_count[0] + 1
+    end
+end
+
+!! ============================================================
+!! TEST 1: Valid program — no errors
+!! x = 42
+!! show x
+!! ============================================================
+show "=== T1: valid program ==="
+stmts = []
+push(stmts, mk_assign("x", mk_num(42)))
+push(stmts, mk_show(mk_id("x")))
+errs = analyze(stmts)
+check("T1 no errors", len(errs) == 0)
+
+!! ============================================================
+!! TEST 2: Undefined variable
+!! show y   (y never assigned)
+!! ============================================================
+show "=== T2: undefined var ==="
+stmts = []
+push(stmts, mk_show(mk_id("y")))
+errs = analyze(stmts)
+check("T2 has error", len(errs) == 1)
+e2 = errs[0]
+show "  error: {e2}"
+check("T2 msg", e2 == "undefined variable: y")
+
+!! ============================================================
+!! TEST 3: Undefined function
+!! foo(1)
+!! ============================================================
+show "=== T3: undefined func ==="
+stmts = []
+args3 = []
+push(args3, mk_num(1))
+push(stmts, mk_call("foo", args3))
+errs = analyze(stmts)
+check("T3 has error", len(errs) == 1)
+e3 = errs[0]
+show "  error: {e3}"
+check("T3 msg", e3 == "undefined function: foo")
+
+!! ============================================================
+!! TEST 4: Function arity mismatch
+!! len(1, 2)   — len expects 1 arg
+!! ============================================================
+show "=== T4: arity mismatch ==="
+stmts = []
+args4 = []
+push(args4, mk_num(1))
+push(args4, mk_num(2))
+push(stmts, mk_call("len", args4))
+errs = analyze(stmts)
+check("T4 has error", len(errs) == 1)
+e4 = errs[0]
+show "  error: {e4}"
+check("T4 msg", e4 == "len expects 1 args, got 2")
+
+!! ============================================================
+!! TEST 5: Duplicate function
+!! func add(a, b) ... end
+!! func add(x) ... end
+!! ============================================================
+show "=== T5: duplicate func ==="
+stmts = []
+body5 = []
+push(body5, mk_return(mk_num(0)))
+push(stmts, mk_func("myfunc", ["a", "b"], body5))
+push(stmts, mk_func("myfunc", ["x"], body5))
+errs = analyze(stmts)
+check("T5 has error", len(errs) == 1)
+e5 = errs[0]
+show "  error: {e5}"
+check("T5 msg", e5 == "duplicate function: myfunc")
+
+!! ============================================================
+!! TEST 6: Return outside function
+!! return 42  (at top level)
+!! ============================================================
+show "=== T6: return outside func ==="
+stmts = []
+push(stmts, mk_return(mk_num(42)))
+errs = analyze(stmts)
+check("T6 has error", len(errs) == 1)
+e6 = errs[0]
+show "  error: {e6}"
+check("T6 msg", e6 == "return outside function")
+
+!! ============================================================
+!! TEST 7: Function params are visible inside body
+!! func greet(name)
+!!     show name       ← should NOT error
+!! end
+!! ============================================================
+show "=== T7: func params visible ==="
+stmts = []
+body7 = []
+push(body7, mk_show(mk_id("name")))
+push(stmts, mk_func("greet", ["name"], body7))
+errs = analyze(stmts)
+check("T7 no errors", len(errs) == 0)
+
+!! ============================================================
+!! TEST 8: Forward function call
+!! foo()
+!! func foo() show 1 end
+!! ============================================================
+show "=== T8: forward call ==="
+stmts = []
+push(stmts, mk_call("bar", []))
+body8 = []
+push(body8, mk_show(mk_num(1)))
+push(stmts, mk_func("bar", [], body8))
+errs = analyze(stmts)
+check("T8 no errors", len(errs) == 0)
+
+!! ============================================================
+!! TEST 9: Valid complex program
+!! x = 10
+!! func double(n)
+!!     return n * 2
+!! end
+!! show double(x)
+!! ============================================================
+show "=== T9: complex valid ==="
+stmts = []
+push(stmts, mk_assign("x", mk_num(10)))
+body9 = []
+push(body9, mk_return(mk_binop("*", mk_id("n"), mk_num(2))))
+push(stmts, mk_func("double", ["n"], body9))
+args9 = []
+push(args9, mk_id("x"))
+push(stmts, mk_show(mk_call("double", args9)))
+errs = analyze(stmts)
+check("T9 no errors", len(errs) == 0)
+
+!! ============================================================
+!! Summary
+!! ============================================================
+show ""
+p = pass_count[0]
+f = fail_count[0]
+show "Results: {p} passed, {f} failed"
+show "all_done"

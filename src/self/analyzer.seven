@@ -1,0 +1,392 @@
+!! ============================================================
+!! SEVEN Self-Hosted Semantic Analyzer
+!! Walks AST (from parser) and validates:
+!!   - Undefined variable usage
+!!   - Function call arity (param count mismatch)
+!!   - Duplicate function definitions
+!!   - Return outside function
+!!   - Break outside loop (future)
+!!
+!! Uses map-based symbol tables.
+!! Mutable state via array boxes.
+!! ============================================================
+
+!! State
+sym_funcs   = map_new()
+sym_globals = map_new()
+errors      = []
+ana_scope   = [0]
+ana_locals  = map_new()
+ana_in_loop = [0]
+
+!! Built-in functions with their param counts
+!! -1 means variadic
+sym_funcs = map_set(sym_funcs, "len", 1)
+sym_funcs = map_set(sym_funcs, "type", 1)
+sym_funcs = map_set(sym_funcs, "str", 1)
+sym_funcs = map_set(sym_funcs, "int", 1)
+sym_funcs = map_set(sym_funcs, "float", 1)
+sym_funcs = map_set(sym_funcs, "ord", 1)
+sym_funcs = map_set(sym_funcs, "chr", 1)
+sym_funcs = map_set(sym_funcs, "char_at", 2)
+sym_funcs = map_set(sym_funcs, "substr", 3)
+sym_funcs = map_set(sym_funcs, "replace", 3)
+sym_funcs = map_set(sym_funcs, "split", 2)
+sym_funcs = map_set(sym_funcs, "join", 2)
+sym_funcs = map_set(sym_funcs, "upper", 1)
+sym_funcs = map_set(sym_funcs, "lower", 1)
+sym_funcs = map_set(sym_funcs, "trim", 1)
+sym_funcs = map_set(sym_funcs, "starts_with", 2)
+sym_funcs = map_set(sym_funcs, "ends_with", 2)
+sym_funcs = map_set(sym_funcs, "contains", 2)
+sym_funcs = map_set(sym_funcs, "index_of", 2)
+sym_funcs = map_set(sym_funcs, "abs", 1)
+sym_funcs = map_set(sym_funcs, "min", 2)
+sym_funcs = map_set(sym_funcs, "max", 2)
+sym_funcs = map_set(sym_funcs, "round", 1)
+sym_funcs = map_set(sym_funcs, "floor", 1)
+sym_funcs = map_set(sym_funcs, "ceil", 1)
+sym_funcs = map_set(sym_funcs, "sqrt", 1)
+sym_funcs = map_set(sym_funcs, "pow", 2)
+sym_funcs = map_set(sym_funcs, "random", 0)
+sym_funcs = map_set(sym_funcs, "range", -1)
+sym_funcs = map_set(sym_funcs, "sort", 1)
+sym_funcs = map_set(sym_funcs, "reverse", 1)
+sym_funcs = map_set(sym_funcs, "slice", -1)
+sym_funcs = map_set(sym_funcs, "map_new", 0)
+sym_funcs = map_set(sym_funcs, "map_set", 3)
+sym_funcs = map_set(sym_funcs, "map_get", 2)
+sym_funcs = map_set(sym_funcs, "map_has", 2)
+sym_funcs = map_set(sym_funcs, "map_delete", 2)
+sym_funcs = map_set(sym_funcs, "map_count", 1)
+sym_funcs = map_set(sym_funcs, "keys", 1)
+sym_funcs = map_set(sym_funcs, "error", 1)
+sym_funcs = map_set(sym_funcs, "exit", 1)
+sym_funcs = map_set(sym_funcs, "clock", 0)
+sym_funcs = map_set(sym_funcs, "sleep", 1)
+sym_funcs = map_set(sym_funcs, "read_file", 1)
+sym_funcs = map_set(sym_funcs, "write_file", 2)
+sym_funcs = map_set(sym_funcs, "append_file", 2)
+sym_funcs = map_set(sym_funcs, "file_exists", 1)
+
+func ana_error(msg)
+    push(errors, msg)
+end
+
+!! ============================================================
+!! Pass 1: Register all function definitions (names + arity)
+!! This allows forward references — call before define
+!! ============================================================
+func ana_register_funcs(stmts)
+    i = 0
+    while i < len(stmts)
+        node = stmts[i]
+        typ = map_get(node, "type")
+        if typ == "func"
+            fname = map_get(node, "name")
+            if map_has(sym_funcs, fname) == 1
+                ana_error("duplicate function: " + fname)
+            else
+                params = map_get(node, "params")
+                sym_funcs = map_set(sym_funcs, fname, len(params))
+            end
+        end
+        i = i + 1
+    end
+end
+
+!! ============================================================
+!! Check if a name is defined (global, local/param, or function)
+!! ============================================================
+func ana_is_defined(name)
+    if ana_scope[0] == 1
+        if map_has(ana_locals, name) == 1
+            return 1
+        end
+    end
+    if map_has(sym_globals, name) == 1
+        return 1
+    end
+    if map_has(sym_funcs, name) == 1
+        return 1
+    end
+    return 0
+end
+
+!! ============================================================
+!! Analyze expression nodes
+!! ============================================================
+func ana_expr(node)
+    if node == 0
+        return 0
+    end
+    typ = map_get(node, "type")
+
+    if typ == "number" or typ == "string"
+        return 0
+    end
+
+    if typ == "ident"
+        name = map_get(node, "name")
+        if ana_is_defined(name) == 0
+            ana_error("undefined variable: " + name)
+        end
+        return 0
+    end
+
+    if typ == "binop"
+        ana_expr(map_get(node, "left"))
+        ana_expr(map_get(node, "right"))
+        return 0
+    end
+
+    if typ == "unaryop"
+        ana_expr(map_get(node, "expr"))
+        return 0
+    end
+
+    if typ == "call"
+        fname = map_get(node, "name")
+        args = map_get(node, "args")
+        if map_has(sym_funcs, fname) == 0
+            ana_error("undefined function: " + fname)
+        else
+            expected = map_get(sym_funcs, fname)
+            if expected != -1 and len(args) != expected
+                e = expected
+                a = len(args)
+                ana_error(fname + " expects " + str(e) + " args, got " + str(a))
+            end
+        end
+        i = 0
+        while i < len(args)
+            ana_expr(args[i])
+            i = i + 1
+        end
+        return 0
+    end
+
+    if typ == "index"
+        ana_expr(map_get(node, "object"))
+        ana_expr(map_get(node, "index"))
+        return 0
+    end
+
+    if typ == "array"
+        elems = map_get(node, "elems")
+        i = 0
+        while i < len(elems)
+            ana_expr(elems[i])
+            i = i + 1
+        end
+        return 0
+    end
+
+    return 0
+end
+
+!! ============================================================
+!! Analyze statement nodes
+!! ============================================================
+func ana_stmt(node)
+    if node == 0
+        return 0
+    end
+    typ = map_get(node, "type")
+
+    if typ == "assign"
+        ana_expr(map_get(node, "value"))
+        if map_has(node, "index") == 1
+            ana_expr(map_get(node, "index"))
+        end
+        tgt = map_get(node, "target")
+        if ana_scope[0] == 0
+            sym_globals = map_set(sym_globals, tgt, 1)
+        else
+            ana_locals = map_set(ana_locals, tgt, 1)
+        end
+        return 0
+    end
+
+    if typ == "show"
+        ana_expr(map_get(node, "value"))
+        return 0
+    end
+
+    if typ == "ask"
+        tgt = map_get(node, "target")
+        if ana_scope[0] == 0
+            sym_globals = map_set(sym_globals, tgt, 1)
+        else
+            ana_locals = map_set(ana_locals, tgt, 1)
+        end
+        return 0
+    end
+
+    if typ == "return"
+        if ana_scope[0] == 0
+            ana_error("return outside function")
+        end
+        val = map_get(node, "value")
+        if val != 0
+            ana_expr(val)
+        end
+        return 0
+    end
+
+    if typ == "assert"
+        ana_expr(map_get(node, "expr"))
+        return 0
+    end
+
+    if typ == "push"
+        ana_expr(map_get(node, "target"))
+        ana_expr(map_get(node, "value"))
+        return 0
+    end
+
+    if typ == "if"
+        ana_expr(map_get(node, "cond"))
+        ana_block(map_get(node, "body"))
+        elifs = map_get(node, "elifs")
+        i = 0
+        while i < len(elifs)
+            enode = elifs[i]
+            ana_expr(map_get(enode, "cond"))
+            ana_block(map_get(enode, "body"))
+            i = i + 1
+        end
+        else_body = map_get(node, "else_body")
+        if len(else_body) > 0
+            ana_block(else_body)
+        end
+        return 0
+    end
+
+    if typ == "while"
+        ana_expr(map_get(node, "cond"))
+        old_loop = ana_in_loop[0]
+        ana_in_loop[0] = 1
+        ana_block(map_get(node, "body"))
+        ana_in_loop[0] = old_loop
+        return 0
+    end
+
+    if typ == "repeat"
+        ana_expr(map_get(node, "count"))
+        vname = map_get(node, "var")
+        old_loop = ana_in_loop[0]
+        ana_in_loop[0] = 1
+        if vname != ""
+            if ana_scope[0] == 0
+                sym_globals = map_set(sym_globals, vname, 1)
+            else
+                ana_locals = map_set(ana_locals, vname, 1)
+            end
+        end
+        ana_block(map_get(node, "body"))
+        ana_in_loop[0] = old_loop
+        return 0
+    end
+
+    if typ == "each"
+        ana_expr(map_get(node, "iter"))
+        vname = map_get(node, "var")
+        old_loop = ana_in_loop[0]
+        ana_in_loop[0] = 1
+        if ana_scope[0] == 0
+            sym_globals = map_set(sym_globals, vname, 1)
+        else
+            ana_locals = map_set(ana_locals, vname, 1)
+        end
+        ana_block(map_get(node, "body"))
+        ana_in_loop[0] = old_loop
+        return 0
+    end
+
+    if typ == "func"
+        fname = map_get(node, "name")
+        params = map_get(node, "params")
+        old_scope = ana_scope[0]
+        old_locals = ana_locals
+        ana_scope[0] = 1
+        ana_locals = map_new()
+        i = 0
+        while i < len(params)
+            ana_locals = map_set(ana_locals, params[i], 1)
+            i = i + 1
+        end
+        ana_block(map_get(node, "body"))
+        ana_scope[0] = old_scope
+        ana_locals = old_locals
+        return 0
+    end
+
+    if typ == "trycatch"
+        ana_block(map_get(node, "try_body"))
+        catch_var = map_get(node, "catch_var")
+        if catch_var != ""
+            if ana_scope[0] == 0
+                sym_globals = map_set(sym_globals, catch_var, 1)
+            else
+                ana_locals = map_set(ana_locals, catch_var, 1)
+            end
+        end
+        ana_block(map_get(node, "catch_body"))
+        return 0
+    end
+
+    if typ == "match"
+        ana_expr(map_get(node, "expr"))
+        cases = map_get(node, "cases")
+        i = 0
+        while i < len(cases)
+            cnode = cases[i]
+            ana_expr(map_get(cnode, "value"))
+            ana_block(map_get(cnode, "body"))
+            i = i + 1
+        end
+        abv = map_get(node, "above")
+        if len(abv) > 0
+            ana_block(abv)
+        end
+        blw = map_get(node, "below")
+        if len(blw) > 0
+            ana_block(blw)
+        end
+        return 0
+    end
+
+    if typ == "call"
+        ana_expr(node)
+        return 0
+    end
+
+    if typ == "ident"
+        ana_expr(node)
+        return 0
+    end
+
+    return 0
+end
+
+func ana_block(stmts)
+    i = 0
+    while i < len(stmts)
+        ana_stmt(stmts[i])
+        i = i + 1
+    end
+end
+
+!! ============================================================
+!! Main entry point: analyze a list of top-level statements
+!! ============================================================
+func analyze(stmts)
+    errors = []
+    sym_globals = map_new()
+    ana_scope[0] = 0
+    ana_in_loop[0] = 0
+    ana_register_funcs(stmts)
+    ana_block(stmts)
+    return errors
+end

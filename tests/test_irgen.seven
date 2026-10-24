@@ -1,0 +1,574 @@
+!! Test IR generator
+!! Build AST nodes manually, generate IR, verify
+
+!! ============================================================
+!! IR generator (inline needed parts)
+!! ============================================================
+ir_code   = []
+ir_reg    = [0]
+ir_label  = [0]
+
+func ir_reset()
+    ir_code = []
+    ir_reg[0] = 0
+    ir_label[0] = 0
+end
+
+func ir_new_reg()
+    r = ir_reg[0]
+    ir_reg[0] = ir_reg[0] + 1
+    return r
+end
+
+func ir_new_label()
+    l = ir_label[0]
+    ir_label[0] = ir_label[0] + 1
+    return "L" + str(l)
+end
+
+func ir_emit(instr)
+    push(ir_code, instr)
+end
+
+func ir_mk(op)
+    n = map_new()
+    n = map_set(n, "op", op)
+    return n
+end
+
+func ir_expr(node)
+    if node == 0
+        r = ir_new_reg()
+        inst = ir_mk("CONST")
+        inst = map_set(inst, "reg", r)
+        inst = map_set(inst, "value", 0)
+        ir_emit(inst)
+        return r
+    end
+    typ = map_get(node, "type")
+
+    if typ == "number"
+        r = ir_new_reg()
+        inst = ir_mk("CONST")
+        inst = map_set(inst, "reg", r)
+        inst = map_set(inst, "value", map_get(node, "value"))
+        ir_emit(inst)
+        return r
+    end
+
+    if typ == "string"
+        r = ir_new_reg()
+        inst = ir_mk("CONST")
+        inst = map_set(inst, "reg", r)
+        inst = map_set(inst, "value", map_get(node, "value"))
+        ir_emit(inst)
+        return r
+    end
+
+    if typ == "ident"
+        r = ir_new_reg()
+        inst = ir_mk("LOAD")
+        inst = map_set(inst, "reg", r)
+        inst = map_set(inst, "name", map_get(node, "name"))
+        ir_emit(inst)
+        return r
+    end
+
+    if typ == "binop"
+        r1 = ir_expr(map_get(node, "left"))
+        r2 = ir_expr(map_get(node, "right"))
+        r = ir_new_reg()
+        inst = ir_mk("BINOP")
+        inst = map_set(inst, "reg", r)
+        inst = map_set(inst, "binop", map_get(node, "op"))
+        inst = map_set(inst, "r1", r1)
+        inst = map_set(inst, "r2", r2)
+        ir_emit(inst)
+        return r
+    end
+
+    if typ == "call"
+        fname = map_get(node, "name")
+        args = map_get(node, "args")
+        arg_regs = []
+        i = 0
+        while i < len(args)
+            ar = ir_expr(args[i])
+            push(arg_regs, ar)
+            i = i + 1
+        end
+        i = 0
+        while i < len(arg_regs)
+            inst = ir_mk("ARG")
+            inst = map_set(inst, "reg", arg_regs[i])
+            ir_emit(inst)
+            i = i + 1
+        end
+        r = ir_new_reg()
+        inst = ir_mk("CALL")
+        inst = map_set(inst, "reg", r)
+        inst = map_set(inst, "name", fname)
+        inst = map_set(inst, "nargs", len(args))
+        ir_emit(inst)
+        return r
+    end
+
+    if typ == "index"
+        obj_r = ir_expr(map_get(node, "object"))
+        idx_r = ir_expr(map_get(node, "index"))
+        r = ir_new_reg()
+        inst = ir_mk("INDEX")
+        inst = map_set(inst, "reg", r)
+        inst = map_set(inst, "obj", obj_r)
+        inst = map_set(inst, "idx", idx_r)
+        ir_emit(inst)
+        return r
+    end
+
+    if typ == "array"
+        elems = map_get(node, "elems")
+        elem_regs = []
+        i = 0
+        while i < len(elems)
+            er = ir_expr(elems[i])
+            push(elem_regs, er)
+            i = i + 1
+        end
+        i = 0
+        while i < len(elem_regs)
+            inst = ir_mk("ARG")
+            inst = map_set(inst, "reg", elem_regs[i])
+            ir_emit(inst)
+            i = i + 1
+        end
+        r = ir_new_reg()
+        inst = ir_mk("ARRLIT")
+        inst = map_set(inst, "reg", r)
+        inst = map_set(inst, "count", len(elems))
+        ir_emit(inst)
+        return r
+    end
+
+    r = ir_new_reg()
+    inst = ir_mk("CONST")
+    inst = map_set(inst, "reg", r)
+    inst = map_set(inst, "value", 0)
+    ir_emit(inst)
+    return r
+end
+
+func ir_stmt(node)
+    if node == 0
+        return 0
+    end
+    typ = map_get(node, "type")
+
+    if typ == "assign"
+        r = ir_expr(map_get(node, "value"))
+        tgt = map_get(node, "target")
+        if map_has(node, "index") == 1
+            obj_r = ir_new_reg()
+            inst = ir_mk("LOAD")
+            inst = map_set(inst, "reg", obj_r)
+            inst = map_set(inst, "name", tgt)
+            ir_emit(inst)
+            idx_r = ir_expr(map_get(node, "index"))
+            inst = ir_mk("ISTORE")
+            inst = map_set(inst, "obj", obj_r)
+            inst = map_set(inst, "idx", idx_r)
+            inst = map_set(inst, "val", r)
+            ir_emit(inst)
+        else
+            inst = ir_mk("STORE")
+            inst = map_set(inst, "name", tgt)
+            inst = map_set(inst, "reg", r)
+            ir_emit(inst)
+        end
+        return 0
+    end
+
+    if typ == "show"
+        r = ir_expr(map_get(node, "value"))
+        inst = ir_mk("SHOW")
+        inst = map_set(inst, "reg", r)
+        ir_emit(inst)
+        return 0
+    end
+
+    if typ == "return"
+        val = map_get(node, "value")
+        if val != 0
+            r = ir_expr(val)
+            inst = ir_mk("RET")
+            inst = map_set(inst, "reg", r)
+            ir_emit(inst)
+        else
+            ir_emit(ir_mk("RET0"))
+        end
+        return 0
+    end
+
+    if typ == "if"
+        cond_r = ir_expr(map_get(node, "cond"))
+        end_label = ir_new_label()
+        inst = ir_mk("JZ")
+        inst = map_set(inst, "reg", cond_r)
+        inst = map_set(inst, "label", end_label)
+        ir_emit(inst)
+        ir_block(map_get(node, "body"))
+        inst = ir_mk("LABEL")
+        inst = map_set(inst, "name", end_label)
+        ir_emit(inst)
+        return 0
+    end
+
+    if typ == "while"
+        top_label = ir_new_label()
+        end_label = ir_new_label()
+        inst = ir_mk("LABEL")
+        inst = map_set(inst, "name", top_label)
+        ir_emit(inst)
+        cond_r = ir_expr(map_get(node, "cond"))
+        inst = ir_mk("JZ")
+        inst = map_set(inst, "reg", cond_r)
+        inst = map_set(inst, "label", end_label)
+        ir_emit(inst)
+        ir_block(map_get(node, "body"))
+        inst = ir_mk("JMP")
+        inst = map_set(inst, "label", top_label)
+        ir_emit(inst)
+        inst = ir_mk("LABEL")
+        inst = map_set(inst, "name", end_label)
+        ir_emit(inst)
+        return 0
+    end
+
+    if typ == "func"
+        fname = map_get(node, "name")
+        params = map_get(node, "params")
+        inst = ir_mk("FUNC")
+        inst = map_set(inst, "name", fname)
+        ir_emit(inst)
+        i = 0
+        while i < len(params)
+            inst = ir_mk("PARAM")
+            inst = map_set(inst, "name", params[i])
+            ir_emit(inst)
+            i = i + 1
+        end
+        ir_block(map_get(node, "body"))
+        ir_emit(ir_mk("RET0"))
+        ir_emit(ir_mk("ENDFUNC"))
+        return 0
+    end
+
+    if typ == "assert"
+        r = ir_expr(map_get(node, "expr"))
+        inst = ir_mk("ASSERT")
+        inst = map_set(inst, "reg", r)
+        ir_emit(inst)
+        return 0
+    end
+
+    if typ == "call"
+        ir_expr(node)
+        return 0
+    end
+
+    return 0
+end
+
+func ir_block(stmts)
+    i = 0
+    while i < len(stmts)
+        ir_stmt(stmts[i])
+        i = i + 1
+    end
+end
+
+func generate_ir(stmts)
+    ir_block(stmts)
+    return ir_code
+end
+
+func ir_print(code)
+    i = 0
+    while i < len(code)
+        inst = code[i]
+        op = map_get(inst, "op")
+        if op == "CONST"
+            r = map_get(inst, "reg")
+            v = map_get(inst, "value")
+            show "  r{r} = CONST {v}"
+        elif op == "LOAD"
+            r = map_get(inst, "reg")
+            nm = map_get(inst, "name")
+            show "  r{r} = LOAD {nm}"
+        elif op == "STORE"
+            nm = map_get(inst, "name")
+            r = map_get(inst, "reg")
+            show "  STORE {nm} = r{r}"
+        elif op == "BINOP"
+            r = map_get(inst, "reg")
+            o = map_get(inst, "binop")
+            r1 = map_get(inst, "r1")
+            r2 = map_get(inst, "r2")
+            show "  r{r} = r{r1} {o} r{r2}"
+        elif op == "CALL"
+            r = map_get(inst, "reg")
+            nm = map_get(inst, "name")
+            na = map_get(inst, "nargs")
+            show "  r{r} = CALL {nm}({na})"
+        elif op == "ARG"
+            r = map_get(inst, "reg")
+            show "  ARG r{r}"
+        elif op == "RET"
+            r = map_get(inst, "reg")
+            show "  RET r{r}"
+        elif op == "RET0"
+            show "  RET0"
+        elif op == "SHOW"
+            r = map_get(inst, "reg")
+            show "  SHOW r{r}"
+        elif op == "LABEL"
+            nm = map_get(inst, "name")
+            show "{nm}:"
+        elif op == "JMP"
+            lb = map_get(inst, "label")
+            show "  JMP {lb}"
+        elif op == "JZ"
+            r = map_get(inst, "reg")
+            lb = map_get(inst, "label")
+            show "  JZ r{r} -> {lb}"
+        elif op == "FUNC"
+            nm = map_get(inst, "name")
+            show "FUNC {nm}:"
+        elif op == "ENDFUNC"
+            show "  ENDFUNC"
+        elif op == "PARAM"
+            nm = map_get(inst, "name")
+            show "  PARAM {nm}"
+        elif op == "INDEX"
+            r = map_get(inst, "reg")
+            o = map_get(inst, "obj")
+            idx = map_get(inst, "idx")
+            show "  r{r} = r{o}[r{idx}]"
+        elif op == "ISTORE"
+            o = map_get(inst, "obj")
+            idx = map_get(inst, "idx")
+            v = map_get(inst, "val")
+            show "  r{o}[r{idx}] = r{v}"
+        elif op == "ASSERT"
+            r = map_get(inst, "reg")
+            show "  ASSERT r{r}"
+        elif op == "ARRLIT"
+            r = map_get(inst, "reg")
+            c = map_get(inst, "count")
+            show "  r{r} = ARRLIT({c})"
+        else
+            show "  ??? {op}"
+        end
+        i = i + 1
+    end
+end
+
+!! ============================================================
+!! AST helpers
+!! ============================================================
+func mk(typ)
+    n = map_new()
+    n = map_set(n, "type", typ)
+    return n
+end
+
+func mk_num(v)
+    n = mk("number")
+    n = map_set(n, "value", v)
+    return n
+end
+
+func mk_id(name)
+    n = mk("ident")
+    n = map_set(n, "name", name)
+    return n
+end
+
+func mk_assign(name, val)
+    n = mk("assign")
+    n = map_set(n, "target", name)
+    n = map_set(n, "value", val)
+    return n
+end
+
+func mk_show(val)
+    n = mk("show")
+    n = map_set(n, "value", val)
+    return n
+end
+
+func mk_binop(op, left, right)
+    n = mk("binop")
+    n = map_set(n, "op", op)
+    n = map_set(n, "left", left)
+    n = map_set(n, "right", right)
+    return n
+end
+
+func mk_call(name, args)
+    n = mk("call")
+    n = map_set(n, "name", name)
+    n = map_set(n, "args", args)
+    return n
+end
+
+func mk_func(name, params, body)
+    n = mk("func")
+    n = map_set(n, "name", name)
+    n = map_set(n, "params", params)
+    n = map_set(n, "body", body)
+    return n
+end
+
+func mk_return(val)
+    n = mk("return")
+    n = map_set(n, "value", val)
+    return n
+end
+
+func mk_while(cond, body)
+    n = mk("while")
+    n = map_set(n, "cond", cond)
+    n = map_set(n, "body", body)
+    return n
+end
+
+!! ============================================================
+!! Test helpers
+!! ============================================================
+pass_count = [0]
+fail_count = [0]
+
+func check(name, cond)
+    if cond == 1
+        show "PASS: {name}"
+        pass_count[0] = pass_count[0] + 1
+    else
+        show "FAIL: {name}"
+        fail_count[0] = fail_count[0] + 1
+    end
+end
+
+func get_op(code, idx)
+    inst = code[idx]
+    return map_get(inst, "op")
+end
+
+!! ============================================================
+!! TEST 1: x = 42 → CONST + STORE
+!! ============================================================
+show "=== T1: assign ==="
+ir_code = []
+ir_reg[0] = 0
+ir_label[0] = 0
+stmts = []
+push(stmts, mk_assign("x", mk_num(42)))
+code = generate_ir(stmts)
+ir_print(code)
+check("T1 count", len(code) == 2)
+check("T1 const", get_op(code, 0) == "CONST")
+check("T1 store", get_op(code, 1) == "STORE")
+
+!! ============================================================
+!! TEST 2: show x + 1 → LOAD + CONST + BINOP + SHOW
+!! ============================================================
+show "=== T2: show expr ==="
+ir_code = []
+ir_reg[0] = 0
+ir_label[0] = 0
+stmts = []
+push(stmts, mk_assign("x", mk_num(10)))
+push(stmts, mk_show(mk_binop("+", mk_id("x"), mk_num(1))))
+code = generate_ir(stmts)
+ir_print(code)
+check("T2 count", len(code) == 6)
+check("T2 show", get_op(code, 5) == "SHOW")
+
+!! ============================================================
+!! TEST 3: func add(a,b) return a+b end
+!! ============================================================
+show "=== T3: func ==="
+ir_code = []
+ir_reg[0] = 0
+ir_label[0] = 0
+stmts = []
+body3 = []
+push(body3, mk_return(mk_binop("+", mk_id("a"), mk_id("b"))))
+push(stmts, mk_func("add", ["a", "b"], body3))
+code = generate_ir(stmts)
+ir_print(code)
+check("T3 func", get_op(code, 0) == "FUNC")
+check("T3 param a", get_op(code, 1) == "PARAM")
+check("T3 param b", get_op(code, 2) == "PARAM")
+check("T3 ret", get_op(code, 6) == "RET")
+last3 = len(code) - 1
+check("T3 endfunc", get_op(code, last3) == "ENDFUNC")
+
+!! ============================================================
+!! TEST 4: while loop → LABEL + JZ + body + JMP + LABEL
+!! ============================================================
+show "=== T4: while ==="
+ir_code = []
+ir_reg[0] = 0
+ir_label[0] = 0
+stmts = []
+push(stmts, mk_assign("i", mk_num(0)))
+wbody = []
+push(wbody, mk_assign("i", mk_binop("+", mk_id("i"), mk_num(1))))
+push(stmts, mk_while(mk_binop("<", mk_id("i"), mk_num(10)), wbody))
+code = generate_ir(stmts)
+ir_print(code)
+check("T4 label", get_op(code, 2) == "LABEL")
+check("T4 jz", get_op(code, 6) == "JZ")
+check("T4 jmp", get_op(code, 11) == "JMP")
+last4 = len(code) - 1
+check("T4 end label", get_op(code, last4) == "LABEL")
+
+!! ============================================================
+!! TEST 5: function call → ARG + CALL
+!! ============================================================
+show "=== T5: call ==="
+ir_code = []
+ir_reg[0] = 0
+ir_label[0] = 0
+stmts = []
+push(stmts, mk_assign("x", mk_num(5)))
+args5 = []
+push(args5, mk_id("x"))
+push(args5, mk_num(2))
+push(stmts, mk_show(mk_call("add", args5)))
+code = generate_ir(stmts)
+ir_print(code)
+has_arg = 0
+has_call = 0
+i = 0
+while i < len(code)
+    o = get_op(code, i)
+    if o == "ARG"
+        has_arg = 1
+    end
+    if o == "CALL"
+        has_call = 1
+    end
+    i = i + 1
+end
+check("T5 has ARG", has_arg == 1)
+check("T5 has CALL", has_call == 1)
+
+!! ============================================================
+!! Summary
+!! ============================================================
+show ""
+p = pass_count[0]
+f = fail_count[0]
+show "Results: {p} passed, {f} failed"
+show "all_done"

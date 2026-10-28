@@ -1,0 +1,596 @@
+#!/usr/bin/env bash
+# ============================================================
+# SPM — SEVEN Package Manager
+# Usage: spm <command> [args]
+#
+# Commands:
+#   init                Create seven.pkg in current directory
+#   install <pkg>       Install a package (GitHub or local path)
+#   uninstall <pkg>     Remove an installed package
+#   list                List installed packages
+#   info [pkg]          Show package info
+#   publish             Package for publishing
+#   search <query>      Search registry for packages
+#   update              Update all installed packages
+#   run <script>        Run a named script from seven.pkg
+# ============================================================
+
+set -euo pipefail
+
+SPM_VERSION="1.0.0"
+PKG_FILE="seven.pkg"
+MODULES_DIR="spm_modules"
+LOCK_FILE="spm.lock"
+REGISTRY_URL="https://raw.githubusercontent.com/seven-packages/registry/main"
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+DIM='\033[2m'
+RESET='\033[0m'
+
+# ---- Helpers ----
+
+die() { echo -e "${RED}error:${RESET} $1" >&2; exit 1; }
+info() { echo -e "${CYAN}info:${RESET} $1"; }
+ok() { echo -e "${GREEN}✓${RESET} $1"; }
+warn() { echo -e "${YELLOW}warn:${RESET} $1"; }
+
+pkg_get() {
+    local key="$1"
+    local file="${2:-$PKG_FILE}"
+    [ -f "$file" ] || return 1
+    grep -E "^${key}\s*=" "$file" 2>/dev/null | head -1 | sed 's/^[^=]*=\s*//' | sed 's/\s*$//'
+}
+
+pkg_set() {
+    local key="$1" val="$2" file="${3:-$PKG_FILE}"
+    if grep -qE "^${key}\s*=" "$file" 2>/dev/null; then
+        sed -i "s|^${key}\s*=.*|${key} = ${val}|" "$file"
+    else
+        echo "${key} = ${val}" >> "$file"
+    fi
+}
+
+require_pkg() {
+    [ -f "$PKG_FILE" ] || die "no $PKG_FILE found. Run 'spm init' first."
+}
+
+# ---- Commands ----
+
+cmd_init() {
+    if [ -f "$PKG_FILE" ]; then
+        die "$PKG_FILE already exists. Delete it first to reinitialize."
+    fi
+
+    local dirname
+    dirname="$(basename "$(pwd)")"
+    local name="${dirname// /-}"
+    name="$(echo "$name" | tr '[:upper:]' '[:lower:]')"
+
+    local author=""
+    if command -v git &>/dev/null; then
+        author="$(git config user.name 2>/dev/null || true)"
+    fi
+
+    cat > "$PKG_FILE" << EOF
+name = ${name}
+version = 0.1.0
+description = A SEVEN language package
+author = ${author}
+license = MIT
+
+[dependencies]
+
+[scripts]
+test = tools/test
+EOF
+
+    ok "created $PKG_FILE"
+    echo ""
+    cat "$PKG_FILE"
+}
+
+cmd_install() {
+    require_pkg
+
+    if [ $# -eq 0 ]; then
+        cmd_install_all
+        return
+    fi
+
+    local pkg="$1"
+    local version="${2:-latest}"
+
+    # Local path install
+    if [ -d "$pkg" ]; then
+        cmd_install_local "$pkg"
+        return
+    fi
+
+    # GitHub shorthand: user/repo
+    if [[ "$pkg" == */* ]]; then
+        cmd_install_github "$pkg" "$version"
+        return
+    fi
+
+    # Registry lookup
+    cmd_install_registry "$pkg" "$version"
+}
+
+cmd_install_local() {
+    local src="$1"
+    local pkg_file="$src/$PKG_FILE"
+
+    [ -f "$pkg_file" ] || die "no $PKG_FILE in $src"
+
+    local name
+    name="$(pkg_get "name" "$pkg_file")"
+    [ -n "$name" ] || die "package has no name"
+
+    local dest="$MODULES_DIR/$name"
+    mkdir -p "$dest"
+
+    # Copy .seven files
+    local count=0
+    for f in "$src"/*.seven; do
+        [ -f "$f" ] || continue
+        cp "$f" "$dest/"
+        count=$((count + 1))
+    done
+
+    # Copy lib/ if exists
+    if [ -d "$src/lib" ]; then
+        cp -r "$src/lib" "$dest/"
+        count=$((count + $(find "$src/lib" -name "*.seven" | wc -l)))
+    fi
+
+    # Copy seven.pkg
+    cp "$pkg_file" "$dest/"
+
+    # Add to dependencies
+    local ver
+    ver="$(pkg_get "version" "$pkg_file")"
+    add_dependency "$name" "local:$src"
+
+    # Update lock file
+    update_lock "$name" "$ver" "local" "$src"
+
+    ok "installed ${BOLD}$name${RESET} ($count files) from local path"
+}
+
+cmd_install_github() {
+    local repo="$1"
+    local version="$2"
+
+    command -v git &>/dev/null || die "git is required for GitHub installs"
+
+    local name
+    name="$(echo "$repo" | cut -d/ -f2)"
+
+    local dest="$MODULES_DIR/$name"
+    local tmpdir
+    tmpdir="$(mktemp -d)"
+
+    info "fetching $repo..."
+
+    local git_url="https://github.com/$repo.git"
+    if [ "$version" = "latest" ]; then
+        git clone --depth 1 "$git_url" "$tmpdir/$name" 2>/dev/null \
+            || die "failed to clone $repo"
+    else
+        git clone --depth 1 --branch "$version" "$git_url" "$tmpdir/$name" 2>/dev/null \
+            || die "failed to clone $repo@$version"
+    fi
+
+    # Install from cloned dir
+    if [ -f "$tmpdir/$name/$PKG_FILE" ]; then
+        cmd_install_local "$tmpdir/$name"
+    else
+        # No seven.pkg — just copy .seven files
+        mkdir -p "$dest"
+        local count=0
+        for f in "$tmpdir/$name"/*.seven "$tmpdir/$name"/lib/*.seven; do
+            [ -f "$f" ] || continue
+            cp "$f" "$dest/"
+            count=$((count + 1))
+        done
+
+        if [ $count -eq 0 ]; then
+            rm -rf "$tmpdir" "$dest"
+            die "no .seven files found in $repo"
+        fi
+
+        add_dependency "$name" "github:$repo"
+        update_lock "$name" "$version" "github" "$repo"
+        ok "installed ${BOLD}$name${RESET} ($count files) from github:$repo"
+    fi
+
+    rm -rf "$tmpdir"
+}
+
+cmd_install_registry() {
+    local pkg="$1"
+    local version="$2"
+
+    # Try to fetch package info from registry
+    local reg_url="$REGISTRY_URL/packages/$pkg.json"
+
+    if command -v curl &>/dev/null; then
+        local pkg_info
+        pkg_info="$(curl -sf "$reg_url" 2>/dev/null)" || true
+
+        if [ -n "$pkg_info" ]; then
+            local repo
+            repo="$(echo "$pkg_info" | grep -o '"repo"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*"repo"[[:space:]]*:[[:space:]]*"//' | sed 's/"$//')"
+            if [ -n "$repo" ]; then
+                cmd_install_github "$repo" "$version"
+                return
+            fi
+        fi
+    fi
+
+    # Fallback: try seven-packages org
+    info "trying seven-packages/$pkg..."
+    cmd_install_github "seven-packages/$pkg" "$version" 2>/dev/null \
+        || die "package '$pkg' not found. Try: spm install user/repo"
+}
+
+cmd_install_all() {
+    require_pkg
+
+    local in_deps=false
+    local installed=0
+
+    while IFS= read -r line; do
+        local trimmed="${line#"${line%%[![:space:]]*}"}"
+
+        if [[ "$trimmed" == "[dependencies]" ]]; then
+            in_deps=true
+            continue
+        fi
+        if [[ "$trimmed" == "["* ]]; then
+            in_deps=false
+            continue
+        fi
+
+        if $in_deps && [[ "$trimmed" == *"="* ]]; then
+            local dep_name dep_src
+            dep_name="$(echo "$trimmed" | cut -d= -f1 | sed 's/\s*$//')"
+            dep_src="$(echo "$trimmed" | cut -d= -f2- | sed 's/^\s*//')"
+
+            if [ -n "$dep_name" ] && [ -n "$dep_src" ]; then
+                if [[ "$dep_src" == github:* ]]; then
+                    local repo="${dep_src#github:}"
+                    cmd_install_github "$repo" "latest"
+                elif [[ "$dep_src" == local:* ]]; then
+                    local path="${dep_src#local:}"
+                    cmd_install_local "$path"
+                fi
+                installed=$((installed + 1))
+            fi
+        fi
+    done < "$PKG_FILE"
+
+    if [ $installed -eq 0 ]; then
+        info "no dependencies to install"
+    else
+        ok "installed $installed dependencies"
+    fi
+}
+
+cmd_uninstall() {
+    require_pkg
+    [ $# -gt 0 ] || die "usage: spm uninstall <package>"
+
+    local name="$1"
+    local dest="$MODULES_DIR/$name"
+
+    if [ ! -d "$dest" ]; then
+        die "package '$name' is not installed"
+    fi
+
+    rm -rf "$dest"
+    remove_dependency "$name"
+    remove_lock "$name"
+
+    # Clean up empty modules dir
+    if [ -d "$MODULES_DIR" ] && [ -z "$(ls -A "$MODULES_DIR" 2>/dev/null)" ]; then
+        rmdir "$MODULES_DIR"
+    fi
+
+    ok "uninstalled ${BOLD}$name${RESET}"
+}
+
+cmd_list() {
+    if [ ! -d "$MODULES_DIR" ] || [ -z "$(ls -A "$MODULES_DIR" 2>/dev/null)" ]; then
+        info "no packages installed"
+        return
+    fi
+
+    echo -e "${BOLD}Installed packages:${RESET}"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+    for pkg_dir in "$MODULES_DIR"/*/; do
+        [ -d "$pkg_dir" ] || continue
+        local name
+        name="$(basename "$pkg_dir")"
+        local ver="unknown"
+        local desc=""
+
+        if [ -f "$pkg_dir/$PKG_FILE" ]; then
+            ver="$(pkg_get "version" "$pkg_dir/$PKG_FILE")"
+            desc="$(pkg_get "description" "$pkg_dir/$PKG_FILE")"
+        fi
+
+        local count
+        count="$(find "$pkg_dir" -name "*.seven" | wc -l)"
+
+        echo -e "  ${GREEN}$name${RESET} ${DIM}v$ver${RESET} ($count files)"
+        if [ -n "$desc" ]; then
+            echo -e "    ${DIM}$desc${RESET}"
+        fi
+    done
+}
+
+cmd_info() {
+    if [ $# -gt 0 ]; then
+        local name="$1"
+        local pkg_path="$MODULES_DIR/$name/$PKG_FILE"
+        [ -f "$pkg_path" ] || die "package '$name' not found"
+        echo -e "${BOLD}Package: $name${RESET}"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        cat "$pkg_path"
+    else
+        require_pkg
+        echo -e "${BOLD}Project Info${RESET}"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        cat "$PKG_FILE"
+    fi
+}
+
+cmd_publish() {
+    require_pkg
+
+    local name ver
+    name="$(pkg_get "name")"
+    ver="$(pkg_get "version")"
+
+    [ -n "$name" ] || die "package name is required in $PKG_FILE"
+    [ -n "$ver" ] || die "version is required in $PKG_FILE"
+
+    local tarball="${name}-${ver}.tar.gz"
+    local tmpdir
+    tmpdir="$(mktemp -d)"
+    local pkg_dir="$tmpdir/$name-$ver"
+    mkdir -p "$pkg_dir"
+
+    # Copy package files
+    cp "$PKG_FILE" "$pkg_dir/"
+    for f in *.seven; do
+        [ -f "$f" ] && cp "$f" "$pkg_dir/"
+    done
+    if [ -d "lib" ]; then
+        cp -r "lib" "$pkg_dir/"
+    fi
+
+    # Create tarball
+    tar -czf "$tarball" -C "$tmpdir" "$name-$ver"
+    rm -rf "$tmpdir"
+
+    local size
+    size="$(du -h "$tarball" | cut -f1)"
+    ok "packaged ${BOLD}$name@$ver${RESET} → $tarball ($size)"
+    echo ""
+    echo -e "${DIM}To publish, push your repo to GitHub and register at:${RESET}"
+    echo -e "${DIM}  https://github.com/seven-packages/registry${RESET}"
+    echo ""
+    echo -e "${DIM}Others can install with:${RESET}"
+    echo -e "  spm install ${BOLD}your-username/$name${RESET}"
+}
+
+cmd_run() {
+    require_pkg
+    [ $# -gt 0 ] || die "usage: spm run <script>"
+
+    local script_name="$1"
+    shift
+
+    local in_scripts=false
+    local script_cmd=""
+
+    while IFS= read -r line; do
+        local trimmed="${line#"${line%%[![:space:]]*}"}"
+        if [[ "$trimmed" == "[scripts]" ]]; then
+            in_scripts=true
+            continue
+        fi
+        if [[ "$trimmed" == "["* ]]; then
+            in_scripts=false
+            continue
+        fi
+        if $in_scripts && [[ "$trimmed" == "${script_name} ="* ]]; then
+            script_cmd="$(echo "$trimmed" | cut -d= -f2- | sed 's/^\s*//')"
+            break
+        fi
+    done < "$PKG_FILE"
+
+    [ -n "$script_cmd" ] || die "script '$script_name' not found in $PKG_FILE"
+
+    info "running: $script_cmd $*"
+    eval "$script_cmd" "$@"
+}
+
+cmd_update() {
+    require_pkg
+
+    if [ ! -f "$LOCK_FILE" ]; then
+        info "no lock file found. Run 'spm install' first."
+        return
+    fi
+
+    local updated=0
+    while IFS= read -r line; do
+        if [[ "$line" == "[[package]]" ]]; then
+            local name="" source="" ref=""
+        elif [[ "$line" == name* ]]; then
+            name="$(echo "$line" | cut -d= -f2- | sed 's/^\s*//' | tr -d '"')"
+        elif [[ "$line" == source* ]]; then
+            source="$(echo "$line" | cut -d= -f2- | sed 's/^\s*//' | tr -d '"')"
+        elif [[ "$line" == ref* ]]; then
+            ref="$(echo "$line" | cut -d= -f2- | sed 's/^\s*//' | tr -d '"')"
+        elif [ -z "$line" ] && [ -n "$name" ]; then
+            if [ "$source" = "github" ] && [ -n "$ref" ]; then
+                info "updating $name from github:$ref..."
+                cmd_install_github "$ref" "latest" && updated=$((updated + 1))
+            fi
+            name="" source="" ref=""
+        fi
+    done < "$LOCK_FILE"
+
+    if [ $updated -eq 0 ]; then
+        info "all packages up to date"
+    else
+        ok "updated $updated packages"
+    fi
+}
+
+cmd_search() {
+    [ $# -gt 0 ] || die "usage: spm search <query>"
+    local query="$1"
+
+    info "searching for '$query'..."
+
+    if command -v curl &>/dev/null; then
+        local index
+        index="$(curl -sf "$REGISTRY_URL/index.json" 2>/dev/null)" || true
+
+        if [ -n "$index" ]; then
+            echo "$index" | grep -i "$query" || info "no packages found matching '$query'"
+            return
+        fi
+    fi
+
+    info "registry not available. Try browsing: https://github.com/seven-packages"
+}
+
+# ---- Dependency management ----
+
+add_dependency() {
+    local name="$1" source="$2"
+
+    if grep -qE "^${name}\s*=" "$PKG_FILE" 2>/dev/null; then
+        sed -i "s|^${name}\s*=.*|${name} = ${source}|" "$PKG_FILE"
+    else
+        # Add after [dependencies] section
+        sed -i "/^\[dependencies\]/a ${name} = ${source}" "$PKG_FILE"
+    fi
+}
+
+remove_dependency() {
+    local name="$1"
+    sed -i "/^${name}\s*=/d" "$PKG_FILE"
+}
+
+# ---- Lock file ----
+
+update_lock() {
+    local name="$1" ver="$2" source="$3" ref="$4"
+
+    # Remove existing entry
+    remove_lock "$name"
+
+    cat >> "$LOCK_FILE" << EOF
+
+[[package]]
+name = "$name"
+version = "$ver"
+source = "$source"
+ref = "$ref"
+EOF
+}
+
+remove_lock() {
+    local name="$1"
+    [ -f "$LOCK_FILE" ] || return 0
+
+    # Remove the package block
+    local tmpfile
+    tmpfile="$(mktemp)"
+    local skip=false
+
+    while IFS= read -r line; do
+        if [[ "$line" == "[[package]]" ]]; then
+            skip=false
+        fi
+        if [[ "$line" == "name = \"$name\"" ]]; then
+            skip=true
+            # Remove the [[package]] line we just wrote
+            sed -i '$ { /^\[\[package\]\]$/d }' "$tmpfile"
+        fi
+        if ! $skip; then
+            echo "$line" >> "$tmpfile"
+        fi
+        if $skip && [ -z "$line" ]; then
+            skip=false
+        fi
+    done < "$LOCK_FILE"
+
+    mv "$tmpfile" "$LOCK_FILE"
+}
+
+# ---- Version / Help ----
+
+cmd_version() {
+    echo -e "${BOLD}SPM${RESET} — SEVEN Package Manager v$SPM_VERSION"
+}
+
+cmd_help() {
+    cmd_version
+    echo ""
+    echo -e "${BOLD}Usage:${RESET} spm <command> [args]"
+    echo ""
+    echo -e "${BOLD}Commands:${RESET}"
+    echo "  init                Create $PKG_FILE in current directory"
+    echo "  install [pkg]       Install package (or all from $PKG_FILE)"
+    echo "  uninstall <pkg>     Remove a package"
+    echo "  list                List installed packages"
+    echo "  info [pkg]          Show package info"
+    echo "  publish             Package for publishing"
+    echo "  search <query>      Search the registry"
+    echo "  update              Update all packages"
+    echo "  run <script>        Run a named script"
+    echo "  version             Show SPM version"
+    echo "  help                Show this help"
+    echo ""
+    echo -e "${BOLD}Install sources:${RESET}"
+    echo "  spm install <name>          From registry"
+    echo "  spm install user/repo       From GitHub"
+    echo "  spm install ./path          From local directory"
+    echo ""
+    echo -e "${BOLD}Package file:${RESET} $PKG_FILE"
+    echo -e "${BOLD}Modules dir:${RESET}  $MODULES_DIR/"
+    echo -e "${BOLD}Lock file:${RESET}    $LOCK_FILE"
+}
+
+# ---- Main dispatch ----
+
+cmd="${1:-help}"
+shift 2>/dev/null || true
+
+case "$cmd" in
+    init)       cmd_init "$@" ;;
+    install|i)  cmd_install "$@" ;;
+    uninstall)  cmd_uninstall "$@" ;;
+    list|ls)    cmd_list "$@" ;;
+    info)       cmd_info "$@" ;;
+    publish)    cmd_publish "$@" ;;
+    search|s)   cmd_search "$@" ;;
+    update|up)  cmd_update "$@" ;;
+    run)        cmd_run "$@" ;;
+    version|-v|--version) cmd_version ;;
+    help|-h|--help)       cmd_help ;;
+    *)          die "unknown command: $cmd. Run 'spm help' for usage." ;;
+esac

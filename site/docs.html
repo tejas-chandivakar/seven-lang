@@ -95,6 +95,7 @@
                     <a href="#string-methods" class="sidebar-link block py-1.5 pl-3 border-l-2 border-transparent text-gray-400 hover:text-white transition-colors">String Methods</a>
 
                     <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 mt-6">Tools</p>
+                    <a href="#spm" class="sidebar-link block py-1.5 pl-3 border-l-2 border-transparent text-gray-400 hover:text-white transition-colors">Package Manager (SPM)</a>
                     <a href="#tools" class="sidebar-link block py-1.5 pl-3 border-l-2 border-transparent text-gray-400 hover:text-white transition-colors">Developer Tools</a>
                     <a href="#runtime" class="sidebar-link block py-1.5 pl-3 border-l-2 border-transparent text-gray-400 hover:text-white transition-colors">Runtime Model</a>
                 </nav>
@@ -107,7 +108,7 @@
                     <!-- Overview -->
                     <section id="overview" class="doc-section mb-16">
                         <h1 class="text-3xl sm:text-4xl font-bold text-white mb-2">SEVEN Language Documentation</h1>
-                        <p class="text-gray-400 mb-6">Version 1.2 &mdash; Phase 12 Complete</p>
+                        <p class="text-gray-400 mb-6">Version 1.3 &mdash; Phase 13 Complete</p>
                         <p class="text-gray-300 leading-relaxed mb-4">SEVEN is a compiled, dynamically-typed programming language designed for <strong class="text-white">assembly-level speed with Python-level simplicity</strong>.</p>
                         <ul class="space-y-2 text-gray-400 text-sm">
                             <li>File extensions: <code class="text-seven-400 font-mono">.seven</code> (primary), <code class="text-gray-400 font-mono">.sev</code>, <code class="text-gray-400 font-mono">.sv7</code>, <code class="text-gray-400 font-mono">.s7</code></li>
@@ -515,6 +516,76 @@
                                     <tr><td class="py-2 pr-4 font-mono text-xs text-seven-400">.repeat(n)</td><td class="py-2">Repeat n times</td></tr>
                                 </tbody>
                             </table>
+                        </div>
+                    </section>
+
+                    <!-- Package Manager -->
+                    <section id="spm" class="doc-section mb-16">
+                        <h2 class="text-2xl font-bold text-white mb-4">Package Manager (SPM)</h2>
+                        <p class="text-gray-300 mb-6">SPM manages dependencies, scripts, and publishing for SEVEN projects.</p>
+
+                        <h3 class="text-lg font-semibold text-white mb-3">Quick Start</h3>
+                        <div class="code-block rounded-xl p-5 mb-6 overflow-x-auto">
+                            <pre class="text-sm font-mono"><code><span class="cmt"># Initialize a new project</span>
+<span class="kw">spm</span> init
+
+<span class="cmt"># Install a package from GitHub</span>
+<span class="kw">spm</span> install user/repo
+
+<span class="cmt"># Install from local path</span>
+<span class="kw">spm</span> install ./path/to/package
+
+<span class="cmt"># List installed packages</span>
+<span class="kw">spm</span> list
+
+<span class="cmt"># Run a named script</span>
+<span class="kw">spm</span> run test</code></pre>
+                        </div>
+
+                        <h3 class="text-lg font-semibold text-white mb-3">Package File (seven.pkg)</h3>
+                        <div class="code-block rounded-xl p-5 mb-6 overflow-x-auto">
+                            <pre class="text-sm font-mono"><code>name = my-project
+version = 1.0.0
+description = My SEVEN project
+author = Your Name
+license = MIT
+
+[dependencies]
+mathext = github:seven-packages/mathext
+
+[scripts]
+test = tools/test
+build = seven build main.seven</code></pre>
+                        </div>
+
+                        <h3 class="text-lg font-semibold text-white mb-3">Commands</h3>
+                        <div class="overflow-x-auto mb-6">
+                            <table class="w-full text-sm">
+                                <thead><tr class="border-b border-white/10">
+                                    <th class="text-left py-2 pr-4 text-gray-400 font-medium">Command</th>
+                                    <th class="text-left py-2 text-gray-400 font-medium">Description</th>
+                                </tr></thead>
+                                <tbody class="text-gray-300">
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-cyan-300">spm init</td><td>Create seven.pkg manifest</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-cyan-300">spm install [pkg]</td><td>Install package or all dependencies</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-cyan-300">spm uninstall &lt;pkg&gt;</td><td>Remove a package</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-cyan-300">spm list</td><td>List installed packages</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-cyan-300">spm info [pkg]</td><td>Show package or project info</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-cyan-300">spm publish</td><td>Package as tarball for distribution</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-cyan-300">spm search &lt;q&gt;</td><td>Search the registry</td></tr>
+                                    <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-cyan-300">spm update</td><td>Update all installed packages</td></tr>
+                                    <tr><td class="py-2 pr-4 font-mono text-cyan-300">spm run &lt;script&gt;</td><td>Run a named script from seven.pkg</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <h3 class="text-lg font-semibold text-white mb-3">Using Packages</h3>
+                        <div class="code-block rounded-xl p-5 mb-4 overflow-x-auto">
+                            <pre class="text-sm font-mono"><code><span class="cmt">!! After: spm install ./mathext</span>
+<span class="kw">use</span> <span class="str">"spm_modules/mathext/mathext.seven"</span>
+
+show fibonacci(<span class="num">10</span>)    <span class="cmt">!! 55</span>
+show is_prime(<span class="num">17</span>)     <span class="cmt">!! 1</span></code></pre>
                         </div>
                     </section>
 

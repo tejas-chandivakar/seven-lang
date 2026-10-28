@@ -36,6 +36,7 @@ section .data
                 db "  version             - show version info", 10
                 db "  help                - show this help", 10
                 db 10
+                db "Tools:  spm (package manager), seven-fmt, seven-lint, seven-test", 10
                 db "Accepted extensions: .seven .sev .sv7 .s7", 10, 0
     msg_usage_len equ $ - msg_usage
 

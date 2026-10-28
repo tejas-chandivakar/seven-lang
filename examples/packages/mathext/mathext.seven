@@ -1,0 +1,58 @@
+!! mathext — Extended math functions for SEVEN
+!! Install: spm install ./examples/packages/mathext
+
+func fibonacci(n)
+    if n below 2
+        result = n
+    else
+        a = 0
+        b = 1
+        i = 2
+        while i atmost n
+            temp = b
+            b = a + b
+            a = temp
+            i = i + 1
+        done
+        result = b
+    end
+end
+
+func is_prime(n)
+    if n below 2
+        result = 0
+    else
+        result = 1
+        i = 2
+        while i * i atmost n
+            if n % i is 0
+                result = 0
+            end
+            i = i + 1
+        done
+    end
+end
+
+func abs(n)
+    if n below 0
+        result = 0 - n
+    else
+        result = n
+    end
+end
+
+func min(a, b)
+    if a below b
+        result = a
+    else
+        result = b
+    end
+end
+
+func max(a, b)
+    if a above b
+        result = a
+    else
+        result = b
+    end
+end

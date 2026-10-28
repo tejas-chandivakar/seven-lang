@@ -1,0 +1,10 @@
+name = mathext
+version = 1.0.0
+description = Extended math functions for SEVEN
+author = SEVEN Team
+license = MIT
+
+[dependencies]
+
+[scripts]
+test = seven run tests.seven

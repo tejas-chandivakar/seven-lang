@@ -53,6 +53,26 @@ chmod +x "$TMP"
 mv "$TMP" "$BIN_DIR/seven"
 echo "Installed: $BIN_DIR/seven"
 
+# --- install tools (spm, fmt, lint, test, profile) -------------------------
+TOOLS_URL="https://raw.githubusercontent.com/$REPO/main/tools"
+for tool in spm fmt lint test profile; do
+  TMP="$(mktemp)"
+  echo "Downloading seven-$tool ..."
+  # shellcheck disable=SC2086
+  $DL "$TMP" "$TOOLS_URL/$tool" 2>/dev/null && {
+    chmod +x "$TMP"
+    mv "$TMP" "$BIN_DIR/seven-$tool"
+    echo "Installed: $BIN_DIR/seven-$tool"
+  } || {
+    rm -f "$TMP"
+    echo "Skipped: seven-$tool (not available)"
+  }
+done
+# spm also available as standalone 'spm'
+if [ -f "$BIN_DIR/seven-spm" ]; then
+  ln -sf "$BIN_DIR/seven-spm" "$BIN_DIR/spm" 2>/dev/null || true
+fi
+
 # --- PATH hint --------------------------------------------------------------
 case ":$PATH:" in
   *":$BIN_DIR:"*) ;;

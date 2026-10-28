@@ -111,8 +111,21 @@
 - [x] Linter — block matching, style checks, variable usage (`tools/lint`)
 - [x] Profiler — compile/asm/execution timing (`tools/profile`)
 
-## Phase 8 — Package Manager (SPM)
-`spm init`, `spm install`, `spm publish`, registry.
+## Phase 8 — Package Manager (SPM) (COMPLETE)
+**Goal:** Package management for SEVEN projects
+
+- [x] `spm init` — create seven.pkg manifest
+- [x] `spm install <pkg>` — install from local path, GitHub, or registry
+- [x] `spm uninstall <pkg>` — remove installed packages
+- [x] `spm list` — list installed packages
+- [x] `spm info [pkg]` — show package/project info
+- [x] `spm publish` — package as tarball for distribution
+- [x] `spm search <query>` — search the registry
+- [x] `spm update` — update all installed packages
+- [x] `spm run <script>` — run named scripts from seven.pkg
+- [x] Lock file (spm.lock) for reproducible installs
+- [x] GitHub-based package registry (seven-packages org)
+- [x] Example package (mathext) with fibonacci, is_prime, abs, min, max
 
 ## Phase 9 — Testing Framework (COMPLETE)
 **Goal:** Assert-based testing with automated test runner
@@ -157,9 +170,15 @@
 
 ---
 
-## Future
-- [ ] Package manager (SPM): `spm init`, `spm install`, `spm publish`
+## Future — Performance
+- [ ] Native integer registers (eliminate str↔int conversion per operation)
+- [ ] Register allocation for loop variables (keep counters in rcx/rdx)
+- [ ] Register-based expression evaluation (eliminate push/pop stack machine)
+- [ ] Constant folding (compile-time evaluation of literal expressions)
+- [ ] Peephole optimization (redundant push/pop removal, inc/dec fusion)
+- [ ] Loop invariant hoisting
+
+## Future — Features
 - [ ] Documentation website: sevenlang.org, tutorials
-- [ ] Codegen integer handling (numbers currently stored as string literals)
 - [ ] Garbage collector or arena-reset allocator
 - [ ] Self-hosting loop close: compile real `.seven` programs end-to-end

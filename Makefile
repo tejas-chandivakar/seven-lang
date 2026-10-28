@@ -55,7 +55,7 @@ SEVEN_LLVM := $(BUILD_DIR)/seven-llvm
 
 SEVEN_ASM := $(BUILD_DIR)/seven-asm
 
-.PHONY: all seven llvm test test-lex clean dirs dist
+.PHONY: all seven llvm test test-lex clean dirs dist dist-windows
 
 all: seven
 
@@ -140,3 +140,18 @@ dist: seven
 	@cd $(DIST_DIR) && tar -czf seven-linux-x86_64.tar.gz seven && \
 		sha256sum seven seven-linux-x86_64.tar.gz > checksums.txt
 	@echo "Packaged -> $(DIST_DIR)/ (seven, seven-linux-x86_64.tar.gz, checksums.txt)"
+
+# Cross-compile Windows distribution (requires mingw-w64)
+MINGW_CC := x86_64-w64-mingw32-gcc
+MINGW_CLANG := clang-21
+
+dist-windows: dirs llvm
+	@mkdir -p $(DIST_DIR)/windows
+	@echo "[1/3] Compiling runtime for Windows..."
+	$(MINGW_CC) -O2 -c $(LLVM_RT_SRC) -o $(DIST_DIR)/windows/seven_runtime.o
+	@echo "[2/3] Cross-compiling seven-llvm.exe..."
+	$(MINGW_CC) -O2 $(LLVM_CFLAGS) -I$(SRC_DIR) $(LLVM_SRCS) -o $(DIST_DIR)/windows/seven-llvm.exe $(LLVM_LDFLAGS)
+	@echo "[3/3] Packaging..."
+	@cp $(DIST_DIR)/windows/seven_runtime.o $(DIST_DIR)/windows/
+	@cd $(DIST_DIR)/windows && zip ../seven-windows-x86_64.zip seven-llvm.exe seven_runtime.o
+	@echo "Packaged -> $(DIST_DIR)/seven-windows-x86_64.zip"

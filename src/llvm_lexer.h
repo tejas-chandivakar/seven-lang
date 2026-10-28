@@ -85,10 +85,10 @@ typedef enum {
 
     TOK_NEWLINE,      // end of statement
     TOK_EOF,          // end of input
-} TokenType;
+} SevenTokenType;
 
 typedef struct {
-    TokenType type;
+    SevenTokenType type;
     char *value;       // heap-allocated string value
     int line;
     int col;
@@ -114,10 +114,10 @@ void lexer_free(Lexer *lex);
 // Token access
 Token *lexer_peek(Lexer *lex);
 Token *lexer_next(Lexer *lex);
-int lexer_match(Lexer *lex, TokenType type);
-Token *lexer_expect(Lexer *lex, TokenType type);
+int lexer_match(Lexer *lex, SevenTokenType type);
+Token *lexer_expect(Lexer *lex, SevenTokenType type);
 
 // Debug
-const char *token_type_name(TokenType t);
+const char *token_type_name(SevenTokenType t);
 
 #endif

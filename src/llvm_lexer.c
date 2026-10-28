@@ -8,7 +8,7 @@
 #include <string.h>
 #include <ctype.h>
 
-static void lexer_add(Lexer *lex, TokenType type, const char *val, int line, int col) {
+static void lexer_add(Lexer *lex, SevenTokenType type, const char *val, int line, int col) {
     if (lex->count >= lex->capacity) {
         lex->capacity *= 2;
         lex->tokens = realloc(lex->tokens, sizeof(Token) * lex->capacity);
@@ -20,7 +20,7 @@ static void lexer_add(Lexer *lex, TokenType type, const char *val, int line, int
     t->col = col;
 }
 
-typedef struct { const char *word; TokenType type; } Keyword;
+typedef struct { const char *word; SevenTokenType type; } Keyword;
 
 static const Keyword keywords[] = {
     {"show", TOK_SHOW}, {"set", TOK_SET}, {"to", TOK_TO},
@@ -46,7 +46,7 @@ static const Keyword keywords[] = {
     {NULL, 0}
 };
 
-static TokenType lookup_keyword(const char *word) {
+static SevenTokenType lookup_keyword(const char *word) {
     for (int i = 0; keywords[i].word; i++) {
         if (strcmp(word, keywords[i].word) == 0)
             return keywords[i].type;
@@ -150,7 +150,7 @@ void lexer_tokenize(Lexer *lex) {
             if (len > 255) len = 255;
             memcpy(word, &src[start], len);
             word[len] = '\0';
-            TokenType tt = lookup_keyword(word);
+            SevenTokenType tt = lookup_keyword(word);
             lexer_add(lex, tt, word, line, col);
             continue;
         }
@@ -202,7 +202,7 @@ Token *lexer_next(Lexer *lex) {
     return t;
 }
 
-int lexer_match(Lexer *lex, TokenType type) {
+int lexer_match(Lexer *lex, SevenTokenType type) {
     if (lexer_peek(lex)->type == type) {
         lexer_next(lex);
         return 1;
@@ -210,7 +210,7 @@ int lexer_match(Lexer *lex, TokenType type) {
     return 0;
 }
 
-Token *lexer_expect(Lexer *lex, TokenType type) {
+Token *lexer_expect(Lexer *lex, SevenTokenType type) {
     Token *t = lexer_next(lex);
     if (t->type != type) {
         fprintf(stderr, "%s:%d: error: expected %s, got %s",
@@ -222,7 +222,7 @@ Token *lexer_expect(Lexer *lex, TokenType type) {
     return t;
 }
 
-const char *token_type_name(TokenType t) {
+const char *token_type_name(SevenTokenType t) {
     switch (t) {
         case TOK_INT: return "integer";
         case TOK_STRING: return "string";

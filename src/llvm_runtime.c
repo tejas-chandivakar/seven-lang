@@ -1,5 +1,6 @@
 // ============================================================
 // SEVEN Language — C Runtime Library Implementation
+// Cross-platform: Linux, macOS, Windows (MSVC & MinGW)
 // ============================================================
 
 #include "llvm_runtime.h"
@@ -8,8 +9,20 @@
 #include <string.h>
 #include <ctype.h>
 #include <time.h>
-#include <unistd.h>
-#include <sys/stat.h>
+
+#ifdef _WIN32
+    #define WIN32_LEAN_AND_MEAN
+    #include <windows.h>
+    #include <io.h>
+    #include <direct.h>
+    #include <sys/stat.h>
+    #ifdef _MSC_VER
+        #define strdup _strdup
+    #endif
+#else
+    #include <unistd.h>
+    #include <sys/stat.h>
+#endif
 
 // ---- String functions ----
 
@@ -39,7 +52,7 @@ int64_t seven_str_equal(const char *a, const char *b) {
 
 char *seven_str_from_int(int64_t n) {
     char buf[32];
-    snprintf(buf, sizeof(buf), "%lld", (long long)n);
+    snprintf(buf, sizeof(buf), "%" PRId64, n);
     return strdup(buf);
 }
 
@@ -266,7 +279,7 @@ char *seven_arr_join(int64_t *arr, const char *sep) {
             memcpy(buf + pos, sep, seplen);
             pos += seplen;
         }
-        pos += snprintf(buf + pos, sizeof(buf) - pos, "%lld", (long long)arr[2 + i]);
+        pos += snprintf(buf + pos, sizeof(buf) - pos, "%" PRId64, arr[2 + i]);
     }
     buf[pos] = '\0';
     return strdup(buf);
@@ -378,7 +391,7 @@ int64_t seven_abs_val(int64_t n) {
 
 char *seven_hex(int64_t n) {
     char buf[32];
-    snprintf(buf, sizeof(buf), "%llx", (long long)n);
+    snprintf(buf, sizeof(buf), "%" PRIx64, n);
     return strdup(buf);
 }
 
@@ -444,18 +457,36 @@ int64_t seven_time(void) {
 }
 
 int64_t seven_clock_ns(void) {
+#ifdef _WIN32
+    LARGE_INTEGER freq, count;
+    QueryPerformanceFrequency(&freq);
+    QueryPerformanceCounter(&count);
+    return (int64_t)((double)count.QuadPart / freq.QuadPart * 1000000000.0);
+#else
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (int64_t)ts.tv_sec * 1000000000LL + ts.tv_nsec;
+#endif
 }
 
 void seven_sleep(int64_t seconds) {
+#ifdef _WIN32
+    Sleep((DWORD)(seconds * 1000));
+#else
     sleep((unsigned)seconds);
+#endif
 }
 
 char *seven_env(const char *name) {
+#ifdef _WIN32
+    char buf[4096];
+    DWORD len = GetEnvironmentVariableA(name, buf, sizeof(buf));
+    if (len == 0 || len >= sizeof(buf)) return strdup("");
+    return strdup(buf);
+#else
     const char *val = getenv(name);
     return strdup(val ? val : "");
+#endif
 }
 
 int64_t seven_system(const char *cmd) {
@@ -475,7 +506,7 @@ char *seven_ask(const char *prompt) {
 }
 
 void seven_show_int(int64_t val) {
-    printf("%lld\n", (long long)val);
+    printf("%" PRId64 "\n", val);
 }
 
 void seven_show_str(const char *s) {

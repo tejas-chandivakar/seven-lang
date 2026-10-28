@@ -212,6 +212,26 @@
 
 ---
 
+## Phase 14 — Platform Support (IN PROGRESS)
+**Goal:** Native support on all major platforms
+
+### 14a — Windows Native (COMPLETE)
+- [x] Cross-platform runtime (`llvm_runtime.c`) — Win32 API + POSIX
+- [x] Cross-platform codegen (`llvm_codegen.c`) — exe detection, clang detection, linking
+- [x] Cross-platform CLI (`llvm_main.c`) — `--asm` delegation, `.exe` extension
+- [x] CMake build system (`CMakeLists.txt`) for Windows builds
+- [x] `build.bat` — auto-detects LLVM, configures and builds
+- [x] `install-windows.bat` — one-command setup (installs LLVM + CMake + builds)
+- [x] Portable format specifiers (`PRId64`/`PRIx64`) for MSVC compatibility
+- [x] Windows path handling (backslash + forward slash)
+
+### 14b — Future
+- [ ] macOS native builds (Apple Silicon + x86_64)
+- [ ] Linux ARM64 builds
+- [ ] Package manager integration (winget, brew, apt)
+
+---
+
 ## Future — Performance
 - [ ] LLVM optimization passes (O2/O3)
 - [ ] Constant folding (compile-time evaluation of literal expressions)
@@ -221,7 +241,6 @@
 
 ## Future — Features
 - [ ] Custom backend (like Rust's Cranelift — eventually replace LLVM)
-- [ ] Windows native builds (MSVC target)
 - [ ] WebAssembly target (`--target wasm32`)
 - [ ] Documentation website: sevenlang.org, tutorials
 - [ ] Garbage collector or arena-reset allocator

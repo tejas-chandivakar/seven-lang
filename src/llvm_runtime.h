@@ -6,6 +6,7 @@
 #define SEVEN_RUNTIME_H
 
 #include <stdint.h>
+#include <inttypes.h>
 
 // Tagged value: bit 0 = 1 means pointer (string/array), 0 means integer
 // We use a simpler approach: all values are int64_t

@@ -7,7 +7,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
+
+#ifdef _WIN32
+    #define WIN32_LEAN_AND_MEAN
+    #include <windows.h>
+    #include <io.h>
+    #define PATH_SEP '\\'
+#else
+    #include <unistd.h>
+    #define PATH_SEP '/'
+#endif
 
 // Runtime function refs (declared in declare_externals)
 static LLVMValueRef rt_str_concat, rt_str_len, rt_str_equal;
@@ -1484,21 +1493,131 @@ int seven_codegen_emit(SevenModule *mod, const char *output, int run_after) {
 
     // Find runtime object next to our executable
     char exe_dir[512] = "";
-    ssize_t elen = readlink("/proc/self/exe", exe_dir, sizeof(exe_dir) - 1);
-    if (elen > 0) {
-        exe_dir[elen] = '\0';
-        char *slash = strrchr(exe_dir, '/');
-        if (slash) *(slash + 1) = '\0';
+#ifdef _WIN32
+    {
+        char exe_path[512];
+        DWORD elen = GetModuleFileNameA(NULL, exe_path, sizeof(exe_path));
+        if (elen > 0) {
+            strncpy(exe_dir, exe_path, sizeof(exe_dir) - 1);
+            char *sep = strrchr(exe_dir, '\\');
+            if (!sep) sep = strrchr(exe_dir, '/');
+            if (sep) *(sep + 1) = '\0';
+        }
     }
+#else
+    {
+        ssize_t elen = readlink("/proc/self/exe", exe_dir, sizeof(exe_dir) - 1);
+        if (elen > 0) {
+            exe_dir[elen] = '\0';
+            char *slash = strrchr(exe_dir, '/');
+            if (slash) *(slash + 1) = '\0';
+        }
+    }
+#endif
+
     char rt_obj[512];
     snprintf(rt_obj, sizeof(rt_obj), "%sseven_runtime.o", exe_dir);
 
-    // Link with clang (quote paths for spaces)
-    char cmd[2048];
-    snprintf(cmd, sizeof(cmd), "clang-21 \"%s\" \"%s\" -o \"%s\" -lm 2>&1", obj_path, rt_obj, output);
+    // Detect clang binary
+    const char *clang_bin = NULL;
+#ifdef _WIN32
+    if (system("clang --version >NUL 2>&1") == 0)
+        clang_bin = "clang";
+#else
+    if (system("clang-21 --version >/dev/null 2>&1") == 0)
+        clang_bin = "clang-21";
+    else if (system("clang --version >/dev/null 2>&1") == 0)
+        clang_bin = "clang";
+#endif
+
+    if (!clang_bin) {
+        fprintf(stderr, "error: clang not found. Install LLVM/Clang.\n");
+        remove(obj_path);
+        LLVMDisposeTargetMachine(machine);
+        return 0;
+    }
+
+    // Link: clang user.o runtime.o -o output -lm
+    char cmd[4096];
+#ifdef _WIN32
+    {
+        // Find MSVC and Windows SDK lib paths for the linker
+        char msvc_lib[512] = "";
+        char ucrt_lib[512] = "";
+        char um_lib[512] = "";
+
+        // Try to find VS install via vswhere
+        FILE *vsp = _popen("\"C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vswhere.exe\" -latest -property installationPath 2>NUL", "r");
+        char vs_path[512] = "";
+        if (vsp) {
+            if (fgets(vs_path, sizeof(vs_path), vsp)) {
+                // Strip newline
+                char *nl = strchr(vs_path, '\r');
+                if (nl) *nl = '\0';
+                nl = strchr(vs_path, '\n');
+                if (nl) *nl = '\0';
+            }
+            _pclose(vsp);
+        }
+
+        // Find MSVC tools version
+        if (vs_path[0]) {
+            char search_path[512];
+            snprintf(search_path, sizeof(search_path), "dir /b \"%s\\VC\\Tools\\MSVC\" 2>NUL", vs_path);
+            FILE *dp = _popen(search_path, "r");
+            char msvc_ver[64] = "";
+            if (dp) {
+                char line[64];
+                while (fgets(line, sizeof(line), dp)) {
+                    char *nl2 = strchr(line, '\r');
+                    if (nl2) *nl2 = '\0';
+                    nl2 = strchr(line, '\n');
+                    if (nl2) *nl2 = '\0';
+                    if (line[0]) strncpy(msvc_ver, line, sizeof(msvc_ver) - 1);
+                }
+                _pclose(dp);
+            }
+            if (msvc_ver[0])
+                snprintf(msvc_lib, sizeof(msvc_lib), "%s\\VC\\Tools\\MSVC\\%s\\lib\\x64", vs_path, msvc_ver);
+        }
+
+        // Find Windows SDK version
+        FILE *sdkp = _popen("dir /b \"C:\\Program Files (x86)\\Windows Kits\\10\\Lib\" 2>NUL", "r");
+        char sdk_ver[64] = "";
+        if (sdkp) {
+            char line[64];
+            while (fgets(line, sizeof(line), sdkp)) {
+                char *nl3 = strchr(line, '\r');
+                if (nl3) *nl3 = '\0';
+                nl3 = strchr(line, '\n');
+                if (nl3) *nl3 = '\0';
+                if (line[0] == '1' && line[1] == '0')
+                    strncpy(sdk_ver, line, sizeof(sdk_ver) - 1);
+            }
+            _pclose(sdkp);
+        }
+        if (sdk_ver[0]) {
+            snprintf(ucrt_lib, sizeof(ucrt_lib), "C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\%s\\ucrt\\x64", sdk_ver);
+            snprintf(um_lib, sizeof(um_lib), "C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\%s\\um\\x64", sdk_ver);
+        }
+
+        // Build link command with library paths
+        int off = snprintf(cmd, sizeof(cmd), "%s \"%s\" \"%s\" -o \"%s\"",
+                           clang_bin, obj_path, rt_obj, output);
+        if (msvc_lib[0])
+            off += snprintf(cmd + off, sizeof(cmd) - off, " -L\"%s\"", msvc_lib);
+        if (ucrt_lib[0])
+            off += snprintf(cmd + off, sizeof(cmd) - off, " -L\"%s\"", ucrt_lib);
+        if (um_lib[0])
+            off += snprintf(cmd + off, sizeof(cmd) - off, " -L\"%s\"", um_lib);
+        snprintf(cmd + off, sizeof(cmd) - off, " 2>&1");
+    }
+#else
+    snprintf(cmd, sizeof(cmd), "%s \"%s\" \"%s\" -o \"%s\" -lm 2>&1",
+             clang_bin, obj_path, rt_obj, output);
+#endif
     int ret = system(cmd);
 
-    // Clean up object file
     remove(obj_path);
 
     if (ret != 0) {
@@ -1512,9 +1631,22 @@ int seven_codegen_emit(SevenModule *mod, const char *output, int run_after) {
     // Run if requested
     if (run_after) {
         char run_cmd[512];
+#ifdef _WIN32
+        snprintf(run_cmd, sizeof(run_cmd), "\"%s\"", output);
+#else
         snprintf(run_cmd, sizeof(run_cmd), "\"./%s\"", output);
+#endif
         ret = system(run_cmd);
-        remove(output); // cleanup
+        remove(output);
+#ifdef _WIN32
+        // Also clean up .pdb on Windows
+        char pdb_path[512];
+        snprintf(pdb_path, sizeof(pdb_path), "%s", output);
+        char *dot = strrchr(pdb_path, '.');
+        if (dot) strcpy(dot, ".pdb");
+        else strcat(pdb_path, ".pdb");
+        remove(pdb_path);
+#endif
         LLVMDisposeTargetMachine(machine);
         return (ret == 0);
     }

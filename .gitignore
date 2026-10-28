@@ -3,9 +3,11 @@ dist/
 *.o
 *.obj
 *.exe
+*.pdb
 tools/nasm/
 .vscode/
 .idea/
+.claude/
 
 # Generated assembly and binaries from test runs
 *.asm

@@ -9,7 +9,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
+#ifdef _WIN32
+    #define WIN32_LEAN_AND_MEAN
+    #include <windows.h>
+    #include <process.h>
+#else
+    #include <unistd.h>
+#endif
 #include "llvm_lexer.h"
 #include "llvm_codegen.h"
 
@@ -56,15 +62,32 @@ int main(int argc, char **argv) {
     // Check for --asm flag: delegate to NASM binary
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--asm") == 0) {
-            char exe_path[512] = "";
-            ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
-            if (len > 0) {
-                exe_path[len] = '\0';
-                char *slash = strrchr(exe_path, '/');
-                if (slash) *(slash + 1) = '\0';
+            char exe_dir[512] = "";
+#ifdef _WIN32
+            {
+                char buf[512];
+                DWORD elen = GetModuleFileNameA(NULL, buf, sizeof(buf));
+                if (elen > 0) {
+                    strncpy(exe_dir, buf, sizeof(exe_dir) - 1);
+                    char *sep = strrchr(exe_dir, '\\');
+                    if (!sep) sep = strrchr(exe_dir, '/');
+                    if (sep) *(sep + 1) = '\0';
+                }
             }
             char asm_bin[512];
-            snprintf(asm_bin, sizeof(asm_bin), "%sseven-asm", exe_path);
+            snprintf(asm_bin, sizeof(asm_bin), "%sseven-asm.exe", exe_dir);
+#else
+            {
+                ssize_t elen = readlink("/proc/self/exe", exe_dir, sizeof(exe_dir) - 1);
+                if (elen > 0) {
+                    exe_dir[elen] = '\0';
+                    char *slash = strrchr(exe_dir, '/');
+                    if (slash) *(slash + 1) = '\0';
+                }
+            }
+            char asm_bin[512];
+            snprintf(asm_bin, sizeof(asm_bin), "%sseven-asm", exe_dir);
+#endif
             // Remove --asm from args
             char *new_argv[64];
             int j = 0;
@@ -74,7 +97,12 @@ int main(int argc, char **argv) {
                     new_argv[j++] = argv[k];
             }
             new_argv[j] = NULL;
+#ifdef _WIN32
+            int ret = (int)_spawnv(_P_WAIT, asm_bin, (const char *const *)new_argv);
+            return ret;
+#else
             execv(asm_bin, new_argv);
+#endif
             fprintf(stderr, "error: NASM backend not found at %s\n", asm_bin);
             return 1;
         }
@@ -120,15 +148,19 @@ int main(int argc, char **argv) {
         }
     }
 
-    // Default output name: strip extension, add nothing (ELF) or .exe (Windows)
+    // Default output name: strip extension, add .exe on Windows or Windows target
     char default_output[256];
     if (!output) {
         strncpy(default_output, input, sizeof(default_output) - 5);
         char *dot = strrchr(default_output, '.');
         if (dot) *dot = '\0';
+#ifdef _WIN32
+        strcat(default_output, ".exe");
+#else
         if (target && strstr(target, "windows")) {
             strcat(default_output, ".exe");
         }
+#endif
         output = default_output;
     }
 

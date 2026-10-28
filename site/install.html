@@ -60,18 +60,22 @@
             <!-- Requirements -->
             <section class="mb-12">
                 <h2 class="text-xl font-semibold text-white mb-4">Requirements</h2>
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div class="p-4 rounded-xl border border-white/5 bg-white/[0.02]">
-                        <p class="font-mono text-sm text-seven-400 mb-1">Platform</p>
-                        <p class="text-sm text-gray-400">Linux x86-64</p>
+                        <p class="font-mono text-sm text-seven-400 mb-1">Linux (NASM backend)</p>
+                        <p class="text-sm text-gray-400">NASM + GNU ld + make</p>
                     </div>
                     <div class="p-4 rounded-xl border border-white/5 bg-white/[0.02]">
-                        <p class="font-mono text-sm text-seven-400 mb-1">Assembler</p>
-                        <p class="text-sm text-gray-400">NASM</p>
+                        <p class="font-mono text-sm text-seven-400 mb-1">Linux (LLVM backend)</p>
+                        <p class="text-sm text-gray-400">LLVM 21 + Clang + GCC + make</p>
                     </div>
                     <div class="p-4 rounded-xl border border-white/5 bg-white/[0.02]">
-                        <p class="font-mono text-sm text-seven-400 mb-1">Linker</p>
-                        <p class="text-sm text-gray-400">GNU ld</p>
+                        <p class="font-mono text-sm text-seven-400 mb-1">Windows (Native)</p>
+                        <p class="text-sm text-gray-400">LLVM + CMake</p>
+                    </div>
+                    <div class="p-4 rounded-xl border border-white/5 bg-white/[0.02]">
+                        <p class="font-mono text-sm text-seven-400 mb-1">Windows (WSL)</p>
+                        <p class="text-sm text-gray-400">WSL 2 + Linux requirements</p>
                     </div>
                 </div>
             </section>
@@ -149,10 +153,68 @@ make</code></pre>
                 </div>
             </section>
 
+            <!-- LLVM Backend -->
+            <section class="mb-12 p-6 rounded-2xl border border-seven-600/30 bg-seven-600/5">
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-seven-600/20 text-seven-400 border border-seven-600/30">NEW in v1.4</span>
+                    <h2 class="text-xl font-semibold text-white">LLVM Backend</h2>
+                </div>
+                <p class="text-gray-400 text-sm mb-4">33x faster compilation with native LLVM. The LLVM backend is now the default on all platforms.</p>
+                <div class="code-block rounded-xl border border-white/5 overflow-hidden">
+                    <div class="flex items-center justify-between px-4 py-2.5 border-b border-white/5">
+                        <span class="text-xs text-gray-500 font-mono">Build LLVM backend (Linux)</span>
+                        <button onclick="copyCode(this)" class="copy-btn text-xs text-gray-500 hover:text-white transition px-2 py-1 rounded">Copy</button>
+                    </div>
+                    <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>sudo apt install llvm-21-dev clang-21 gcc
+make llvm</code></pre>
+                </div>
+                <div class="code-block rounded-xl border border-white/5 overflow-hidden mt-4">
+                    <div class="flex items-center justify-between px-4 py-2.5 border-b border-white/5">
+                        <span class="text-xs text-gray-500 font-mono">Usage</span>
+                    </div>
+                    <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>./build/seven-llvm run hello.seven
+./build/seven-llvm build hello.seven -o hello
+<span class="text-emerald-400">Compiled: hello</span></code></pre>
+                </div>
+            </section>
+
+            <!-- Windows Native -->
+            <section class="mb-12">
+                <h2 class="text-xl font-semibold text-white mb-4">Windows (Native)</h2>
+                <p class="text-gray-400 text-sm mb-4">Build SEVEN natively on Windows with LLVM and CMake.</p>
+                <div class="code-block rounded-xl border border-white/5 overflow-hidden">
+                    <div class="flex items-center justify-between px-4 py-2.5 border-b border-white/5">
+                        <span class="text-xs text-gray-500 font-mono">Quick Setup (PowerShell)</span>
+                        <button onclick="copyCode(this)" class="copy-btn text-xs text-gray-500 hover:text-white transition px-2 py-1 rounded">Copy</button>
+                    </div>
+                    <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>git clone https://github.com/tejas-chandivakar/seven-lang.git
+cd seven-lang
+install-windows.bat</code></pre>
+                </div>
+                <p class="text-sm text-gray-500 mt-3">This installs LLVM and CMake via winget and builds <code class="text-gray-400 font-mono text-xs">seven-llvm.exe</code>.</p>
+                <div class="code-block rounded-xl border border-white/5 overflow-hidden mt-4">
+                    <div class="flex items-center justify-between px-4 py-2.5 border-b border-white/5">
+                        <span class="text-xs text-gray-500 font-mono">Manual Setup</span>
+                        <button onclick="copyCode(this)" class="copy-btn text-xs text-gray-500 hover:text-white transition px-2 py-1 rounded">Copy</button>
+                    </div>
+                    <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>winget install LLVM.LLVM
+winget install Kitware.CMake
+build.bat</code></pre>
+                </div>
+                <div class="code-block rounded-xl border border-white/5 overflow-hidden mt-4">
+                    <div class="flex items-center justify-between px-4 py-2.5 border-b border-white/5">
+                        <span class="text-xs text-gray-500 font-mono">Usage</span>
+                    </div>
+                    <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>build\seven-llvm.exe run hello.seven
+build\seven-llvm.exe build hello.seven -o hello.exe
+<span class="text-emerald-400">Compiled: hello.exe</span></code></pre>
+                </div>
+            </section>
+
             <!-- Windows WSL -->
             <section class="mb-12">
                 <h2 class="text-xl font-semibold text-white mb-4">Windows (via WSL)</h2>
-                <p class="text-gray-400 text-sm mb-4">SEVEN runs on Windows through the Windows Subsystem for Linux.</p>
+                <p class="text-gray-400 text-sm mb-4">Alternatively, run SEVEN through the Windows Subsystem for Linux.</p>
                 <div class="code-block rounded-xl border border-white/5 overflow-hidden">
                     <div class="flex items-center justify-between px-4 py-2.5 border-b border-white/5">
                         <span class="text-xs text-gray-500 font-mono">PowerShell (one-time setup)</span>

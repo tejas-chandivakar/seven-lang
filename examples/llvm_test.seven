@@ -1,0 +1,56 @@
+!! LLVM Backend Test
+show "=== SEVEN LLVM Backend ==="
+
+!! Variables and math
+x = 10
+y = 20
+z = x + y
+show z
+
+!! Arithmetic
+show x * y
+show 100 - 37
+show 144 / 12
+
+!! If/else
+if x above 5
+    show "x is above 5"
+else
+    show "x is 5 or below"
+end
+
+!! While loop
+i = 0
+total = 0
+while i below 10
+    total = total + i
+    i = i + 1
+done
+show total
+
+!! Function
+func square(n)
+    result = n * n
+end
+
+show square(7)
+show square(12)
+
+!! Repeat
+count = 0
+repeat 5
+    count = count + 1
+done
+show count
+
+!! Nested if
+a = 15
+if a above 20
+    show "big"
+elif a above 10
+    show "medium"
+else
+    show "small"
+end
+
+show "=== All tests passed! ==="

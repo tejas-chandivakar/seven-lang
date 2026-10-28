@@ -41,7 +41,17 @@ SEVEN_BIN := $(BUILD_DIR)/seven
 
 ALL_OBJS := $(MAIN_OBJ) $(LEXER_OBJ) $(CODEGEN_OBJ) $(RUNTIME_OBJ) $(INTERP_OBJ)
 
-.PHONY: all seven test test-lex clean dirs dist
+# LLVM backend
+CC       := gcc
+CLANG    := clang-21
+LLVM_CONFIG := llvm-config-21
+LLVM_CFLAGS  = $(shell $(LLVM_CONFIG) --cflags 2>/dev/null)
+LLVM_LDFLAGS = $(shell $(LLVM_CONFIG) --ldflags --libs core analysis native bitwriter 2>/dev/null) -lm
+
+LLVM_SRCS := $(SRC_DIR)/llvm_main.c $(SRC_DIR)/llvm_lexer.c $(SRC_DIR)/llvm_codegen.c
+SEVEN_LLVM := $(BUILD_DIR)/seven-llvm
+
+.PHONY: all seven llvm test test-lex clean dirs dist
 
 all: seven
 
@@ -64,6 +74,12 @@ $(RUNTIME_OBJ): $(RUNTIME_SRC)
 
 $(INTERP_OBJ): $(INTERP_SRC)
 	$(NASM) $(NASMFLAGS) $< -o $@
+
+# LLVM backend build
+llvm: dirs $(SEVEN_LLVM)
+
+$(SEVEN_LLVM): $(LLVM_SRCS)
+	$(CC) -O2 $(LLVM_CFLAGS) -I$(SRC_DIR) $^ -o $@ $(LLVM_LDFLAGS)
 
 dirs:
 	@mkdir -p $(BUILD_DIR)

@@ -1,0 +1,7 @@
+total = 0
+i = 0
+while i below 100000000
+    total = total + 1
+    i = i + 1
+done
+show total

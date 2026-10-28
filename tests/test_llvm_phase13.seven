@@ -1,0 +1,76 @@
+!! SEVEN LLVM Phase 13 — Full Feature Test
+
+!! --- Strings ---
+name = "SEVEN"
+greeting = "Hello, " + name + "!"
+show greeting
+
+!! String methods
+show upper("hello")
+show lower("WORLD")
+show trim("  spaces  ")
+show len("test")
+
+!! String comparison
+if "abc" is "abc"
+    show "string equality works"
+end
+
+!! String concat with int
+show "Version: " + str(13)
+
+!! --- Arrays ---
+nums = [10, 20, 30, 40, 50]
+show len(nums)
+
+!! Array subscript
+show nums[0]
+show nums[2]
+
+!! Each loop
+total = 0
+each nums as n
+    total = total + n
+done
+show total
+
+!! Push / Pop
+push nums, 60
+show len(nums)
+
+!! Range
+r = range(1, 6, 1)
+show len(r)
+
+!! --- Math builtins ---
+show pow(2, 10)
+show abs(-42)
+show sign(-7)
+show gcd(12, 8)
+show clamp(15, 0, 10)
+
+!! --- Conversion ---
+show hex(255)
+show bin(10)
+show bool(1)
+
+!! --- Builtin str functions ---
+show contains("hello world", "world")
+show replace("foo bar foo", "foo", "baz")
+show substr("abcdef", 1, 3)
+show char_at("hello", 0)
+show ord("A")
+show chr(65)
+
+!! --- Functions with strings ---
+func greet(who)
+    result = 0
+end
+show greet("world")
+
+!! --- Assert ---
+assert(1 is 1, "basic assert")
+assert(len("test") is 4, "len assert")
+assert(pow(2, 3) is 8, "pow assert")
+
+show "=== Phase 13 All Tests Passed! ==="

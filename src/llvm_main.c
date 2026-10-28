@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include "llvm_lexer.h"
 #include "llvm_codegen.h"
 
@@ -30,22 +31,65 @@ static char *read_file(const char *path) {
 
 static void print_usage(void) {
     fprintf(stderr,
-        "SEVEN LLVM Compiler v1.3\n"
+        "SEVEN Language v1.4 — Write Simple. Run Native.\n"
         "\n"
-        "Usage: seven-llvm <command> <file.seven> [options]\n"
+        "Usage: seven <command> <file.seven> [options]\n"
         "\n"
         "Commands:\n"
-        "  build <file>   Compile to native executable\n"
+        "  build <file>   Compile to native executable (LLVM)\n"
         "  run   <file>   Compile and run immediately\n"
         "\n"
         "Options:\n"
         "  -o <output>    Output file name\n"
         "  --emit-ir      Print LLVM IR to stdout\n"
         "  --target <t>   Target triple (e.g. x86_64-pc-windows-msvc)\n"
+        "  --asm          Use NASM x86-64 backend instead of LLVM\n"
         "\n");
 }
 
 int main(int argc, char **argv) {
+    if (argc < 2) {
+        print_usage();
+        return 1;
+    }
+
+    // Check for --asm flag: delegate to NASM binary
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--asm") == 0) {
+            char exe_path[512] = "";
+            ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
+            if (len > 0) {
+                exe_path[len] = '\0';
+                char *slash = strrchr(exe_path, '/');
+                if (slash) *(slash + 1) = '\0';
+            }
+            char asm_bin[512];
+            snprintf(asm_bin, sizeof(asm_bin), "%sseven-asm", exe_path);
+            // Remove --asm from args
+            char *new_argv[64];
+            int j = 0;
+            new_argv[j++] = asm_bin;
+            for (int k = 1; k < argc && j < 63; k++) {
+                if (strcmp(argv[k], "--asm") != 0)
+                    new_argv[j++] = argv[k];
+            }
+            new_argv[j] = NULL;
+            execv(asm_bin, new_argv);
+            fprintf(stderr, "error: NASM backend not found at %s\n", asm_bin);
+            return 1;
+        }
+    }
+
+    // Version / help
+    if (strcmp(argv[1], "--version") == 0 || strcmp(argv[1], "-v") == 0) {
+        printf("SEVEN v1.4 (LLVM backend)\n");
+        return 0;
+    }
+    if (strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0) {
+        print_usage();
+        return 0;
+    }
+
     if (argc < 3) {
         print_usage();
         return 1;

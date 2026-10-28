@@ -1,12 +1,33 @@
 // ============================================================
 // SEVEN Language — LLVM Code Generator Implementation
-// Phase 13a: show (print), variables, math, if/while
+// Phase 13: Full LLVM backend with strings, arrays, stdlib
 // ============================================================
 
 #include "llvm_codegen.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+
+// Runtime function refs (declared in declare_externals)
+static LLVMValueRef rt_str_concat, rt_str_len, rt_str_equal;
+static LLVMValueRef rt_str_upper, rt_str_lower, rt_str_trim;
+static LLVMValueRef rt_str_contains, rt_str_replace, rt_str_substr;
+static LLVMValueRef rt_str_find, rt_str_count, rt_str_pad;
+static LLVMValueRef rt_str_from_int, rt_str_to_int;
+static LLVMValueRef rt_ord, rt_chr, rt_str_char_at;
+static LLVMValueRef rt_arr_new, rt_arr_len, rt_arr_push, rt_arr_pop;
+static LLVMValueRef rt_arr_get, rt_arr_set, rt_arr_sort, rt_arr_reverse;
+static LLVMValueRef rt_arr_join, rt_arr_range, rt_arr_find, rt_arr_unique;
+static LLVMValueRef rt_arr_fill, rt_arr_slice, rt_arr_concat;
+static LLVMValueRef rt_arr_insert, rt_arr_remove;
+static LLVMValueRef rt_pow, rt_clamp, rt_sign, rt_gcd;
+static LLVMValueRef rt_sum, rt_avg, rt_abs_val;
+static LLVMValueRef rt_hex, rt_bin, rt_bool_fn, rt_number;
+static LLVMValueRef rt_file_exists, rt_file_write, rt_file_read;
+static LLVMValueRef rt_file_append, rt_file_delete;
+static LLVMValueRef rt_time, rt_clock_ns, rt_sleep_fn, rt_env, rt_system_fn;
+static LLVMValueRef rt_ask, rt_show_int, rt_show_str;
 
 // ---- Forward declarations ----
 static void compile_statement(SevenModule *mod);
@@ -19,6 +40,15 @@ static void compile_repeat(SevenModule *mod);
 static void compile_func_def(SevenModule *mod);
 static void compile_func_call(SevenModule *mod, const char *name);
 static void compile_assert(SevenModule *mod);
+static void compile_each(SevenModule *mod);
+static void compile_push(SevenModule *mod);
+static void compile_pop(SevenModule *mod);
+static void compile_write_file(SevenModule *mod);
+static void compile_read_file(SevenModule *mod);
+static void compile_delete_file(SevenModule *mod);
+static void compile_append_file(SevenModule *mod);
+static LLVMValueRef compile_builtin_call(SevenModule *mod, const char *name);
+static LLVMValueRef compile_array_literal(SevenModule *mod);
 
 static void skip_newlines(SevenModule *mod) {
     while (lexer_peek(mod->lex)->type == TOK_NEWLINE)
@@ -62,6 +92,29 @@ static VarInfo *create_var(SevenModule *mod, const char *name, int is_string) {
     return v;
 }
 
+// ---- Helpers ----
+static LLVMValueRef load_var(SevenModule *mod, VarInfo *v) {
+    LLVMValueRef raw = LLVMBuildLoad2(mod->builder, LLVMInt64TypeInContext(mod->ctx), v->alloca, v->name);
+    if (v->is_string >= 1)
+        return LLVMBuildIntToPtr(mod->builder, raw, LLVMPointerTypeInContext(mod->ctx, 0), "ptr");
+    return raw;
+}
+
+static LLVMValueRef val_to_ptr(SevenModule *mod, LLVMValueRef val) {
+    if (LLVMGetTypeKind(LLVMTypeOf(val)) == LLVMPointerTypeKind) return val;
+    return LLVMBuildIntToPtr(mod->builder, val, LLVMPointerTypeInContext(mod->ctx, 0), "toptr");
+}
+
+static LLVMValueRef val_to_i64(SevenModule *mod, LLVMValueRef val) {
+    if (LLVMGetTypeKind(LLVMTypeOf(val)) == LLVMPointerTypeKind)
+        return LLVMBuildPtrToInt(mod->builder, val, LLVMInt64TypeInContext(mod->ctx), "toi64");
+    return val;
+}
+
+static int is_ptr_val(LLVMValueRef val) {
+    return LLVMGetTypeKind(LLVMTypeOf(val)) == LLVMPointerTypeKind;
+}
+
 // ---- External function declarations ----
 static void declare_externals(SevenModule *mod) {
     LLVMTypeRef i8ptr = LLVMPointerTypeInContext(mod->ctx, 0);
@@ -84,6 +137,91 @@ static void declare_externals(SevenModule *mod) {
     mod->fmt_int = LLVMBuildGlobalStringPtr(mod->builder, "%lld", "fmt_int");
     mod->fmt_str = LLVMBuildGlobalStringPtr(mod->builder, "%s", "fmt_str");
     mod->fmt_newline = LLVMBuildGlobalStringPtr(mod->builder, "\n", "fmt_nl");
+
+    LLVMTypeRef v = LLVMVoidTypeInContext(mod->ctx);
+
+    // Helper to declare a function
+    #define FN(var, cname, ret, n, ...) { \
+        LLVMTypeRef a[] = { __VA_ARGS__ }; \
+        var = LLVMAddFunction(mod->module, cname, LLVMFunctionType(ret, a, n, 0)); \
+    }
+    #define FN0(var, cname, ret) \
+        var = LLVMAddFunction(mod->module, cname, LLVMFunctionType(ret, NULL, 0, 0));
+
+    // String
+    FN(rt_str_concat, "seven_str_concat", i8ptr, 2, i8ptr, i8ptr);
+    FN(rt_str_len, "seven_str_len", i64, 1, i8ptr);
+    FN(rt_str_equal, "seven_str_equal", i64, 2, i8ptr, i8ptr);
+    FN(rt_str_upper, "seven_str_upper", i8ptr, 1, i8ptr);
+    FN(rt_str_lower, "seven_str_lower", i8ptr, 1, i8ptr);
+    FN(rt_str_trim, "seven_str_trim", i8ptr, 1, i8ptr);
+    FN(rt_str_contains, "seven_str_contains", i64, 2, i8ptr, i8ptr);
+    FN(rt_str_replace, "seven_str_replace", i8ptr, 3, i8ptr, i8ptr, i8ptr);
+    FN(rt_str_substr, "seven_str_substr", i8ptr, 3, i8ptr, i64, i64);
+    FN(rt_str_find, "seven_str_find", i64, 2, i8ptr, i8ptr);
+    FN(rt_str_count, "seven_str_count", i64, 2, i8ptr, i8ptr);
+    FN(rt_str_pad, "seven_str_pad", i8ptr, 3, i8ptr, i64, i8ptr);
+    FN(rt_str_from_int, "seven_str_from_int", i8ptr, 1, i64);
+    FN(rt_str_to_int, "seven_str_to_int", i64, 1, i8ptr);
+    FN(rt_ord, "seven_ord", i64, 1, i8ptr);
+    FN(rt_chr, "seven_chr", i8ptr, 1, i64);
+    FN(rt_str_char_at, "seven_str_char_at", i8ptr, 2, i8ptr, i64);
+
+    // Array
+    FN0(rt_arr_new, "seven_arr_new", i8ptr);
+    FN(rt_arr_len, "seven_arr_len", i64, 1, i8ptr);
+    FN(rt_arr_push, "seven_arr_push", v, 2, i8ptr, i64);
+    FN(rt_arr_pop, "seven_arr_pop", i64, 1, i8ptr);
+    FN(rt_arr_get, "seven_arr_get", i64, 2, i8ptr, i64);
+    FN(rt_arr_set, "seven_arr_set", v, 3, i8ptr, i64, i64);
+    FN(rt_arr_sort, "seven_arr_sort", v, 1, i8ptr);
+    FN(rt_arr_reverse, "seven_arr_reverse", v, 1, i8ptr);
+    FN(rt_arr_join, "seven_arr_join", i8ptr, 2, i8ptr, i8ptr);
+    FN(rt_arr_range, "seven_arr_range", i8ptr, 3, i64, i64, i64);
+    FN(rt_arr_find, "seven_arr_find", i64, 2, i8ptr, i64);
+    FN(rt_arr_unique, "seven_arr_unique", i8ptr, 1, i8ptr);
+    FN(rt_arr_fill, "seven_arr_fill", i8ptr, 2, i64, i64);
+    FN(rt_arr_slice, "seven_arr_slice", i8ptr, 3, i8ptr, i64, i64);
+    FN(rt_arr_concat, "seven_arr_concat", i8ptr, 2, i8ptr, i8ptr);
+    FN(rt_arr_insert, "seven_arr_insert", v, 3, i8ptr, i64, i64);
+    FN(rt_arr_remove, "seven_arr_remove", v, 2, i8ptr, i64);
+
+    // Math
+    FN(rt_pow, "seven_pow", i64, 2, i64, i64);
+    FN(rt_clamp, "seven_clamp", i64, 3, i64, i64, i64);
+    FN(rt_sign, "seven_sign", i64, 1, i64);
+    FN(rt_gcd, "seven_gcd", i64, 2, i64, i64);
+    FN(rt_sum, "seven_sum", i64, 1, i8ptr);
+    FN(rt_avg, "seven_avg", i64, 1, i8ptr);
+    FN(rt_abs_val, "seven_abs_val", i64, 1, i64);
+
+    // Conversion
+    FN(rt_hex, "seven_hex", i8ptr, 1, i64);
+    FN(rt_bin, "seven_bin", i8ptr, 1, i64);
+    FN(rt_bool_fn, "seven_bool", i64, 1, i64);
+    FN(rt_number, "seven_number", i64, 1, i8ptr);
+
+    // File I/O
+    FN(rt_file_exists, "seven_file_exists", i64, 1, i8ptr);
+    FN(rt_file_write, "seven_file_write", v, 2, i8ptr, i8ptr);
+    FN(rt_file_read, "seven_file_read", i8ptr, 1, i8ptr);
+    FN(rt_file_append, "seven_file_append", v, 2, i8ptr, i8ptr);
+    FN(rt_file_delete, "seven_file_delete", v, 1, i8ptr);
+
+    // OS
+    FN0(rt_time, "seven_time", i64);
+    FN0(rt_clock_ns, "seven_clock_ns", i64);
+    FN(rt_sleep_fn, "seven_sleep", v, 1, i64);
+    FN(rt_env, "seven_env", i8ptr, 1, i8ptr);
+    FN(rt_system_fn, "seven_system", i64, 1, i8ptr);
+
+    // I/O
+    FN(rt_ask, "seven_ask", i8ptr, 1, i8ptr);
+    FN(rt_show_int, "seven_show_int", v, 1, i64);
+    FN(rt_show_str, "seven_show_str", v, 1, i8ptr);
+
+    #undef FN
+    #undef FN0
 }
 
 // ---- Codegen init ----
@@ -134,11 +272,183 @@ static LLVMValueRef compile_primary(SevenModule *mod) {
 
             // Check for function call: ident(
             if (lexer_peek(mod->lex)->type == TOK_LPAREN) {
+                // Try builtin first
+                LLVMValueRef bv = compile_builtin_call(mod, name);
+                if (bv) return bv;
+
+                // User-defined function
                 compile_func_call(mod, name);
-                // Get the return value from the call
                 LLVMBasicBlockRef bb = LLVMGetInsertBlock(mod->builder);
                 LLVMValueRef last = LLVMGetLastInstruction(bb);
                 return last;
+            }
+
+            // Check for method call: ident.method(args)
+            if (lexer_peek(mod->lex)->type == TOK_DOT) {
+                VarInfo *v = find_var(mod, name);
+                if (!v) {
+                    fprintf(stderr, "error: undefined variable '%s'\n", name);
+                    return LLVMConstInt(LLVMInt64TypeInContext(mod->ctx), 0, 0);
+                }
+                LLVMValueRef obj = load_var(mod, v);
+                lexer_next(mod->lex); // skip .
+                Token *method = lexer_expect(mod->lex, TOK_IDENT);
+                const char *mname = method->value;
+                lexer_expect(mod->lex, TOK_LPAREN);
+
+                // String methods
+                if (strcmp(mname, "len") == 0) {
+                    lexer_expect(mod->lex, TOK_RPAREN);
+                    if (v->is_string == 2) {
+                        LLVMValueRef args[] = { obj };
+                        return LLVMBuildCall2(mod->builder, LLVMFunctionType(LLVMInt64TypeInContext(mod->ctx), (LLVMTypeRef[]){LLVMPointerTypeInContext(mod->ctx,0)}, 1, 0), rt_arr_len, args, 1, "len");
+                    } else {
+                        LLVMValueRef args[] = { obj };
+                        return LLVMBuildCall2(mod->builder, LLVMFunctionType(LLVMInt64TypeInContext(mod->ctx), (LLVMTypeRef[]){LLVMPointerTypeInContext(mod->ctx,0)}, 1, 0), rt_str_len, args, 1, "len");
+                    }
+                } else if (strcmp(mname, "upper") == 0) {
+                    lexer_expect(mod->lex, TOK_RPAREN);
+                    LLVMValueRef args[] = { obj };
+                    return LLVMBuildCall2(mod->builder, LLVMFunctionType(LLVMPointerTypeInContext(mod->ctx,0), (LLVMTypeRef[]){LLVMPointerTypeInContext(mod->ctx,0)}, 1, 0), rt_str_upper, args, 1, "upper");
+                } else if (strcmp(mname, "lower") == 0) {
+                    lexer_expect(mod->lex, TOK_RPAREN);
+                    LLVMValueRef args[] = { obj };
+                    return LLVMBuildCall2(mod->builder, LLVMFunctionType(LLVMPointerTypeInContext(mod->ctx,0), (LLVMTypeRef[]){LLVMPointerTypeInContext(mod->ctx,0)}, 1, 0), rt_str_lower, args, 1, "lower");
+                } else if (strcmp(mname, "trim") == 0) {
+                    lexer_expect(mod->lex, TOK_RPAREN);
+                    LLVMValueRef args[] = { obj };
+                    return LLVMBuildCall2(mod->builder, LLVMFunctionType(LLVMPointerTypeInContext(mod->ctx,0), (LLVMTypeRef[]){LLVMPointerTypeInContext(mod->ctx,0)}, 1, 0), rt_str_trim, args, 1, "trim");
+                } else if (strcmp(mname, "contains") == 0) {
+                    LLVMValueRef arg = compile_expr(mod);
+                    lexer_expect(mod->lex, TOK_RPAREN);
+                    LLVMTypeRef pt = LLVMPointerTypeInContext(mod->ctx, 0);
+                    LLVMValueRef args[] = { obj, arg };
+                    return LLVMBuildCall2(mod->builder, LLVMFunctionType(LLVMInt64TypeInContext(mod->ctx), (LLVMTypeRef[]){pt, pt}, 2, 0), rt_str_contains, args, 2, "contains");
+                } else if (strcmp(mname, "replace") == 0) {
+                    LLVMValueRef a1 = compile_expr(mod);
+                    lexer_expect(mod->lex, TOK_COMMA);
+                    LLVMValueRef a2 = compile_expr(mod);
+                    lexer_expect(mod->lex, TOK_RPAREN);
+                    LLVMTypeRef pt = LLVMPointerTypeInContext(mod->ctx, 0);
+                    LLVMValueRef args[] = { obj, a1, a2 };
+                    return LLVMBuildCall2(mod->builder, LLVMFunctionType(pt, (LLVMTypeRef[]){pt, pt, pt}, 3, 0), rt_str_replace, args, 3, "replace");
+                } else if (strcmp(mname, "find") == 0) {
+                    LLVMValueRef a1 = compile_expr(mod);
+                    lexer_expect(mod->lex, TOK_RPAREN);
+                    LLVMTypeRef pt = LLVMPointerTypeInContext(mod->ctx, 0);
+                    if (v->is_string == 1) {
+                        LLVMValueRef args[] = { obj, a1 };
+                        return LLVMBuildCall2(mod->builder, LLVMFunctionType(LLVMInt64TypeInContext(mod->ctx), (LLVMTypeRef[]){pt, pt}, 2, 0), rt_str_find, args, 2, "find");
+                    } else {
+                        LLVMValueRef args[] = { obj, val_to_i64(mod, a1) };
+                        LLVMTypeRef i64 = LLVMInt64TypeInContext(mod->ctx);
+                        return LLVMBuildCall2(mod->builder, LLVMFunctionType(i64, (LLVMTypeRef[]){pt, i64}, 2, 0), rt_arr_find, args, 2, "find");
+                    }
+                } else if (strcmp(mname, "push") == 0) {
+                    LLVMValueRef a1 = compile_expr(mod);
+                    lexer_expect(mod->lex, TOK_RPAREN);
+                    LLVMTypeRef pt = LLVMPointerTypeInContext(mod->ctx, 0);
+                    LLVMTypeRef i64 = LLVMInt64TypeInContext(mod->ctx);
+                    LLVMValueRef args[] = { obj, val_to_i64(mod, a1) };
+                    LLVMBuildCall2(mod->builder, LLVMFunctionType(LLVMVoidTypeInContext(mod->ctx), (LLVMTypeRef[]){pt, i64}, 2, 0), rt_arr_push, args, 2, "");
+                    return obj;
+                } else if (strcmp(mname, "pop") == 0) {
+                    lexer_expect(mod->lex, TOK_RPAREN);
+                    LLVMTypeRef pt = LLVMPointerTypeInContext(mod->ctx, 0);
+                    LLVMValueRef args[] = { obj };
+                    return LLVMBuildCall2(mod->builder, LLVMFunctionType(LLVMInt64TypeInContext(mod->ctx), (LLVMTypeRef[]){pt}, 1, 0), rt_arr_pop, args, 1, "pop");
+                } else if (strcmp(mname, "sort") == 0) {
+                    lexer_expect(mod->lex, TOK_RPAREN);
+                    LLVMTypeRef pt = LLVMPointerTypeInContext(mod->ctx, 0);
+                    LLVMValueRef args[] = { obj };
+                    LLVMBuildCall2(mod->builder, LLVMFunctionType(LLVMVoidTypeInContext(mod->ctx), (LLVMTypeRef[]){pt}, 1, 0), rt_arr_sort, args, 1, "");
+                    return obj;
+                } else if (strcmp(mname, "reverse") == 0) {
+                    lexer_expect(mod->lex, TOK_RPAREN);
+                    LLVMTypeRef pt = LLVMPointerTypeInContext(mod->ctx, 0);
+                    LLVMValueRef args[] = { obj };
+                    LLVMBuildCall2(mod->builder, LLVMFunctionType(LLVMVoidTypeInContext(mod->ctx), (LLVMTypeRef[]){pt}, 1, 0), rt_arr_reverse, args, 1, "");
+                    return obj;
+                } else if (strcmp(mname, "join") == 0) {
+                    LLVMValueRef a1 = compile_expr(mod);
+                    lexer_expect(mod->lex, TOK_RPAREN);
+                    LLVMTypeRef pt = LLVMPointerTypeInContext(mod->ctx, 0);
+                    LLVMValueRef args[] = { obj, a1 };
+                    return LLVMBuildCall2(mod->builder, LLVMFunctionType(pt, (LLVMTypeRef[]){pt, pt}, 2, 0), rt_arr_join, args, 2, "join");
+                } else if (strcmp(mname, "unique") == 0) {
+                    lexer_expect(mod->lex, TOK_RPAREN);
+                    LLVMTypeRef pt = LLVMPointerTypeInContext(mod->ctx, 0);
+                    LLVMValueRef args[] = { obj };
+                    return LLVMBuildCall2(mod->builder, LLVMFunctionType(pt, (LLVMTypeRef[]){pt}, 1, 0), rt_arr_unique, args, 1, "unique");
+                } else if (strcmp(mname, "slice") == 0) {
+                    LLVMValueRef a1 = compile_expr(mod);
+                    lexer_expect(mod->lex, TOK_COMMA);
+                    LLVMValueRef a2 = compile_expr(mod);
+                    lexer_expect(mod->lex, TOK_RPAREN);
+                    LLVMTypeRef pt = LLVMPointerTypeInContext(mod->ctx, 0);
+                    LLVMTypeRef i64 = LLVMInt64TypeInContext(mod->ctx);
+                    LLVMValueRef args[] = { obj, val_to_i64(mod, a1), val_to_i64(mod, a2) };
+                    return LLVMBuildCall2(mod->builder, LLVMFunctionType(pt, (LLVMTypeRef[]){pt, i64, i64}, 3, 0), rt_arr_slice, args, 3, "slice");
+                } else if (strcmp(mname, "get") == 0) {
+                    LLVMValueRef a1 = compile_expr(mod);
+                    lexer_expect(mod->lex, TOK_RPAREN);
+                    LLVMTypeRef pt = LLVMPointerTypeInContext(mod->ctx, 0);
+                    LLVMTypeRef i64 = LLVMInt64TypeInContext(mod->ctx);
+                    LLVMValueRef args[] = { obj, val_to_i64(mod, a1) };
+                    return LLVMBuildCall2(mod->builder, LLVMFunctionType(i64, (LLVMTypeRef[]){pt, i64}, 2, 0), rt_arr_get, args, 2, "get");
+                } else if (strcmp(mname, "set") == 0) {
+                    LLVMValueRef a1 = compile_expr(mod);
+                    lexer_expect(mod->lex, TOK_COMMA);
+                    LLVMValueRef a2 = compile_expr(mod);
+                    lexer_expect(mod->lex, TOK_RPAREN);
+                    LLVMTypeRef pt = LLVMPointerTypeInContext(mod->ctx, 0);
+                    LLVMTypeRef i64 = LLVMInt64TypeInContext(mod->ctx);
+                    LLVMValueRef args[] = { obj, val_to_i64(mod, a1), val_to_i64(mod, a2) };
+                    LLVMBuildCall2(mod->builder, LLVMFunctionType(LLVMVoidTypeInContext(mod->ctx), (LLVMTypeRef[]){pt, i64, i64}, 3, 0), rt_arr_set, args, 3, "");
+                    return obj;
+                } else if (strcmp(mname, "substr") == 0) {
+                    LLVMValueRef a1 = compile_expr(mod);
+                    lexer_expect(mod->lex, TOK_COMMA);
+                    LLVMValueRef a2 = compile_expr(mod);
+                    lexer_expect(mod->lex, TOK_RPAREN);
+                    LLVMTypeRef pt = LLVMPointerTypeInContext(mod->ctx, 0);
+                    LLVMTypeRef i64 = LLVMInt64TypeInContext(mod->ctx);
+                    LLVMValueRef args[] = { obj, val_to_i64(mod, a1), val_to_i64(mod, a2) };
+                    return LLVMBuildCall2(mod->builder, LLVMFunctionType(pt, (LLVMTypeRef[]){pt, i64, i64}, 3, 0), rt_str_substr, args, 3, "substr");
+                } else if (strcmp(mname, "count") == 0) {
+                    LLVMValueRef a1 = compile_expr(mod);
+                    lexer_expect(mod->lex, TOK_RPAREN);
+                    LLVMTypeRef pt = LLVMPointerTypeInContext(mod->ctx, 0);
+                    LLVMValueRef args[] = { obj, a1 };
+                    return LLVMBuildCall2(mod->builder, LLVMFunctionType(LLVMInt64TypeInContext(mod->ctx), (LLVMTypeRef[]){pt, pt}, 2, 0), rt_str_count, args, 2, "count");
+                } else if (strcmp(mname, "char_at") == 0) {
+                    LLVMValueRef a1 = compile_expr(mod);
+                    lexer_expect(mod->lex, TOK_RPAREN);
+                    LLVMTypeRef pt = LLVMPointerTypeInContext(mod->ctx, 0);
+                    LLVMTypeRef i64 = LLVMInt64TypeInContext(mod->ctx);
+                    LLVMValueRef args[] = { obj, val_to_i64(mod, a1) };
+                    return LLVMBuildCall2(mod->builder, LLVMFunctionType(pt, (LLVMTypeRef[]){pt, i64}, 2, 0), rt_str_char_at, args, 2, "char_at");
+                } else {
+                    fprintf(stderr, "error: unknown method '%s'\n", mname);
+                    return LLVMConstInt(LLVMInt64TypeInContext(mod->ctx), 0, 0);
+                }
+            }
+
+            // Check for array subscript: ident[expr]
+            if (lexer_peek(mod->lex)->type == TOK_LBRACKET) {
+                VarInfo *v = find_var(mod, name);
+                if (!v) {
+                    fprintf(stderr, "error: undefined variable '%s'\n", name);
+                    return LLVMConstInt(LLVMInt64TypeInContext(mod->ctx), 0, 0);
+                }
+                LLVMValueRef arr = load_var(mod, v);
+                lexer_next(mod->lex); // skip [
+                LLVMValueRef idx = compile_expr(mod);
+                lexer_expect(mod->lex, TOK_RBRACKET);
+                LLVMTypeRef pt = LLVMPointerTypeInContext(mod->ctx, 0);
+                LLVMTypeRef i64 = LLVMInt64TypeInContext(mod->ctx);
+                LLVMValueRef args[] = { arr, val_to_i64(mod, idx) };
+                return LLVMBuildCall2(mod->builder, LLVMFunctionType(i64, (LLVMTypeRef[]){pt, i64}, 2, 0), rt_arr_get, args, 2, "aget");
             }
 
             VarInfo *v = find_var(mod, name);
@@ -146,7 +456,7 @@ static LLVMValueRef compile_primary(SevenModule *mod) {
                 fprintf(stderr, "error: undefined variable '%s'\n", name);
                 return LLVMConstInt(LLVMInt64TypeInContext(mod->ctx), 0, 0);
             }
-            return LLVMBuildLoad2(mod->builder, LLVMInt64TypeInContext(mod->ctx), v->alloca, name);
+            return load_var(mod, v);
         }
 
         case TOK_LPAREN: {
@@ -154,6 +464,19 @@ static LLVMValueRef compile_primary(SevenModule *mod) {
             LLVMValueRef val = compile_expr(mod);
             lexer_expect(mod->lex, TOK_RPAREN);
             return val;
+        }
+
+        case TOK_LBRACKET:
+            return compile_array_literal(mod);
+
+        case TOK_ASK: {
+            lexer_next(mod->lex);
+            lexer_expect(mod->lex, TOK_LPAREN);
+            LLVMValueRef prompt = compile_expr(mod);
+            lexer_expect(mod->lex, TOK_RPAREN);
+            LLVMTypeRef pt = LLVMPointerTypeInContext(mod->ctx, 0);
+            LLVMValueRef args[] = { prompt };
+            return LLVMBuildCall2(mod->builder, LLVMFunctionType(pt, (LLVMTypeRef[]){pt}, 1, 0), rt_ask, args, 1, "ask");
         }
 
         case TOK_NOT: {
@@ -210,7 +533,20 @@ static LLVMValueRef compile_additive(SevenModule *mod) {
         if (t->type == TOK_PLUS) {
             lexer_next(mod->lex);
             LLVMValueRef right = compile_multiplicative(mod);
-            left = LLVMBuildAdd(mod->builder, left, right, "add");
+            if (is_ptr_val(left) || is_ptr_val(right)) {
+                // String concatenation
+                LLVMValueRef l = is_ptr_val(left) ? left : LLVMBuildCall2(mod->builder,
+                    LLVMFunctionType(LLVMPointerTypeInContext(mod->ctx,0), (LLVMTypeRef[]){LLVMInt64TypeInContext(mod->ctx)}, 1, 0),
+                    rt_str_from_int, (LLVMValueRef[]){left}, 1, "itoa");
+                LLVMValueRef r = is_ptr_val(right) ? right : LLVMBuildCall2(mod->builder,
+                    LLVMFunctionType(LLVMPointerTypeInContext(mod->ctx,0), (LLVMTypeRef[]){LLVMInt64TypeInContext(mod->ctx)}, 1, 0),
+                    rt_str_from_int, (LLVMValueRef[]){right}, 1, "itoa");
+                LLVMTypeRef pt = LLVMPointerTypeInContext(mod->ctx, 0);
+                left = LLVMBuildCall2(mod->builder, LLVMFunctionType(pt, (LLVMTypeRef[]){pt, pt}, 2, 0),
+                    rt_str_concat, (LLVMValueRef[]){l, r}, 2, "concat");
+            } else {
+                left = LLVMBuildAdd(mod->builder, left, right, "add");
+            }
         } else if (t->type == TOK_MINUS) {
             lexer_next(mod->lex);
             LLVMValueRef right = compile_multiplicative(mod);
@@ -242,6 +578,17 @@ static LLVMValueRef compile_comparison(SevenModule *mod) {
     if (is_cmp) {
         lexer_next(mod->lex);
         LLVMValueRef right = compile_additive(mod);
+        if ((pred == LLVMIntEQ || pred == LLVMIntNE) && (is_ptr_val(left) || is_ptr_val(right))) {
+            LLVMTypeRef pt = LLVMPointerTypeInContext(mod->ctx, 0);
+            LLVMValueRef args[] = { left, right };
+            LLVMValueRef eq = LLVMBuildCall2(mod->builder, LLVMFunctionType(LLVMInt64TypeInContext(mod->ctx), (LLVMTypeRef[]){pt, pt}, 2, 0), rt_str_equal, args, 2, "streq");
+            if (pred == LLVMIntNE) {
+                LLVMValueRef zero = LLVMConstInt(LLVMInt64TypeInContext(mod->ctx), 0, 0);
+                LLVMValueRef c = LLVMBuildICmp(mod->builder, LLVMIntEQ, eq, zero, "neq");
+                return LLVMBuildZExt(mod->builder, c, LLVMInt64TypeInContext(mod->ctx), "neq_ext");
+            }
+            return eq;
+        }
         LLVMValueRef cmp = LLVMBuildICmp(mod->builder, pred, left, right, "cmp");
         return LLVMBuildZExt(mod->builder, cmp, LLVMInt64TypeInContext(mod->ctx), "cmp_ext");
     }
@@ -323,17 +670,28 @@ static void compile_assignment(SevenModule *mod) {
     if (op->type == TOK_ASSIGN) {
         // x = expr
         lexer_next(mod->lex); // skip =
+
+        // Detect array literal for type tracking
+        int rhs_is_array = (lexer_peek(mod->lex)->type == TOK_LBRACKET);
+        // Detect array-returning builtins
+        if (lexer_peek(mod->lex)->type == TOK_IDENT) {
+            const char *fn = lexer_peek(mod->lex)->value;
+            if (strcmp(fn, "range") == 0 || strcmp(fn, "fill") == 0 ||
+                strcmp(fn, "unique") == 0 || strcmp(fn, "sort") == 0)
+                rhs_is_array = 1;
+        }
+
         LLVMValueRef val = compile_expr(mod);
 
-        int is_str = (LLVMGetTypeKind(LLVMTypeOf(val)) == LLVMPointerTypeKind);
-        VarInfo *v = create_var(mod, name, is_str);
+        int is_ptr = (LLVMGetTypeKind(LLVMTypeOf(val)) == LLVMPointerTypeKind);
+        int vtype = is_ptr ? (rhs_is_array ? 2 : 1) : 0;
+        VarInfo *v = create_var(mod, name, vtype);
 
-        if (is_str) {
-            // Store pointer as i64 (cast)
+        if (is_ptr) {
             LLVMValueRef cast = LLVMBuildPtrToInt(mod->builder, val,
                 LLVMInt64TypeInContext(mod->ctx), "ptr2int");
             LLVMBuildStore(mod->builder, cast, v->alloca);
-            v->is_string = 1;
+            v->is_string = vtype;
         } else {
             LLVMBuildStore(mod->builder, val, v->alloca);
             v->is_string = 0;
@@ -606,6 +964,10 @@ static void compile_func_call(SevenModule *mod, const char *name) {
     for (int i = 0; i < fi->param_count; i++) param_types[i] = i64;
     LLVMTypeRef fn_type = LLVMFunctionType(i64, param_types, fi->param_count, 0);
 
+    // Convert pointer args to i64 (user funcs use i64 for everything)
+    for (int i = 0; i < arg_count; i++)
+        args[i] = val_to_i64(mod, args[i]);
+
     LLVMBuildCall2(mod->builder, fn_type, fi->func, args, arg_count, "call");
 }
 
@@ -658,6 +1020,354 @@ static void compile_assert(SevenModule *mod) {
     LLVMPositionBuilderAtEnd(mod->builder, ok_bb);
 }
 
+// ---- Builtin function call ----
+static LLVMValueRef compile_builtin_call(SevenModule *mod, const char *name) {
+    LLVMTypeRef i64 = LLVMInt64TypeInContext(mod->ctx);
+    LLVMTypeRef pt = LLVMPointerTypeInContext(mod->ctx, 0);
+    LLVMTypeRef vt = LLVMVoidTypeInContext(mod->ctx);
+
+    // Helper: parse (arg) or (arg, arg, ...)
+    #define PARSE_ARGS_START lexer_next(mod->lex) // skip (
+    #define PARSE_ARG compile_expr(mod)
+    #define PARSE_COMMA lexer_expect(mod->lex, TOK_COMMA)
+    #define PARSE_ARGS_END lexer_expect(mod->lex, TOK_RPAREN)
+    #define CALL1(fn, rt, a1t, a1) LLVMBuildCall2(mod->builder, LLVMFunctionType(rt, (LLVMTypeRef[]){a1t}, 1, 0), fn, (LLVMValueRef[]){a1}, 1, "b")
+    #define CALL2(fn, rt, a1t, a2t, a1, a2) LLVMBuildCall2(mod->builder, LLVMFunctionType(rt, (LLVMTypeRef[]){a1t, a2t}, 2, 0), fn, (LLVMValueRef[]){a1, a2}, 2, "b")
+    #define CALL3(fn, rt, a1t, a2t, a3t, a1, a2, a3) LLVMBuildCall2(mod->builder, LLVMFunctionType(rt, (LLVMTypeRef[]){a1t, a2t, a3t}, 3, 0), fn, (LLVMValueRef[]){a1, a2, a3}, 3, "b")
+
+    // --- String functions ---
+    if (strcmp(name, "len") == 0) {
+        PARSE_ARGS_START;
+        // Check if arg is a variable to determine type
+        Token *peek = lexer_peek(mod->lex);
+        int arg_is_array = 0;
+        if (peek->type == TOK_IDENT) {
+            VarInfo *vv = find_var(mod, peek->value);
+            if (vv && vv->is_string == 2) arg_is_array = 1;
+        } else if (peek->type == TOK_LBRACKET) {
+            arg_is_array = 1;
+        }
+        LLVMValueRef a = PARSE_ARG; PARSE_ARGS_END;
+        if (arg_is_array)
+            return CALL1(rt_arr_len, i64, pt, is_ptr_val(a) ? a : val_to_ptr(mod, a));
+        return CALL1(rt_str_len, i64, pt, a);
+    }
+    if (strcmp(name, "upper") == 0) {
+        PARSE_ARGS_START; LLVMValueRef a = PARSE_ARG; PARSE_ARGS_END;
+        return CALL1(rt_str_upper, pt, pt, a);
+    }
+    if (strcmp(name, "lower") == 0) {
+        PARSE_ARGS_START; LLVMValueRef a = PARSE_ARG; PARSE_ARGS_END;
+        return CALL1(rt_str_lower, pt, pt, a);
+    }
+    if (strcmp(name, "trim") == 0) {
+        PARSE_ARGS_START; LLVMValueRef a = PARSE_ARG; PARSE_ARGS_END;
+        return CALL1(rt_str_trim, pt, pt, a);
+    }
+    if (strcmp(name, "contains") == 0) {
+        PARSE_ARGS_START; LLVMValueRef a = PARSE_ARG; PARSE_COMMA; LLVMValueRef b = PARSE_ARG; PARSE_ARGS_END;
+        return CALL2(rt_str_contains, i64, pt, pt, a, b);
+    }
+    if (strcmp(name, "replace") == 0) {
+        PARSE_ARGS_START; LLVMValueRef a = PARSE_ARG; PARSE_COMMA; LLVMValueRef b = PARSE_ARG; PARSE_COMMA; LLVMValueRef c = PARSE_ARG; PARSE_ARGS_END;
+        return CALL3(rt_str_replace, pt, pt, pt, pt, a, b, c);
+    }
+    if (strcmp(name, "substr") == 0) {
+        PARSE_ARGS_START; LLVMValueRef a = PARSE_ARG; PARSE_COMMA; LLVMValueRef b = PARSE_ARG; PARSE_COMMA; LLVMValueRef c = PARSE_ARG; PARSE_ARGS_END;
+        return CALL3(rt_str_substr, pt, pt, i64, i64, a, val_to_i64(mod, b), val_to_i64(mod, c));
+    }
+    if (strcmp(name, "str_find") == 0 || strcmp(name, "find") == 0) {
+        PARSE_ARGS_START; LLVMValueRef a = PARSE_ARG; PARSE_COMMA; LLVMValueRef b = PARSE_ARG; PARSE_ARGS_END;
+        if (is_ptr_val(b))
+            return CALL2(rt_str_find, i64, pt, pt, a, b);
+        return CALL2(rt_arr_find, i64, pt, i64, val_to_ptr(mod, a), val_to_i64(mod, b));
+    }
+    if (strcmp(name, "count") == 0) {
+        PARSE_ARGS_START; LLVMValueRef a = PARSE_ARG; PARSE_COMMA; LLVMValueRef b = PARSE_ARG; PARSE_ARGS_END;
+        return CALL2(rt_str_count, i64, pt, pt, a, b);
+    }
+    if (strcmp(name, "pad") == 0) {
+        PARSE_ARGS_START; LLVMValueRef a = PARSE_ARG; PARSE_COMMA; LLVMValueRef b = PARSE_ARG; PARSE_COMMA; LLVMValueRef c = PARSE_ARG; PARSE_ARGS_END;
+        return CALL3(rt_str_pad, pt, pt, i64, pt, a, val_to_i64(mod, b), c);
+    }
+    if (strcmp(name, "ord") == 0) {
+        PARSE_ARGS_START; LLVMValueRef a = PARSE_ARG; PARSE_ARGS_END;
+        return CALL1(rt_ord, i64, pt, a);
+    }
+    if (strcmp(name, "chr") == 0) {
+        PARSE_ARGS_START; LLVMValueRef a = PARSE_ARG; PARSE_ARGS_END;
+        return CALL1(rt_chr, pt, i64, val_to_i64(mod, a));
+    }
+    if (strcmp(name, "char_at") == 0) {
+        PARSE_ARGS_START; LLVMValueRef a = PARSE_ARG; PARSE_COMMA; LLVMValueRef b = PARSE_ARG; PARSE_ARGS_END;
+        return CALL2(rt_str_char_at, pt, pt, i64, a, val_to_i64(mod, b));
+    }
+    if (strcmp(name, "str") == 0) {
+        PARSE_ARGS_START; LLVMValueRef a = PARSE_ARG; PARSE_ARGS_END;
+        return CALL1(rt_str_from_int, pt, i64, val_to_i64(mod, a));
+    }
+    if (strcmp(name, "int") == 0 || strcmp(name, "number") == 0) {
+        PARSE_ARGS_START; LLVMValueRef a = PARSE_ARG; PARSE_ARGS_END;
+        if (is_ptr_val(a)) return CALL1(rt_number, i64, pt, a);
+        return a;
+    }
+
+    // --- Math functions ---
+    if (strcmp(name, "pow") == 0) {
+        PARSE_ARGS_START; LLVMValueRef a = PARSE_ARG; PARSE_COMMA; LLVMValueRef b = PARSE_ARG; PARSE_ARGS_END;
+        return CALL2(rt_pow, i64, i64, i64, val_to_i64(mod, a), val_to_i64(mod, b));
+    }
+    if (strcmp(name, "abs") == 0) {
+        PARSE_ARGS_START; LLVMValueRef a = PARSE_ARG; PARSE_ARGS_END;
+        return CALL1(rt_abs_val, i64, i64, val_to_i64(mod, a));
+    }
+    if (strcmp(name, "clamp") == 0) {
+        PARSE_ARGS_START; LLVMValueRef a = PARSE_ARG; PARSE_COMMA; LLVMValueRef b = PARSE_ARG; PARSE_COMMA; LLVMValueRef c = PARSE_ARG; PARSE_ARGS_END;
+        return CALL3(rt_clamp, i64, i64, i64, i64, val_to_i64(mod, a), val_to_i64(mod, b), val_to_i64(mod, c));
+    }
+    if (strcmp(name, "sign") == 0) {
+        PARSE_ARGS_START; LLVMValueRef a = PARSE_ARG; PARSE_ARGS_END;
+        return CALL1(rt_sign, i64, i64, val_to_i64(mod, a));
+    }
+    if (strcmp(name, "gcd") == 0) {
+        PARSE_ARGS_START; LLVMValueRef a = PARSE_ARG; PARSE_COMMA; LLVMValueRef b = PARSE_ARG; PARSE_ARGS_END;
+        return CALL2(rt_gcd, i64, i64, i64, val_to_i64(mod, a), val_to_i64(mod, b));
+    }
+    if (strcmp(name, "sum") == 0) {
+        PARSE_ARGS_START; LLVMValueRef a = PARSE_ARG; PARSE_ARGS_END;
+        return CALL1(rt_sum, i64, pt, val_to_ptr(mod, a));
+    }
+    if (strcmp(name, "avg") == 0) {
+        PARSE_ARGS_START; LLVMValueRef a = PARSE_ARG; PARSE_ARGS_END;
+        return CALL1(rt_avg, i64, pt, val_to_ptr(mod, a));
+    }
+
+    // --- Conversion ---
+    if (strcmp(name, "hex") == 0) {
+        PARSE_ARGS_START; LLVMValueRef a = PARSE_ARG; PARSE_ARGS_END;
+        return CALL1(rt_hex, pt, i64, val_to_i64(mod, a));
+    }
+    if (strcmp(name, "bin") == 0) {
+        PARSE_ARGS_START; LLVMValueRef a = PARSE_ARG; PARSE_ARGS_END;
+        return CALL1(rt_bin, pt, i64, val_to_i64(mod, a));
+    }
+    if (strcmp(name, "bool") == 0) {
+        PARSE_ARGS_START; LLVMValueRef a = PARSE_ARG; PARSE_ARGS_END;
+        return CALL1(rt_bool_fn, i64, i64, val_to_i64(mod, a));
+    }
+
+    // --- Array creation ---
+    if (strcmp(name, "range") == 0) {
+        PARSE_ARGS_START; LLVMValueRef a = PARSE_ARG; PARSE_COMMA; LLVMValueRef b = PARSE_ARG;
+        LLVMValueRef c;
+        if (lexer_match(mod->lex, TOK_COMMA)) c = PARSE_ARG;
+        else c = LLVMConstInt(i64, 1, 0);
+        PARSE_ARGS_END;
+        return CALL3(rt_arr_range, pt, i64, i64, i64, val_to_i64(mod, a), val_to_i64(mod, b), val_to_i64(mod, c));
+    }
+    if (strcmp(name, "fill") == 0) {
+        PARSE_ARGS_START; LLVMValueRef a = PARSE_ARG; PARSE_COMMA; LLVMValueRef b = PARSE_ARG; PARSE_ARGS_END;
+        return CALL2(rt_arr_fill, pt, i64, i64, val_to_i64(mod, a), val_to_i64(mod, b));
+    }
+    if (strcmp(name, "join") == 0) {
+        PARSE_ARGS_START; LLVMValueRef a = PARSE_ARG; PARSE_COMMA; LLVMValueRef b = PARSE_ARG; PARSE_ARGS_END;
+        return CALL2(rt_arr_join, pt, pt, pt, val_to_ptr(mod, a), b);
+    }
+
+    // --- File I/O as functions ---
+    if (strcmp(name, "file_exists") == 0) {
+        PARSE_ARGS_START; LLVMValueRef a = PARSE_ARG; PARSE_ARGS_END;
+        return CALL1(rt_file_exists, i64, pt, a);
+    }
+    if (strcmp(name, "file_read") == 0) {
+        PARSE_ARGS_START; LLVMValueRef a = PARSE_ARG; PARSE_ARGS_END;
+        return CALL1(rt_file_read, pt, pt, a);
+    }
+
+    // --- OS ---
+    if (strcmp(name, "time") == 0) {
+        PARSE_ARGS_START; PARSE_ARGS_END;
+        return LLVMBuildCall2(mod->builder, LLVMFunctionType(i64, NULL, 0, 0), rt_time, NULL, 0, "time");
+    }
+    if (strcmp(name, "clock") == 0 || strcmp(name, "clock_ns") == 0) {
+        PARSE_ARGS_START; PARSE_ARGS_END;
+        return LLVMBuildCall2(mod->builder, LLVMFunctionType(i64, NULL, 0, 0), rt_clock_ns, NULL, 0, "clock");
+    }
+    if (strcmp(name, "env") == 0) {
+        PARSE_ARGS_START; LLVMValueRef a = PARSE_ARG; PARSE_ARGS_END;
+        return CALL1(rt_env, pt, pt, a);
+    }
+    if (strcmp(name, "system") == 0) {
+        PARSE_ARGS_START; LLVMValueRef a = PARSE_ARG; PARSE_ARGS_END;
+        return CALL1(rt_system_fn, i64, pt, a);
+    }
+    if (strcmp(name, "sleep") == 0) {
+        PARSE_ARGS_START; LLVMValueRef a = PARSE_ARG; PARSE_ARGS_END;
+        LLVMBuildCall2(mod->builder, LLVMFunctionType(vt, (LLVMTypeRef[]){i64}, 1, 0), rt_sleep_fn, (LLVMValueRef[]){val_to_i64(mod, a)}, 1, "");
+        return LLVMConstInt(i64, 0, 0);
+    }
+    if (strcmp(name, "ask") == 0) {
+        PARSE_ARGS_START; LLVMValueRef a = PARSE_ARG; PARSE_ARGS_END;
+        return CALL1(rt_ask, pt, pt, a);
+    }
+
+    #undef PARSE_ARGS_START
+    #undef PARSE_ARG
+    #undef PARSE_COMMA
+    #undef PARSE_ARGS_END
+    #undef CALL1
+    #undef CALL2
+    #undef CALL3
+
+    return NULL; // not a builtin
+}
+
+// ---- Array literal ----
+static LLVMValueRef compile_array_literal(SevenModule *mod) {
+    lexer_next(mod->lex); // skip [
+    LLVMTypeRef pt = LLVMPointerTypeInContext(mod->ctx, 0);
+    LLVMTypeRef i64 = LLVMInt64TypeInContext(mod->ctx);
+    LLVMTypeRef vt = LLVMVoidTypeInContext(mod->ctx);
+
+    LLVMValueRef arr = LLVMBuildCall2(mod->builder, LLVMFunctionType(pt, NULL, 0, 0), rt_arr_new, NULL, 0, "arr");
+
+    if (lexer_peek(mod->lex)->type != TOK_RBRACKET) {
+        LLVMValueRef elem = compile_expr(mod);
+        LLVMValueRef args[] = { arr, val_to_i64(mod, elem) };
+        LLVMBuildCall2(mod->builder, LLVMFunctionType(vt, (LLVMTypeRef[]){pt, i64}, 2, 0), rt_arr_push, args, 2, "");
+
+        while (lexer_match(mod->lex, TOK_COMMA)) {
+            elem = compile_expr(mod);
+            LLVMValueRef args2[] = { arr, val_to_i64(mod, elem) };
+            LLVMBuildCall2(mod->builder, LLVMFunctionType(vt, (LLVMTypeRef[]){pt, i64}, 2, 0), rt_arr_push, args2, 2, "");
+        }
+    }
+    lexer_expect(mod->lex, TOK_RBRACKET);
+    return arr;
+}
+
+// ---- Each/as loop ----
+static void compile_each(SevenModule *mod) {
+    lexer_next(mod->lex); // skip 'each'
+    LLVMValueRef collection = compile_expr(mod);
+    lexer_expect(mod->lex, TOK_AS);
+    Token *var_tok = lexer_expect(mod->lex, TOK_IDENT);
+    const char *var_name = var_tok->value;
+
+    LLVMTypeRef i64 = LLVMInt64TypeInContext(mod->ctx);
+    LLVMTypeRef pt = LLVMPointerTypeInContext(mod->ctx, 0);
+
+    LLVMValueRef arr_ptr = is_ptr_val(collection) ? collection : val_to_ptr(mod, collection);
+    LLVMValueRef arr_len = LLVMBuildCall2(mod->builder, LLVMFunctionType(i64, (LLVMTypeRef[]){pt}, 1, 0), rt_arr_len, (LLVMValueRef[]){arr_ptr}, 1, "alen");
+
+    LLVMValueRef idx = LLVMBuildAlloca(mod->builder, i64, "each_i");
+    LLVMBuildStore(mod->builder, LLVMConstInt(i64, 0, 0), idx);
+
+    VarInfo *elem_var = create_var(mod, var_name, 0);
+
+    LLVMBasicBlockRef cond_bb = LLVMAppendBasicBlockInContext(mod->ctx, mod->current_func, "each_cond");
+    LLVMBasicBlockRef body_bb = LLVMCreateBasicBlockInContext(mod->ctx, "each_body");
+    LLVMBasicBlockRef exit_bb = LLVMCreateBasicBlockInContext(mod->ctx, "each_exit");
+
+    LLVMBuildBr(mod->builder, cond_bb);
+    LLVMPositionBuilderAtEnd(mod->builder, cond_bb);
+
+    LLVMValueRef cur_idx = LLVMBuildLoad2(mod->builder, i64, idx, "i");
+    LLVMValueRef cmp = LLVMBuildICmp(mod->builder, LLVMIntSLT, cur_idx, arr_len, "each_test");
+    LLVMBuildCondBr(mod->builder, cmp, body_bb, exit_bb);
+
+    LLVMAppendExistingBasicBlock(mod->current_func, body_bb);
+    LLVMPositionBuilderAtEnd(mod->builder, body_bb);
+
+    // Get current element
+    LLVMValueRef cur_i = LLVMBuildLoad2(mod->builder, i64, idx, "ci");
+    LLVMValueRef elem = LLVMBuildCall2(mod->builder, LLVMFunctionType(i64, (LLVMTypeRef[]){pt, i64}, 2, 0), rt_arr_get, (LLVMValueRef[]){arr_ptr, cur_i}, 2, "elem");
+    LLVMBuildStore(mod->builder, elem, elem_var->alloca);
+
+    skip_newlines(mod);
+    while (1) {
+        Token *t = lexer_peek(mod->lex);
+        if (t->type == TOK_DONE || t->type == TOK_EOF) break;
+        compile_statement(mod);
+        skip_newlines(mod);
+    }
+    lexer_expect(mod->lex, TOK_DONE);
+
+    // Increment index
+    LLVMValueRef next_i = LLVMBuildLoad2(mod->builder, i64, idx, "ni");
+    LLVMValueRef inc = LLVMBuildAdd(mod->builder, next_i, LLVMConstInt(i64, 1, 0), "inc");
+    LLVMBuildStore(mod->builder, inc, idx);
+    LLVMBuildBr(mod->builder, cond_bb);
+
+    LLVMAppendExistingBasicBlock(mod->current_func, exit_bb);
+    LLVMPositionBuilderAtEnd(mod->builder, exit_bb);
+}
+
+// ---- Push statement: push arr, value ----
+static void compile_push(SevenModule *mod) {
+    lexer_next(mod->lex); // skip 'push'
+    Token *arr_tok = lexer_expect(mod->lex, TOK_IDENT);
+    VarInfo *v = find_var(mod, arr_tok->value);
+    if (!v) { fprintf(stderr, "error: undefined '%s'\n", arr_tok->value); return; }
+    LLVMValueRef arr = load_var(mod, v);
+    lexer_expect(mod->lex, TOK_COMMA);
+    LLVMValueRef val = compile_expr(mod);
+    LLVMTypeRef pt = LLVMPointerTypeInContext(mod->ctx, 0);
+    LLVMTypeRef i64 = LLVMInt64TypeInContext(mod->ctx);
+    LLVMBuildCall2(mod->builder, LLVMFunctionType(LLVMVoidTypeInContext(mod->ctx), (LLVMTypeRef[]){pt, i64}, 2, 0),
+        rt_arr_push, (LLVMValueRef[]){arr, val_to_i64(mod, val)}, 2, "");
+}
+
+// ---- Pop statement: pop arr ----
+static void compile_pop(SevenModule *mod) {
+    lexer_next(mod->lex); // skip 'pop'
+    Token *arr_tok = lexer_expect(mod->lex, TOK_IDENT);
+    VarInfo *v = find_var(mod, arr_tok->value);
+    if (!v) { fprintf(stderr, "error: undefined '%s'\n", arr_tok->value); return; }
+    LLVMValueRef arr = load_var(mod, v);
+    LLVMTypeRef pt = LLVMPointerTypeInContext(mod->ctx, 0);
+    LLVMTypeRef i64 = LLVMInt64TypeInContext(mod->ctx);
+    LLVMBuildCall2(mod->builder, LLVMFunctionType(i64, (LLVMTypeRef[]){pt}, 1, 0), rt_arr_pop, (LLVMValueRef[]){arr}, 1, "pop");
+}
+
+// ---- File I/O statements ----
+static void compile_write_file(SevenModule *mod) {
+    lexer_next(mod->lex); // skip 'write'
+    LLVMValueRef path = compile_expr(mod);
+    lexer_expect(mod->lex, TOK_COMMA);
+    LLVMValueRef data = compile_expr(mod);
+    LLVMTypeRef pt = LLVMPointerTypeInContext(mod->ctx, 0);
+    LLVMBuildCall2(mod->builder, LLVMFunctionType(LLVMVoidTypeInContext(mod->ctx), (LLVMTypeRef[]){pt, pt}, 2, 0),
+        rt_file_write, (LLVMValueRef[]){path, data}, 2, "");
+}
+
+static void compile_read_file(SevenModule *mod) {
+    // 'read' is handled as expression via file_read() builtin
+    // As statement: read "path" — just discard result
+    lexer_next(mod->lex);
+    LLVMValueRef path = compile_expr(mod);
+    LLVMTypeRef pt = LLVMPointerTypeInContext(mod->ctx, 0);
+    LLVMBuildCall2(mod->builder, LLVMFunctionType(pt, (LLVMTypeRef[]){pt}, 1, 0), rt_file_read, (LLVMValueRef[]){path}, 1, "rd");
+}
+
+static void compile_delete_file(SevenModule *mod) {
+    lexer_next(mod->lex);
+    LLVMValueRef path = compile_expr(mod);
+    LLVMTypeRef pt = LLVMPointerTypeInContext(mod->ctx, 0);
+    LLVMBuildCall2(mod->builder, LLVMFunctionType(LLVMVoidTypeInContext(mod->ctx), (LLVMTypeRef[]){pt}, 1, 0),
+        rt_file_delete, (LLVMValueRef[]){path}, 1, "");
+}
+
+static void compile_append_file(SevenModule *mod) {
+    lexer_next(mod->lex);
+    LLVMValueRef path = compile_expr(mod);
+    lexer_expect(mod->lex, TOK_COMMA);
+    LLVMValueRef data = compile_expr(mod);
+    LLVMTypeRef pt = LLVMPointerTypeInContext(mod->ctx, 0);
+    LLVMBuildCall2(mod->builder, LLVMFunctionType(LLVMVoidTypeInContext(mod->ctx), (LLVMTypeRef[]){pt, pt}, 2, 0),
+        rt_file_append, (LLVMValueRef[]){path, data}, 2, "");
+}
+
 // ---- Main statement dispatcher ----
 static void compile_statement(SevenModule *mod) {
     skip_newlines(mod);
@@ -668,8 +1378,14 @@ static void compile_statement(SevenModule *mod) {
         case TOK_IF:      compile_if(mod); break;
         case TOK_WHILE:   compile_while(mod); break;
         case TOK_REPEAT:  compile_repeat(mod); break;
+        case TOK_EACH:    compile_each(mod); break;
         case TOK_FUNC:    compile_func_def(mod); break;
         case TOK_ASSERT:  compile_assert(mod); break;
+        case TOK_PUSH:    compile_push(mod); break;
+        case TOK_POP:     compile_pop(mod); break;
+        case TOK_WRITE:   compile_write_file(mod); break;
+        case TOK_DELETE:   compile_delete_file(mod); break;
+        case TOK_APPEND:   compile_append_file(mod); break;
         case TOK_RESULT:
         case TOK_IDENT:   compile_assignment(mod); break;
         case TOK_EOF:     break;
@@ -758,7 +1474,7 @@ int seven_codegen_emit(SevenModule *mod, const char *output, int run_after) {
     char obj_path[512];
     snprintf(obj_path, sizeof(obj_path), "%s.o", output);
 
-    if (LLVMTargetMachineEmitToFile(machine, mod->module, obj_path,
+    if (LLVMTargetMachineEmitToFile(machine, mod->module, (char *)obj_path,
                                      LLVMObjectFile, &error)) {
         fprintf(stderr, "error: %s\n", error);
         LLVMDisposeMessage(error);
@@ -766,9 +1482,20 @@ int seven_codegen_emit(SevenModule *mod, const char *output, int run_after) {
         return 0;
     }
 
-    // Link with clang
-    char cmd[1024];
-    snprintf(cmd, sizeof(cmd), "clang-21 %s -o %s -lm 2>&1", obj_path, output);
+    // Find runtime object next to our executable
+    char exe_dir[512] = "";
+    ssize_t elen = readlink("/proc/self/exe", exe_dir, sizeof(exe_dir) - 1);
+    if (elen > 0) {
+        exe_dir[elen] = '\0';
+        char *slash = strrchr(exe_dir, '/');
+        if (slash) *(slash + 1) = '\0';
+    }
+    char rt_obj[512];
+    snprintf(rt_obj, sizeof(rt_obj), "%sseven_runtime.o", exe_dir);
+
+    // Link with clang (quote paths for spaces)
+    char cmd[2048];
+    snprintf(cmd, sizeof(cmd), "clang-21 \"%s\" \"%s\" -o \"%s\" -lm 2>&1", obj_path, rt_obj, output);
     int ret = system(cmd);
 
     // Clean up object file
@@ -785,7 +1512,7 @@ int seven_codegen_emit(SevenModule *mod, const char *output, int run_after) {
     // Run if requested
     if (run_after) {
         char run_cmd[512];
-        snprintf(run_cmd, sizeof(run_cmd), "./%s", output);
+        snprintf(run_cmd, sizeof(run_cmd), "\"./%s\"", output);
         ret = system(run_cmd);
         remove(output); // cleanup
         LLVMDisposeTargetMachine(machine);

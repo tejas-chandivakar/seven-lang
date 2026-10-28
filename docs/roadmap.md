@@ -170,15 +170,59 @@
 
 ---
 
+## Phase 13 — LLVM Backend (COMPLETE)
+**Goal:** High-performance native compilation via LLVM
+
+### 13a — LLVM Setup + Basic Features
+- [x] C lexer (`llvm_lexer.c`) — tokenizes .seven source
+- [x] LLVM codegen (`llvm_codegen.c`) — generates LLVM IR
+- [x] Variables, math, if/elif/else, while, repeat, func, assert
+- [x] Expression precedence: primary → mul → add → compare → and → or
+- [x] 33x faster than NASM interpreter (0.05s vs 1.67s on 100M loop benchmark)
+
+### 13b — Strings & Arrays
+- [x] String concatenation with `+` operator
+- [x] String comparison with `is`/`isnt`
+- [x] Array literals `[1, 2, 3]`
+- [x] Array subscript `arr[i]`
+- [x] `each`/`as` loop over arrays
+- [x] `push`/`pop` statements
+- [x] Method syntax: `.len()`, `.upper()`, `.lower()`, `.push()`, `.sort()`, etc.
+
+### 13c — Standard Library (28 builtins)
+- [x] C runtime library (`llvm_runtime.c`) — all stdlib functions
+- [x] String: `len`, `upper`, `lower`, `trim`, `contains`, `replace`, `substr`, `find`, `count`, `pad`, `ord`, `chr`, `char_at`, `str`
+- [x] Math: `pow`, `abs`, `clamp`, `sign`, `gcd`, `sum`, `avg`
+- [x] Arrays: `range`, `fill`, `join`, `unique`, `sort`, `reverse`, `slice`, `get`, `set`, `insert`, `remove`, `concat`
+- [x] Conversion: `hex`, `bin`, `bool`, `number`, `int`, `str`
+- [x] File I/O: `file_exists`, `file_read`, `write`, `delete`, `append`
+- [x] OS: `time`, `clock_ns`, `env`, `system`, `sleep`
+- [x] I/O: `ask`
+
+### 13d — Cross-Platform Build
+- [x] `--target <triple>` flag for cross-compilation
+- [x] Runtime object file pre-compiled for linking
+- [x] Path handling for spaces in directory names
+
+### 13e — CLI Integration
+- [x] `--asm` flag delegates to NASM backend
+- [x] `--version` / `--help` flags
+- [x] `--emit-ir` for LLVM IR inspection
+- [x] Version bump to v1.4
+
+---
+
 ## Future — Performance
-- [ ] Native integer registers (eliminate str↔int conversion per operation)
-- [ ] Register allocation for loop variables (keep counters in rcx/rdx)
-- [ ] Register-based expression evaluation (eliminate push/pop stack machine)
+- [ ] LLVM optimization passes (O2/O3)
 - [ ] Constant folding (compile-time evaluation of literal expressions)
-- [ ] Peephole optimization (redundant push/pop removal, inc/dec fusion)
+- [ ] Register-based expression evaluation for NASM backend
+- [ ] Peephole optimization for NASM (redundant push/pop removal)
 - [ ] Loop invariant hoisting
 
 ## Future — Features
+- [ ] Custom backend (like Rust's Cranelift — eventually replace LLVM)
+- [ ] Windows native builds (MSVC target)
+- [ ] WebAssembly target (`--target wasm32`)
 - [ ] Documentation website: sevenlang.org, tutorials
 - [ ] Garbage collector or arena-reset allocator
 - [ ] Self-hosting loop close: compile real `.seven` programs end-to-end

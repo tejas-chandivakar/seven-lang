@@ -49,7 +49,11 @@ LLVM_CFLAGS  = $(shell $(LLVM_CONFIG) --cflags 2>/dev/null)
 LLVM_LDFLAGS = $(shell $(LLVM_CONFIG) --ldflags --libs core analysis native bitwriter 2>/dev/null) -lm
 
 LLVM_SRCS := $(SRC_DIR)/llvm_main.c $(SRC_DIR)/llvm_lexer.c $(SRC_DIR)/llvm_codegen.c
+LLVM_RT_SRC := $(SRC_DIR)/llvm_runtime.c
+LLVM_RT_OBJ := $(BUILD_DIR)/seven_runtime.o
 SEVEN_LLVM := $(BUILD_DIR)/seven-llvm
+
+SEVEN_ASM := $(BUILD_DIR)/seven-asm
 
 .PHONY: all seven llvm test test-lex clean dirs dist
 
@@ -75,11 +79,18 @@ $(RUNTIME_OBJ): $(RUNTIME_SRC)
 $(INTERP_OBJ): $(INTERP_SRC)
 	$(NASM) $(NASMFLAGS) $< -o $@
 
+# Copy NASM binary as seven-asm (for --asm flag delegation)
+$(SEVEN_ASM): $(SEVEN_BIN)
+	cp $< $@
+
 # LLVM backend build
-llvm: dirs $(SEVEN_LLVM)
+llvm: dirs $(SEVEN_LLVM) $(LLVM_RT_OBJ)
 
 $(SEVEN_LLVM): $(LLVM_SRCS)
 	$(CC) -O2 $(LLVM_CFLAGS) -I$(SRC_DIR) $^ -o $@ $(LLVM_LDFLAGS)
+
+$(LLVM_RT_OBJ): $(LLVM_RT_SRC)
+	$(CC) -O2 -c $< -o $@
 
 dirs:
 	@mkdir -p $(BUILD_DIR)

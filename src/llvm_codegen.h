@@ -19,7 +19,7 @@
 typedef struct {
     char *name;
     LLVMValueRef alloca;   // stack slot
-    int is_string;         // 0=int, 1=string
+    int is_string;         // 0=int, 1=string, 2=array
 } VarInfo;
 
 typedef struct {

@@ -1,0 +1,10 @@
+!! Library file — defines a function
+func greet(name)
+    show "Hello, " + name + "!"
+end
+
+func add(a, b)
+    return a + b
+end
+
+lib_loaded = 1

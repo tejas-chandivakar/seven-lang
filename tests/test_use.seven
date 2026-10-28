@@ -1,0 +1,19 @@
+!! Test the 'use' keyword
+show "=== Test use keyword ==="
+
+!! Load the library
+use "tests/use_lib.seven"
+
+!! Call functions defined in the library
+greet("World")
+result = add(40, 2)
+show result
+
+!! Verify the global variable was set
+show lib_loaded
+
+!! Test load-once: using again should be a no-op
+use "tests/use_lib.seven"
+show "no double load"
+
+show "all_done"

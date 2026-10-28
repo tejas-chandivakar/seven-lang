@@ -17,6 +17,10 @@ section .data
     null_str_len equ 4
     divzero_msg  db "Error: division by zero", 10
     divzero_len  equ $ - divzero_msg
+    oom_msg      db "FATAL: Out of heap memory (64MB)", 10
+    oom_msg_len  equ $ - oom_msg
+    mmap_fail_msg db "FATAL: mmap failed to allocate heap", 10
+    mmap_fail_msg_len equ $ - mmap_fail_msg
     type_int_str db "int", 0
     type_str_str db "string", 0
     type_arr_str db "array", 0
@@ -36,27 +40,40 @@ section .text
 
 ; ============================================================
 ; rt_init — Initialize runtime (heap allocator)
-; Uses mmap to allocate 1MB heap
+; Uses mmap to allocate 64MB heap
 ; ============================================================
 global rt_init
 rt_init:
     push rbp
     mov rbp, rsp
-    ; mmap(NULL, 16777216, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0)
+    ; mmap(NULL, 268435456, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0)
     mov rax, 9              ; sys_mmap
     xor rdi, rdi            ; addr = NULL
-    mov rsi, 16777216       ; 16MB
+    mov rsi, 67108864       ; 64MB
     mov rdx, 3              ; PROT_READ | PROT_WRITE
     mov r10, 34             ; MAP_PRIVATE | MAP_ANONYMOUS
     mov r8, -1              ; fd = -1
     xor r9, r9              ; offset = 0
     syscall
+    cmp rax, -1
+    je .mmap_fail
+    cmp rax, -4096
+    ja .mmap_fail
     mov [heap_base], rax
     mov [heap_ptr], rax
-    add rax, 16777216
+    add rax, 268435456
     mov [heap_end], rax
     pop rbp
     ret
+.mmap_fail:
+    mov rax, 1
+    mov rdi, 2
+    lea rsi, [mmap_fail_msg]
+    mov rdx, mmap_fail_msg_len
+    syscall
+    mov rax, 60
+    mov rdi, 138
+    syscall
 
 ; ============================================================
 ; rt_alloc — Bump allocate rdi bytes, return pointer in rax
@@ -73,7 +90,11 @@ rt_alloc:
     xchg rax, [heap_ptr]
     ret
 .oom:
-    ; Out of memory — exit with code 137
+    mov rax, 1
+    mov rdi, 2              ; stderr
+    lea rsi, [oom_msg]
+    mov rdx, oom_msg_len
+    syscall
     mov rax, 60
     mov rdi, 137
     syscall

@@ -65,6 +65,10 @@ section .data
     interp_err_func_len equ $ - interp_err_func
     str_divzero db "Division by zero", 0
     interp_newline db 10, 0
+    use_err_msg db "Error: Could not load file: ", 0
+    use_err_msg_len equ $ - use_err_msg
+    var_overflow_msg db "FATAL: Variable count exceeded 4096", 10
+    var_overflow_msg_len equ $ - var_overflow_msg
 
     ; Boolean string constants
     str_true db "true", 0
@@ -84,20 +88,20 @@ section .bss
     ; Token position
     ip_pos      resq 1
 
-    ; Variable storage (name pointer, name length, value) — max 512 variables
-    var_names   resq 512        ; pointers to name text
-    var_nlens   resq 512        ; name lengths
-    var_vals    resq 512        ; values (integer or string pointer)
+    ; Variable storage (name pointer, name length, value) — max 2048 variables
+    var_names   resq 4096       ; pointers to name text
+    var_nlens   resq 4096       ; name lengths
+    var_vals    resq 4096       ; values (integer or string pointer)
     var_count   resq 1
 
-    ; Function storage — max 128 functions
-    func_names  resq 128        ; pointers to function name
-    func_nlens  resq 128        ; name lengths
-    func_starts resq 128        ; token position where body starts
-    func_param_counts resq 128  ; number of parameters
-    func_param_names  resq 1024 ; parameter names (8 per func * 128)
-    func_param_nlens  resq 1024 ; parameter name lengths
-    func_variadic     resq 128  ; 1 if last param is variadic (many)
+    ; Function storage — max 256 functions
+    func_names  resq 256        ; pointers to function name
+    func_nlens  resq 256        ; name lengths
+    func_starts resq 256        ; token position where body starts
+    func_param_counts resq 256  ; number of parameters
+    func_param_names  resq 2048 ; parameter names (8 per func * 256)
+    func_param_nlens  resq 2048 ; parameter name lengths
+    func_variadic     resq 256  ; 1 if last param is variadic (many)
     func_count  resq 1
 
     ; Call stack for function args — max depth 32, 8 args each
@@ -106,8 +110,8 @@ section .bss
     call_depth  resq 1
 
     ; Saved variable snapshots for function scoping
-    save_vals   resq 512        ; backup of var_vals per call
-    save_count  resq 32         ; backup of var_count per call
+    save_vals   resq 4096       ; backup of var_vals per call
+    save_count  resq 64         ; backup of var_count per call
 
     ; Loop control
     loop_depth  resq 1
@@ -150,9 +154,16 @@ section .bss
     try_depth   resq 1
 
     ; Call scope save/restore (recursion correctness)
-    scope_stack  resq 65536     ; backed-up var values across nested calls
+    scope_stack  resq 524288    ; backed-up var values across nested calls
     scope_sp     resq 1         ; stack pointer into scope_stack
     scope_counts resq 1024      ; saved var_count per call depth (-1 = skipped)
+
+    ; 'use' keyword state — loaded file paths (load-once guard)
+    use_paths   resq 64         ; pointers to loaded file path strings
+    use_count   resq 1          ; number of files loaded via 'use'
+
+    ; 'use' path scratch buffer (for building resolved paths)
+    use_path_buf resb 512
 
 section .text
     extern lexer_get_token, lexer_token_count
@@ -164,7 +175,9 @@ section .text
     extern kw_in, kw_is, kw_isnt, kw_above, kw_below, kw_atleast, kw_atmost
     extern kw_try, kw_catch, kw_error, kw_done, kw_push
     extern kw_ask, kw_write, kw_read, kw_many, kw_match, kw_case
-    extern kw_mode
+    extern kw_mode, kw_use
+    extern lexer_load_file_append, lexer_tokenize
+    extern src_buf, src_len, src_pos, src_line, tok_buf, tok_count
     extern rt_init
     extern rt_print_str, rt_print_int, rt_print_newline
     extern rt_print_val, rt_str_len, rt_str_concat
@@ -204,6 +217,7 @@ interp_init:
     mov qword [eval_sp], 0
     mov qword [arr_count], 0
     mov qword [interp_exit_code], 0
+    mov qword [use_count], 0
     ret
 
 ; ============================================================
@@ -454,6 +468,8 @@ var_set:
 
 .new:
     mov rcx, [var_count]
+    cmp rcx, 4096
+    jae .var_overflow
     mov [var_names + rcx * 8], r12
     mov [var_nlens + rcx * 8], r13
     mov [var_vals + rcx * 8], r14
@@ -462,6 +478,15 @@ var_set:
     pop r13
     pop r12
     ret
+.var_overflow:
+    mov rax, 1
+    mov rdi, 2
+    lea rsi, [var_overflow_msg]
+    mov rdx, var_overflow_msg_len
+    syscall
+    mov rax, 60
+    mov rdi, 99
+    syscall
 
 ; var_get — Get variable value
 ; rdi = name pointer, rsi = name length
@@ -1048,6 +1073,12 @@ interp_stmt:
     call ip_is_kw
     cmp rax, 1
     je .do_error
+
+    lea rdi, [kw_use]
+    mov rsi, 3
+    call ip_is_kw
+    cmp rax, 1
+    je .do_use
 
     ; Unknown keyword — skip it
     call ip_advance
@@ -2122,6 +2153,94 @@ interp_stmt:
     ret
 
 ; ============================================================
+; use "path" — Load and execute another .seven file once
+; Functions/variables defined in the file become globally available.
+; Already-loaded files are skipped (load-once guard).
+; ============================================================
+.do_use:
+    call ip_advance          ; skip 'use'
+    call interp_expr         ; evaluate path → rax = string ptr
+    mov r12, rax             ; r12 = path string
+
+    ; --- Load-once guard: check if already loaded ---
+    xor rcx, rcx
+.use_check_loop:
+    cmp rcx, [use_count]
+    jge .use_not_loaded
+    push rcx
+    mov rdi, [use_paths + rcx * 8]
+    mov rsi, r12
+    call rt_str_eq
+    pop rcx
+    cmp rax, 1
+    je .use_already_loaded
+    inc rcx
+    jmp .use_check_loop
+
+.use_already_loaded:
+    pop rbp
+    ret
+
+.use_not_loaded:
+    ; Register this path in the loaded table
+    mov rax, [use_count]
+    mov [use_paths + rax * 8], r12
+    inc qword [use_count]
+
+    ; --- Save current interpreter position ---
+    push qword [ip_pos]
+
+    ; Remember where new tokens will start (before the old EOF)
+    ; The last token is an EOF from the original file — remove it
+    ; so new tokens follow seamlessly, and the new file adds its own EOF
+    mov r13, [tok_count]
+    dec r13                  ; overwrite old EOF
+    mov [tok_count], r13     ; new tokens start here
+
+    ; --- Append file source to src_buf and lex it ---
+    mov rdi, r12             ; path
+    call lexer_load_file_append
+    cmp rax, 0
+    jne .use_file_error
+
+    ; Tokenize the new source (appends to tok_buf from src_pos)
+    call lexer_tokenize
+
+    ; --- Set ip_pos to start of new tokens and interpret ---
+    mov [ip_pos], r13
+.use_stmt_loop:
+    call ip_skip_nl
+    call ip_tok_type
+    cmp al, TOK_EOF
+    je .use_done
+    call interp_stmt
+    ; Check for return flag (shouldn't happen at top level, but be safe)
+    cmp qword [return_flag], 1
+    je .use_done
+    jmp .use_stmt_loop
+
+.use_done:
+    ; Restore original ip_pos
+    pop qword [ip_pos]
+    pop rbp
+    ret
+
+.use_file_error:
+    ; Print error and continue
+    mov rax, 1
+    mov rdi, 2               ; stderr
+    lea rsi, [use_err_msg]
+    mov rdx, use_err_msg_len
+    syscall
+    ; Print the path
+    mov rdi, r12
+    call rt_print_str
+    call rt_print_newline
+    pop qword [ip_pos]
+    pop rbp
+    ret
+
+; ============================================================
 ; read path — File read (as statement, stores nothing useful)
 ; ============================================================
 .do_read_file:
@@ -2503,7 +2622,7 @@ interp_call:
     mov r8, [var_count]              ; N = number of live vars
     mov r9, [scope_sp]
     lea rax, [r9 + r8]
-    cmp rax, 65536
+    cmp rax, 524288
     ja .call_scope_save_oflow
     mov [scope_counts + r10 * 8], r8
     xor rcx, rcx

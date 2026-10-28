@@ -26,6 +26,7 @@ section .data
     global kw_try, kw_catch, kw_error, kw_done
     global kw_many, kw_mode, kw_push
     global kw_match, kw_case
+    global kw_use
 
     kw_table:
     kw_show     db "show", 0
@@ -71,6 +72,7 @@ section .data
     kw_push     db "push", 0
     kw_match    db "match", 0
     kw_case     db "case", 0
+    kw_use      db "use", 0
     kw_end_marker db 0      ; sentinel
 
     ; ---- Keyword pointer table for fast lookup ----
@@ -119,6 +121,7 @@ section .data
     dq kw_push, 4
     dq kw_match, 5
     dq kw_case, 4
+    dq kw_use, 3
     dq 0, 0                 ; sentinel
 
     ; ---- Token type constants ----
@@ -170,13 +173,13 @@ section .data
 
 section .bss
     ; Source buffer
-    src_buf      resb 131072     ; 128KB source buffer
+    src_buf      resb 524288     ; 512KB source buffer
     src_len      resq 1
     src_pos      resq 1          ; current position in source
     src_line     resq 1          ; current line number
 
-    ; Token output buffer (max 16384 tokens * 16 bytes = 256KB)
-    tok_buf      resb 262144
+    ; Token output buffer (max 65536 tokens * 16 bytes = 1MB)
+    tok_buf      resb 1048576
     tok_count    resq 1
     tok_pos      resq 1          ; current token index (for parser)
 
@@ -185,6 +188,10 @@ section .bss
 
     ; Mode
     current_mode resb 1          ; 0 = hybrid, 1 = natural
+
+    ; Export buffer symbols for use by interp.asm (for 'use' keyword)
+    global src_buf, src_len, src_pos, src_line
+    global tok_buf, tok_count
 
 section .text
 
@@ -224,7 +231,7 @@ lexer_load_file:
     mov rax, 0              ; sys_read
     mov rdi, r12
     mov rsi, src_buf
-    mov rdx, 131071         ; max bytes
+    mov rdx, 524287         ; max bytes (512KB - 1)
     syscall
     cmp rax, 0
     jl .close_error
@@ -251,6 +258,75 @@ lexer_load_file:
     pop rax
 .error:
     mov rax, -1
+    pop r12
+    pop rbp
+    ret
+
+; ============================================================
+; lexer_load_file_append — Load file and APPEND to src_buf
+; rdi = filename (null-terminated)
+; Appends source after existing content. Sets src_pos to start
+; of new content so lexer_tokenize will lex only the new part.
+; Does NOT reset tok_count — new tokens are appended.
+; Returns: rax = 0 on success, -1 on error
+; ============================================================
+global lexer_load_file_append
+lexer_load_file_append:
+    push rbp
+    mov rbp, rsp
+    push r12
+    push r13
+
+    mov r13, [src_len]       ; save where new content starts
+
+    ; Open file
+    mov rax, 2               ; sys_open
+    xor rsi, rsi             ; O_RDONLY
+    xor rdx, rdx
+    syscall
+    cmp rax, 0
+    jl .append_error
+    mov r12, rax             ; save fd
+
+    ; Read file, appending after existing source
+    mov rax, 0               ; sys_read
+    mov rdi, r12
+    lea rsi, [src_buf + r13] ; write after existing content
+    mov rdx, 524287
+    sub rdx, r13             ; remaining buffer space
+    syscall
+    cmp rax, 0
+    jl .append_close_error
+
+    ; Update src_len (old + new bytes read)
+    add rax, r13
+    mov [src_len], rax
+
+    ; Null-terminate
+    mov byte [src_buf + rax], 0
+
+    ; Set src_pos to start of new content
+    mov [src_pos], r13
+    mov qword [src_line], 1
+
+    ; Close file
+    mov rax, 3
+    mov rdi, r12
+    syscall
+
+    xor rax, rax             ; success
+    pop r13
+    pop r12
+    pop rbp
+    ret
+
+.append_close_error:
+    mov rax, 3
+    mov rdi, r12
+    syscall
+.append_error:
+    mov rax, -1
+    pop r13
     pop r12
     pop rbp
     ret

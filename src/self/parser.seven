@@ -41,6 +41,7 @@ p_vals  = []
 p_lines = []
 p_pos   = [0]
 p_len   = [0]
+pa_result = []
 
 !! ============================================================
 !! Helpers
@@ -805,4 +806,20 @@ func ast_print(node, indent)
         show "{pad}UNKNOWN({typ})"
     end
     return 0
+end
+
+!! ============================================================
+!! parse_all — Parse all statements into pa_result[] global
+!! Caller must set pa_result = [] before calling
+!! ============================================================
+func parse_all()
+    p_skip_newlines()
+    while p_at_end() == 0
+        s = parse_stmt()
+        if s != 0
+            push(pa_result, s)
+        end
+        p_skip_newlines()
+    end
+    return pa_result
 end

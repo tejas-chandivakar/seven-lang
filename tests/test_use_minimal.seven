@@ -1,0 +1,26 @@
+!! Test: all 5 modules, parse_all with global pa_result
+use "src/self/lexer.seven"
+use "src/self/parser.seven"
+use "src/self/analyzer.seven"
+use "src/self/irgen.seven"
+use "src/self/codegen.seven"
+
+show "loaded"
+
+source = "x = 42" + chr(10) + "show x" + chr(10)
+lex_run(source)
+ntoks = len(tok_types)
+show ntoks
+
+p_types = tok_types
+p_vals = tok_vals
+p_lines = tok_lines
+p_pos[0] = 0
+p_len[0] = ntoks
+
+pa_result = []
+show "calling parse_all"
+stmts = parse_all()
+show "parsed"
+show len(stmts)
+show "done"

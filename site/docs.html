@@ -82,6 +82,7 @@
                     <a href="#functions" class="sidebar-link block py-1.5 pl-3 border-l-2 border-transparent text-gray-400 hover:text-white transition-colors">Functions</a>
                     <a href="#strings" class="sidebar-link block py-1.5 pl-3 border-l-2 border-transparent text-gray-400 hover:text-white transition-colors">Strings</a>
                     <a href="#arrays" class="sidebar-link block py-1.5 pl-3 border-l-2 border-transparent text-gray-400 hover:text-white transition-colors">Arrays</a>
+                    <a href="#imports" class="sidebar-link block py-1.5 pl-3 border-l-2 border-transparent text-gray-400 hover:text-white transition-colors">Imports</a>
                     <a href="#errors" class="sidebar-link block py-1.5 pl-3 border-l-2 border-transparent text-gray-400 hover:text-white transition-colors">Error Handling</a>
 
                     <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 mt-6">Standard Library</p>
@@ -106,7 +107,7 @@
                     <!-- Overview -->
                     <section id="overview" class="doc-section mb-16">
                         <h1 class="text-3xl sm:text-4xl font-bold text-white mb-2">SEVEN Language Documentation</h1>
-                        <p class="text-gray-400 mb-6">Version 0.7 &mdash; Phase 7 Complete</p>
+                        <p class="text-gray-400 mb-6">Version 1.2 &mdash; Phase 12 Complete</p>
                         <p class="text-gray-300 leading-relaxed mb-4">SEVEN is a compiled, dynamically-typed programming language designed for <strong class="text-white">assembly-level speed with Python-level simplicity</strong>.</p>
                         <ul class="space-y-2 text-gray-400 text-sm">
                             <li>File extensions: <code class="text-seven-400 font-mono">.seven</code> (primary), <code class="text-gray-400 font-mono">.sev</code>, <code class="text-gray-400 font-mono">.sv7</code>, <code class="text-gray-400 font-mono">.s7</code></li>
@@ -330,6 +331,27 @@
 <span class="fn">sort</span>(<span class="op">nums</span>)
 <span class="io">show</span> <span class="fn">join</span>(<span class="op">nums</span>, <span class="str">", "</span>)    <span class="cm">!! 10, 20, 30, 40</span>
 <span class="io">show</span> <span class="fn">len</span>(<span class="op">nums</span>)            <span class="cm">!! 4</span></code></pre>
+                        </div>
+                    </section>
+
+                    <!-- Imports -->
+                    <section id="imports" class="doc-section mb-16">
+                        <h2 class="text-2xl font-bold text-white mb-4">Imports</h2>
+                        <p class="text-gray-400 mb-4">Use the <code class="text-seven-400 font-mono">use</code> keyword to import other SEVEN files. All functions and variables from the imported file become available. Duplicate imports are automatically skipped.</p>
+                        <div class="code-block rounded-xl border border-white/5 overflow-hidden">
+                            <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code><span class="cm">!! Import a module</span>
+<span class="kw">use</span> <span class="str">"lib/math_helpers.seven"</span>
+<span class="kw">use</span> <span class="str">"lib/string_utils.seven"</span>
+
+<span class="cm">!! Duplicate imports are safely ignored</span>
+<span class="kw">use</span> <span class="str">"lib/math_helpers.seven"</span>  <span class="cm">!! no-op, already loaded</span>
+
+<span class="cm">!! All exported functions are now available</span>
+<span class="op">result</span> = <span class="fn">my_helper</span>(<span class="num">42</span>)
+<span class="io">show</span> <span class="op">result</span></code></pre>
+                        </div>
+                        <div class="mt-4 p-4 rounded-lg border border-white/5 bg-white/[0.02] text-sm text-gray-400">
+                            <strong class="text-white">Note:</strong> Paths are relative to the project root. The <code class="text-seven-400 font-mono">use</code> keyword is available in interpreter mode (<code class="text-gray-300 font-mono">seven run</code>).
                         </div>
                     </section>
 

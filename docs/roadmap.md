@@ -123,5 +123,43 @@
 - [x] Assert-based test suite — math, strings, arrays, control flow, functions, conversions
 - [x] 54 tests passing (7 new assert-based + 47 existing)
 
-## Phase 10 — Documentation + Website
-sevenlang.org, docs, playground, tutorials.
+## Phase 10 — Advanced Features (COMPLETE)
+**Goal:** Bitwise operators, string indexing, ord/chr, substr
+
+- [x] Bitwise operators (band, bor, bxor, bnot, shl, shr)
+- [x] `substr(str, start, len)` — substring extraction
+- [x] `ord(char)` / `chr(code)` — character ↔ ASCII conversion
+- [x] String indexing with `char_at`
+- [x] 60+ tests passing
+
+---
+
+## Phase 11 — Self-Hosted Compiler Modules (COMPLETE)
+**Goal:** Full self-hosted compiler pipeline written in SEVEN
+
+- [x] Self-hosted lexer (`src/self/lexer.seven`)
+- [x] Self-hosted parser (`src/self/parser.seven`) — map-based AST
+- [x] Self-hosted semantic analyzer (`src/self/analyzer.seven`)
+- [x] Self-hosted IR generator (`src/self/irgen.seven`)
+- [x] Self-hosted code generator (`src/self/codegen.seven`) — IR → x86-64 assembly
+- [x] Full test coverage for each module
+
+---
+
+## Phase 12 — Imports & Compiler Pipeline (COMPLETE)
+**Goal:** `use` keyword for imports, full pipeline driver
+
+- [x] `use "path.seven"` — import/include with duplicate-guard
+- [x] `compile.seven` — connects all 5 modules into end-to-end pipeline
+- [x] Runtime hardening: heap 16MB → 64MB, OOM error messages, variable overflow checking
+- [x] Interpreter buffer increases: 4096 variables, 524288 scope stack entries
+- [x] 70 tests passing (zero regressions)
+
+---
+
+## Future
+- [ ] Package manager (SPM): `spm init`, `spm install`, `spm publish`
+- [ ] Documentation website: sevenlang.org, tutorials
+- [ ] Codegen integer handling (numbers currently stored as string literals)
+- [ ] Garbage collector or arena-reset allocator
+- [ ] Self-hosting loop close: compile real `.seven` programs end-to-end

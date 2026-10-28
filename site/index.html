@@ -106,17 +106,27 @@
     <section class="relative pt-32 pb-20 sm:pt-40 sm:pb-28 hero-glow">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="max-w-4xl mx-auto text-center">
-                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-seven-500/20 bg-seven-500/5 text-seven-400 text-sm mb-8 fade-in">
-                    <span class="w-2 h-2 rounded-full bg-seven-400 animate-pulse"></span>
-                    v1.4
+                <div class="flex flex-wrap items-center justify-center gap-2 mb-8 fade-in">
+                    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-seven-500/20 bg-seven-500/5 text-seven-400 text-sm">
+                        <span class="w-2 h-2 rounded-full bg-seven-400 animate-pulse"></span>
+                        v1.4 — LLVM Backend
+                    </div>
+                    <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-white/10 bg-white/5 text-gray-400 text-xs font-mono">
+                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z"/></svg>
+                        Linux
+                    </div>
+                    <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-white/10 bg-white/5 text-gray-400 text-xs font-mono">
+                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
+                        Windows
+                    </div>
                 </div>
                 <h1 class="text-5xl sm:text-7xl font-extrabold tracking-tight mb-6 fade-in" style="animation-delay:0.1s">
                     <span class="text-white">Write Simple.</span><br>
                     <span class="gradient-text">Run Native.</span>
                 </h1>
                 <p class="text-lg sm:text-xl text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed fade-in" style="animation-delay:0.2s">
-                    SEVEN is a compiled programming language that generates native x86-64 assembly.
-                    No VM. No garbage collector. No runtime overhead. Just fast, readable code.
+                    SEVEN is a compiled programming language with English-like syntax that compiles to native machine code via LLVM.
+                    Runs on <strong class="text-white">Linux</strong> and <strong class="text-white">Windows</strong>. No VM. No GC. No overhead.
                 </p>
                 <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16 fade-in" style="animation-delay:0.3s">
                     <a href="install.html" class="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-seven-600 hover:bg-seven-500 text-white font-medium transition-all shadow-lg shadow-seven-600/20 hover:shadow-seven-500/30 text-center">

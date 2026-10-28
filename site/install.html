@@ -55,7 +55,115 @@
     <main class="pt-28 pb-20">
         <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
             <h1 class="text-4xl sm:text-5xl font-bold text-white mb-4">Install SEVEN</h1>
-            <p class="text-lg text-gray-400 mb-12">Get up and running in under a minute.</p>
+            <p class="text-lg text-gray-400 mb-8">Get up and running in under a minute.</p>
+
+            <!-- Platform tabs -->
+            <div class="flex gap-2 mb-10" id="platformTabs">
+                <button onclick="showPlatform('linux')" id="tab-linux" class="platform-tab px-4 py-2 rounded-lg text-sm font-medium transition-all bg-white/10 text-white">Linux</button>
+                <button onclick="showPlatform('windows')" id="tab-windows" class="platform-tab px-4 py-2 rounded-lg text-sm font-medium transition-all bg-white/[0.03] text-gray-400 hover:text-white">Windows</button>
+            </div>
+            <script>
+                function showPlatform(p) {
+                    document.querySelectorAll('.platform-section').forEach(s => s.style.display = 'none');
+                    document.querySelectorAll('.platform-tab').forEach(t => { t.className = 'platform-tab px-4 py-2 rounded-lg text-sm font-medium transition-all bg-white/[0.03] text-gray-400 hover:text-white'; });
+                    document.getElementById('section-' + p).style.display = 'block';
+                    document.getElementById('tab-' + p).className = 'platform-tab px-4 py-2 rounded-lg text-sm font-medium transition-all bg-white/10 text-white';
+                }
+            </script>
+
+            <!-- Windows section -->
+            <div id="section-windows" class="platform-section" style="display:none">
+
+            <!-- Windows Quick Start -->
+            <section class="mb-12 p-6 rounded-2xl border border-seven-600/30 bg-seven-600/5">
+                <div class="flex items-center gap-2 mb-4">
+                    <svg class="w-5 h-5 text-seven-400" fill="currentColor" viewBox="0 0 24 24"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
+                    <h2 class="text-xl font-semibold text-white">Windows Quick Start</h2>
+                </div>
+                <div class="code-block rounded-xl overflow-hidden mb-4">
+                    <div class="flex items-center justify-between px-4 py-2.5 border-b border-white/5">
+                        <span class="text-xs text-gray-500 font-mono">Step 1 — Clone and build</span>
+                        <button onclick="copyCode(this)" class="copy-btn text-xs text-gray-500 hover:text-white transition px-2 py-1 rounded">Copy</button>
+                    </div>
+                    <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>git clone https://github.com/tejas-chandivakar/seven-lang.git
+cd seven-lang
+install-windows.bat</code></pre>
+                </div>
+                <div class="code-block rounded-xl overflow-hidden mb-4">
+                    <div class="flex items-center justify-between px-4 py-2.5 border-b border-white/5">
+                        <span class="text-xs text-gray-500 font-mono">Step 2 — Add to PATH (one-time)</span>
+                        <button onclick="copyCode(this)" class="copy-btn text-xs text-gray-500 hover:text-white transition px-2 py-1 rounded">Copy</button>
+                    </div>
+                    <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>setx PATH "%PATH%;C:\path\to\seven-lang\build;C:\Program Files\LLVM\bin"</code></pre>
+                </div>
+                <div class="code-block rounded-xl overflow-hidden mb-4">
+                    <div class="flex items-center justify-between px-4 py-2.5 border-b border-white/5">
+                        <span class="text-xs text-gray-500 font-mono">Step 3 — Use SEVEN</span>
+                        <button onclick="copyCode(this)" class="copy-btn text-xs text-gray-500 hover:text-white transition px-2 py-1 rounded">Copy</button>
+                    </div>
+                    <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>seven-llvm run hello.seven
+seven-llvm build hello.seven -o hello.exe
+hello.exe</code></pre>
+                </div>
+                <p class="text-sm text-gray-500"><code class="text-gray-400 font-mono text-xs">install-windows.bat</code> automatically installs LLVM and CMake via winget, then builds the compiler.</p>
+            </section>
+
+            <!-- Windows Manual setup -->
+            <section class="mb-12">
+                <h2 class="text-xl font-semibold text-white mb-4">Manual Setup</h2>
+                <div class="code-block rounded-xl overflow-hidden mb-4">
+                    <div class="flex items-center justify-between px-4 py-2.5 border-b border-white/5">
+                        <span class="text-xs text-gray-500 font-mono">PowerShell — Install dependencies</span>
+                        <button onclick="copyCode(this)" class="copy-btn text-xs text-gray-500 hover:text-white transition px-2 py-1 rounded">Copy</button>
+                    </div>
+                    <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>winget install LLVM.LLVM
+winget install Kitware.CMake</code></pre>
+                </div>
+                <div class="code-block rounded-xl overflow-hidden mb-4">
+                    <div class="flex items-center justify-between px-4 py-2.5 border-b border-white/5">
+                        <span class="text-xs text-gray-500 font-mono">Build</span>
+                        <button onclick="copyCode(this)" class="copy-btn text-xs text-gray-500 hover:text-white transition px-2 py-1 rounded">Copy</button>
+                    </div>
+                    <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>build.bat</code></pre>
+                </div>
+            </section>
+
+            <!-- Windows Usage -->
+            <section class="mb-12">
+                <h2 class="text-xl font-semibold text-white mb-4">Daily Usage</h2>
+                <div class="code-block rounded-xl overflow-hidden mb-4">
+                    <div class="flex items-center justify-between px-4 py-2.5 border-b border-white/5">
+                        <span class="text-xs text-gray-500 font-mono">Command Prompt / PowerShell</span>
+                    </div>
+                    <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code><span class="text-gray-500">!! Run a program directly</span>
+seven-llvm run myprogram.seven
+
+<span class="text-gray-500">!! Build a standalone .exe</span>
+seven-llvm build myprogram.seven -o myprogram.exe
+myprogram.exe
+
+<span class="text-gray-500">!! Check version</span>
+seven-llvm --version
+
+<span class="text-gray-500">!! See LLVM IR output</span>
+seven-llvm build myprogram.seven --emit-ir</code></pre>
+                </div>
+            </section>
+
+            <!-- VS Code on Windows -->
+            <section class="p-6 rounded-2xl border border-white/5 bg-white/[0.02]">
+                <h2 class="text-xl font-semibold text-white mb-3">VS Code Extension</h2>
+                <p class="text-gray-400 text-sm mb-4">Syntax highlighting and code snippets for .seven files.</p>
+                <div class="code-block rounded-xl border border-white/5 overflow-hidden">
+                    <pre class="px-5 py-3 text-sm font-mono text-gray-300 overflow-x-auto"><code>cd editor\vscode
+code --install-extension .</code></pre>
+                </div>
+            </section>
+
+            </div><!-- end windows section -->
+
+            <!-- Linux section -->
+            <div id="section-linux" class="platform-section">
 
             <!-- Requirements -->
             <section class="mb-12">
@@ -178,52 +286,6 @@ make llvm</code></pre>
                 </div>
             </section>
 
-            <!-- Windows Native -->
-            <section class="mb-12">
-                <h2 class="text-xl font-semibold text-white mb-4">Windows (Native)</h2>
-                <p class="text-gray-400 text-sm mb-4">Build SEVEN natively on Windows with LLVM and CMake.</p>
-                <div class="code-block rounded-xl border border-white/5 overflow-hidden">
-                    <div class="flex items-center justify-between px-4 py-2.5 border-b border-white/5">
-                        <span class="text-xs text-gray-500 font-mono">Quick Setup (PowerShell)</span>
-                        <button onclick="copyCode(this)" class="copy-btn text-xs text-gray-500 hover:text-white transition px-2 py-1 rounded">Copy</button>
-                    </div>
-                    <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>git clone https://github.com/tejas-chandivakar/seven-lang.git
-cd seven-lang
-install-windows.bat</code></pre>
-                </div>
-                <p class="text-sm text-gray-500 mt-3">This installs LLVM and CMake via winget and builds <code class="text-gray-400 font-mono text-xs">seven-llvm.exe</code>.</p>
-                <div class="code-block rounded-xl border border-white/5 overflow-hidden mt-4">
-                    <div class="flex items-center justify-between px-4 py-2.5 border-b border-white/5">
-                        <span class="text-xs text-gray-500 font-mono">Manual Setup</span>
-                        <button onclick="copyCode(this)" class="copy-btn text-xs text-gray-500 hover:text-white transition px-2 py-1 rounded">Copy</button>
-                    </div>
-                    <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>winget install LLVM.LLVM
-winget install Kitware.CMake
-build.bat</code></pre>
-                </div>
-                <div class="code-block rounded-xl border border-white/5 overflow-hidden mt-4">
-                    <div class="flex items-center justify-between px-4 py-2.5 border-b border-white/5">
-                        <span class="text-xs text-gray-500 font-mono">Usage</span>
-                    </div>
-                    <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>build\seven-llvm.exe run hello.seven
-build\seven-llvm.exe build hello.seven -o hello.exe
-<span class="text-emerald-400">Compiled: hello.exe</span></code></pre>
-                </div>
-            </section>
-
-            <!-- Windows WSL -->
-            <section class="mb-12">
-                <h2 class="text-xl font-semibold text-white mb-4">Windows (via WSL)</h2>
-                <p class="text-gray-400 text-sm mb-4">Alternatively, run SEVEN through the Windows Subsystem for Linux.</p>
-                <div class="code-block rounded-xl border border-white/5 overflow-hidden">
-                    <div class="flex items-center justify-between px-4 py-2.5 border-b border-white/5">
-                        <span class="text-xs text-gray-500 font-mono">PowerShell (one-time setup)</span>
-                    </div>
-                    <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>wsl --install</code></pre>
-                </div>
-                <p class="text-sm text-gray-500 mt-3">After WSL is set up, open it and follow the Linux install steps above.</p>
-            </section>
-
             <!-- VS Code Extension -->
             <section class="p-6 rounded-2xl border border-white/5 bg-white/[0.02]">
                 <h2 class="text-xl font-semibold text-white mb-3">VS Code Extension</h2>
@@ -234,6 +296,8 @@ code --install-extension .</code></pre>
                 </div>
                 <p class="text-sm text-gray-500 mt-3">Supports <code class="text-gray-400 font-mono text-xs">.seven</code>, <code class="text-gray-400 font-mono text-xs">.sev</code>, <code class="text-gray-400 font-mono text-xs">.sv7</code>, <code class="text-gray-400 font-mono text-xs">.s7</code> file extensions.</p>
             </section>
+
+            </div><!-- end linux section -->
         </div>
     </main>
 

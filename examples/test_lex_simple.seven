@@ -1,0 +1,164 @@
+!! Quick lexer test
+
+TOK_IDENT   = 1
+TOK_INT     = 2
+TOK_STRING  = 4
+TOK_KEYWORD = 5
+TOK_OP      = 6
+TOK_PUNCT   = 7
+TOK_NEWLINE = 8
+TOK_EOF     = 9
+
+kw = map_new()
+kw = map_set(kw, "show", 1)
+kw = map_set(kw, "if", 1)
+kw = map_set(kw, "end", 1)
+kw = map_set(kw, "func", 1)
+kw = map_set(kw, "return", 1)
+
+func is_alpha(c)
+    a = ord(c)
+    if a >= 65 and a <= 90
+        return 1
+    end
+    if a >= 97 and a <= 122
+        return 1
+    end
+    if a == 95
+        return 1
+    end
+    return 0
+end
+
+func is_digit(c)
+    a = ord(c)
+    if a >= 48 and a <= 57
+        return 1
+    end
+    return 0
+end
+
+func is_space(c)
+    a = ord(c)
+    if a == 32 or a == 9 or a == 13
+        return 1
+    end
+    return 0
+end
+
+tok_types = []
+tok_vals = []
+
+func emit(typ, val)
+    push(tok_types, typ)
+    push(tok_vals, val)
+end
+
+func lex(source)
+    pos = 0
+    slen = len(source)
+    while pos < slen
+        c = char_at(source, pos)
+        a = ord(c)
+
+        if is_space(c) == 1
+            pos = pos + 1
+        elif a == 10
+            emit(TOK_NEWLINE, "NL")
+            pos = pos + 1
+        elif is_digit(c) == 1
+            start = pos
+            pos = pos + 1
+            while pos < slen and is_digit(char_at(source, pos)) == 1
+                pos = pos + 1
+            end
+            nval = substr(source, start, pos - start)
+            emit(TOK_INT, nval)
+        elif is_alpha(c) == 1
+            start = pos
+            pos = pos + 1
+            brk = 0
+            while pos < slen and brk == 0
+                ic = char_at(source, pos)
+                if is_alpha(ic) == 1 or is_digit(ic) == 1
+                    pos = pos + 1
+                else
+                    brk = 1
+                end
+            end
+            word = substr(source, start, pos - start)
+            if map_has(kw, word) == 1
+                emit(TOK_KEYWORD, word)
+            else
+                emit(TOK_IDENT, word)
+            end
+        elif a == 61
+            emit(TOK_OP, "=")
+            pos = pos + 1
+        elif a == 43
+            emit(TOK_OP, "+")
+            pos = pos + 1
+        elif a == 40
+            emit(TOK_PUNCT, "(")
+            pos = pos + 1
+        elif a == 41
+            emit(TOK_PUNCT, ")")
+            pos = pos + 1
+        elif a == 44
+            emit(TOK_PUNCT, ",")
+            pos = pos + 1
+        else
+            pos = pos + 1
+        end
+    end
+    emit(TOK_EOF, "")
+end
+
+!! Test 1
+show "--- test 1 ---"
+lex("x = 42")
+n = len(tok_types)
+show n
+i = 0
+while i < n
+    t = tok_types[i]
+    v = tok_vals[i]
+    show "{t}: {v}"
+    i = i + 1
+end
+
+!! Reset
+tok_types = []
+tok_vals = []
+
+!! Test 2: multi-word
+show "--- test 2 ---"
+lex("func add(a, b)")
+n = len(tok_types)
+show n
+i = 0
+while i < n
+    t = tok_types[i]
+    v = tok_vals[i]
+    show "{t}: {v}"
+    i = i + 1
+end
+
+!! Reset
+tok_types = []
+tok_vals = []
+
+!! Test 3: with keyword
+show "--- test 3 ---"
+lex("show x + 10")
+n = len(tok_types)
+show n
+i = 0
+while i < n
+    t = tok_types[i]
+    v = tok_vals[i]
+    show "{t}: {v}"
+    i = i + 1
+end
+
+show "all tests passed!"

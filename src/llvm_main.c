@@ -47,8 +47,9 @@ static void print_usage(void) {
         "\n"
         "Options:\n"
         "  -o <output>    Output file name\n"
+        "  -O0/-O1/-O2/-O3  Optimization level (default: -O2)\n"
         "  --emit-ir      Print LLVM IR to stdout\n"
-        "  --target <t>   Target triple (e.g. x86_64-pc-windows-msvc)\n"
+        "  --target <t>   Target triple (e.g. wasm32, x86_64-pc-windows-msvc)\n"
         "  --asm          Use NASM x86-64 backend instead of LLVM\n"
         "\n");
 }
@@ -129,6 +130,7 @@ int main(int argc, char **argv) {
     const char *target = NULL;
     int emit_ir = 0;
     int run_mode = 0;
+    int opt_level = 2;
 
     if (strcmp(cmd, "run") == 0) {
         run_mode = 1;
@@ -145,6 +147,14 @@ int main(int argc, char **argv) {
             emit_ir = 1;
         } else if (strcmp(argv[i], "--target") == 0 && i + 1 < argc) {
             target = argv[++i];
+        } else if (strcmp(argv[i], "-O0") == 0) {
+            opt_level = 0;
+        } else if (strcmp(argv[i], "-O1") == 0) {
+            opt_level = 1;
+        } else if (strcmp(argv[i], "-O2") == 0) {
+            opt_level = 2;
+        } else if (strcmp(argv[i], "-O3") == 0) {
+            opt_level = 3;
         }
     }
 
@@ -177,8 +187,11 @@ int main(int argc, char **argv) {
     seven_codegen_init(&mod, input);
 
     if (target) {
+        if (strcmp(target, "wasm") == 0 || strcmp(target, "wasm32") == 0)
+            target = "wasm32-unknown-unknown";
         seven_codegen_set_target(&mod, target);
     }
+    seven_codegen_set_opt(&mod, opt_level);
 
     int ok = seven_codegen_compile(&mod, &lex);
     if (!ok) {

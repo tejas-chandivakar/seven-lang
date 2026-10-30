@@ -1,0 +1,11 @@
+show "Hello, SEVEN!"
+show 42
+set x = 10
+set y = 5
+show x + y
+show x * y
+show "String test"
+set name = upper("hello")
+show name
+show hex(255)
+show bin(10)

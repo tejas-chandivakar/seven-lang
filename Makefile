@@ -128,7 +128,7 @@ test-run: nasm
 	done
 
 clean:
-	rm -rf $(BUILD_DIR)
+	rm -f $(BUILD_DIR)/seven $(BUILD_DIR)/seven-nasm $(BUILD_DIR)/seven-asm $(BUILD_DIR)/*.o $(BUILD_DIR)/*.exe
 
 # Package a release binary + tarball into dist/
 DIST_DIR := dist

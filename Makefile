@@ -5,8 +5,8 @@
 # Requires: NASM + GNU ld (Linux or WSL)
 #
 # Usage:
-#   make           - build the SEVEN compiler
-#   make seven     - same as above
+#   make           - build SEVEN (LLVM backend)
+#   make nasm      - build NASM backend (seven-nasm)
 #   make test-lex  - run lexer on all test files
 #   make test      - compile and run all test examples
 #   make clean     - remove build artifacts
@@ -36,8 +36,8 @@ CODEGEN_OBJ := $(BUILD_DIR)/codegen.o
 RUNTIME_OBJ := $(BUILD_DIR)/runtime.o
 INTERP_OBJ  := $(BUILD_DIR)/interp.o
 
-# Output binary
-SEVEN_BIN := $(BUILD_DIR)/seven
+# Output binary (NASM backend — legacy)
+SEVEN_NASM := $(BUILD_DIR)/seven-nasm
 
 ALL_OBJS := $(MAIN_OBJ) $(LEXER_OBJ) $(CODEGEN_OBJ) $(RUNTIME_OBJ) $(INTERP_OBJ)
 
@@ -51,17 +51,17 @@ LLVM_LDFLAGS = $(shell $(LLVM_CONFIG) --ldflags --libs core analysis native bitw
 LLVM_SRCS := $(SRC_DIR)/llvm_main.c $(SRC_DIR)/llvm_lexer.c $(SRC_DIR)/llvm_codegen.c
 LLVM_RT_SRC := $(SRC_DIR)/llvm_runtime.c
 LLVM_RT_OBJ := $(BUILD_DIR)/seven_runtime.o
-SEVEN_LLVM := $(BUILD_DIR)/seven-llvm
+SEVEN_BIN := $(BUILD_DIR)/seven
 
 SEVEN_ASM := $(BUILD_DIR)/seven-asm
 
-.PHONY: all seven llvm test test-lex clean dirs dist dist-windows
+.PHONY: all nasm llvm test test-lex clean dirs dist dist-windows
 
-all: seven
+all: llvm
 
-seven: dirs $(SEVEN_BIN)
+nasm: dirs $(SEVEN_NASM)
 
-$(SEVEN_BIN): $(ALL_OBJS)
+$(SEVEN_NASM): $(ALL_OBJS)
 	$(LD) $(LDFLAGS) $^ -o $@
 
 $(MAIN_OBJ): $(MAIN_SRC)
@@ -80,13 +80,13 @@ $(INTERP_OBJ): $(INTERP_SRC)
 	$(NASM) $(NASMFLAGS) $< -o $@
 
 # Copy NASM binary as seven-asm (for --asm flag delegation)
-$(SEVEN_ASM): $(SEVEN_BIN)
+$(SEVEN_ASM): $(SEVEN_NASM)
 	cp $< $@
 
-# LLVM backend build
-llvm: dirs $(SEVEN_LLVM) $(LLVM_RT_OBJ)
+# LLVM backend build (default)
+llvm: dirs $(SEVEN_BIN) $(LLVM_RT_OBJ)
 
-$(SEVEN_LLVM): $(LLVM_SRCS)
+$(SEVEN_BIN): $(LLVM_SRCS)
 	$(CC) -O2 $(LLVM_CFLAGS) -I$(SRC_DIR) $^ -o $@ $(LLVM_LDFLAGS)
 
 $(LLVM_RT_OBJ): $(LLVM_RT_SRC)
@@ -95,30 +95,30 @@ $(LLVM_RT_OBJ): $(LLVM_RT_SRC)
 dirs:
 	@mkdir -p $(BUILD_DIR)
 
-# Debug: run lexer on all test files
-test-lex: seven
+# Debug: run lexer on all test files (NASM backend)
+test-lex: nasm
 	@echo "=== Lexer Tests ==="
 	@for f in $(TESTS)/*.seven $(EXAMPLES)/*.seven; do \
 		echo "-- $$f --"; \
-		$(SEVEN_BIN) lex $$f || echo "FAILED: $$f"; \
+		$(SEVEN_NASM) lex $$f || echo "FAILED: $$f"; \
 		echo ""; \
 	done
 
-# Compile tests (codegen only)
-test: seven
+# Compile tests (NASM codegen only)
+test: nasm
 	@echo "=== Compile Tests ==="
 	@for f in $(TESTS)/*.seven; do \
 		echo "-- Compiling: $$f --"; \
-		$(SEVEN_BIN) build $$f && echo "OK" || echo "FAILED: $$f"; \
+		$(SEVEN_NASM) build $$f && echo "OK" || echo "FAILED: $$f"; \
 	done
 
-# Full end-to-end: compile, assemble, link, run
-test-run: seven
+# Full end-to-end: compile, assemble, link, run (NASM)
+test-run: nasm
 	@echo "=== End-to-End Tests ==="
 	@for f in $(TESTS)/*.seven; do \
 		base=$$(basename $$f .seven); \
 		echo "-- $$base --"; \
-		$(SEVEN_BIN) build $$f || { echo "COMPILE FAILED"; continue; }; \
+		$(SEVEN_NASM) build $$f || { echo "COMPILE FAILED"; continue; }; \
 		$(NASM) $(NASMFLAGS) $$base.asm -o $(BUILD_DIR)/$$base.o || { echo "NASM FAILED"; continue; }; \
 		$(LD) $(BUILD_DIR)/$$base.o $(RUNTIME_OBJ) -o $(BUILD_DIR)/$$base || { echo "LINK FAILED"; continue; }; \
 		echo "Output:"; \
@@ -132,7 +132,7 @@ clean:
 
 # Package a release binary + tarball into dist/
 DIST_DIR := dist
-dist: seven
+dist: llvm
 	@mkdir -p $(DIST_DIR)
 	@cp $(SEVEN_BIN) $(DIST_DIR)/seven
 	@strip $(DIST_DIR)/seven || true
@@ -149,9 +149,9 @@ dist-windows: dirs llvm
 	@mkdir -p $(DIST_DIR)/windows
 	@echo "[1/3] Compiling runtime for Windows..."
 	$(MINGW_CC) -O2 -c $(LLVM_RT_SRC) -o $(DIST_DIR)/windows/seven_runtime.o
-	@echo "[2/3] Cross-compiling seven-llvm.exe..."
-	$(MINGW_CC) -O2 $(LLVM_CFLAGS) -I$(SRC_DIR) $(LLVM_SRCS) -o $(DIST_DIR)/windows/seven-llvm.exe $(LLVM_LDFLAGS)
+	@echo "[2/3] Cross-compiling seven.exe..."
+	$(MINGW_CC) -O2 $(LLVM_CFLAGS) -I$(SRC_DIR) $(LLVM_SRCS) -o $(DIST_DIR)/windows/seven.exe $(LLVM_LDFLAGS)
 	@echo "[3/3] Packaging..."
 	@cp $(DIST_DIR)/windows/seven_runtime.o $(DIST_DIR)/windows/
-	@cd $(DIST_DIR)/windows && zip ../seven-windows-x86_64.zip seven-llvm.exe seven_runtime.o
+	@cd $(DIST_DIR)/windows && zip ../seven-windows-x86_64.zip seven.exe seven_runtime.o
 	@echo "Packaged -> $(DIST_DIR)/seven-windows-x86_64.zip"

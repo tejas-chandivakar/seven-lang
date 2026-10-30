@@ -63,7 +63,7 @@ if %ERRORLEVEL% neq 0 (
 echo.
 echo ===============================
 echo  Setup complete!
-echo  Run: build\seven-llvm.exe --version
+echo  Run: seven --version
 echo ===============================
 
 endlocal

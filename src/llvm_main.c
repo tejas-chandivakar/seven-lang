@@ -2,8 +2,8 @@
 // SEVEN Language — LLVM Backend Entry Point
 // Reads .seven source, lexes it, generates LLVM IR, compiles
 //
-// Usage: seven-llvm build <file.seven> [-o output] [--emit-ir]
-//        seven-llvm run  <file.seven>
+// Usage: seven build <file.seven> [-o output] [--emit-ir]
+//        seven run  <file.seven>
 // ============================================================
 
 #include <stdio.h>

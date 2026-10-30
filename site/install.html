@@ -101,8 +101,8 @@ install-windows.bat</code></pre>
                         <span class="text-xs text-gray-500 font-mono">Step 3 — Use SEVEN</span>
                         <button onclick="copyCode(this)" class="copy-btn text-xs text-gray-500 hover:text-white transition px-2 py-1 rounded">Copy</button>
                     </div>
-                    <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>seven-llvm run hello.seven
-seven-llvm build hello.seven -o hello.exe
+                    <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>seven run hello.seven
+seven build hello.seven -o hello.exe
 hello.exe</code></pre>
                 </div>
                 <p class="text-sm text-gray-500"><code class="text-gray-400 font-mono text-xs">install-windows.bat</code> automatically installs LLVM and CMake via winget, then builds the compiler.</p>
@@ -136,17 +136,17 @@ winget install Kitware.CMake</code></pre>
                         <span class="text-xs text-gray-500 font-mono">Command Prompt / PowerShell</span>
                     </div>
                     <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code><span class="text-gray-500">!! Run a program directly</span>
-seven-llvm run myprogram.seven
+seven run myprogram.seven
 
 <span class="text-gray-500">!! Build a standalone .exe</span>
-seven-llvm build myprogram.seven -o myprogram.exe
+seven build myprogram.seven -o myprogram.exe
 myprogram.exe
 
 <span class="text-gray-500">!! Check version</span>
-seven-llvm --version
+seven --version
 
 <span class="text-gray-500">!! See LLVM IR output</span>
-seven-llvm build myprogram.seven --emit-ir</code></pre>
+seven build myprogram.seven --emit-ir</code></pre>
                 </div>
             </section>
 
@@ -280,8 +280,8 @@ make llvm</code></pre>
                     <div class="flex items-center justify-between px-4 py-2.5 border-b border-white/5">
                         <span class="text-xs text-gray-500 font-mono">Usage</span>
                     </div>
-                    <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>./build/seven-llvm run hello.seven
-./build/seven-llvm build hello.seven -o hello
+                    <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>./build/seven run hello.seven
+./build/seven build hello.seven -o hello
 <span class="text-emerald-400">Compiled: hello</span></code></pre>
                 </div>
             </section>

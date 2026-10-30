@@ -1516,7 +1516,11 @@ int seven_codegen_emit(SevenModule *mod, const char *output, int run_after) {
 #endif
 
     char rt_obj[512];
+#ifdef _WIN32
+    snprintf(rt_obj, sizeof(rt_obj), "%sseven_runtime_win.o", exe_dir);
+#else
     snprintf(rt_obj, sizeof(rt_obj), "%sseven_runtime.o", exe_dir);
+#endif
 
     // Detect clang binary
     const char *clang_bin = NULL;

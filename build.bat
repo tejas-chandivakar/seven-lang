@@ -91,10 +91,10 @@ if exist "%~dp0build\llvm-include\llvm-c\Core.h" (
 
 if not exist build mkdir build
 
-REM ---- Compile seven-llvm.exe ----
+REM ---- Compile seven.exe ----
 echo.
-echo [1/3] Compiling seven-llvm.exe...
-clang -O2 src\llvm_main.c src\llvm_lexer.c src\llvm_codegen.c -o build\seven-llvm.exe -I"%LLVM_INC%" -Isrc -I"%MSVC_INC%" -I"%UCRT_INC%" -I"%UM_INC%" -I"%SHARED_INC%" -L"%LLVM_DIR%\lib" -L"%MSVC_LIB%" -L"%UCRT_LIB%" -L"%UM_LIB%" -lLLVM-C -w
+echo [1/3] Compiling seven.exe...
+clang -O2 src\llvm_main.c src\llvm_lexer.c src\llvm_codegen.c -o build\seven.exe -I"%LLVM_INC%" -Isrc -I"%MSVC_INC%" -I"%UCRT_INC%" -I"%UM_INC%" -I"%SHARED_INC%" -L"%LLVM_DIR%\lib" -L"%MSVC_LIB%" -L"%UCRT_LIB%" -L"%UM_LIB%" -lLLVM-C -w
 if %ERRORLEVEL% neq 0 (
     echo ERROR: Compilation failed
     exit /b 1
@@ -102,7 +102,7 @@ if %ERRORLEVEL% neq 0 (
 
 REM ---- Compile runtime ----
 echo [2/3] Compiling runtime...
-clang -O2 -c src\llvm_runtime.c -o build\seven_runtime.o -I"%MSVC_INC%" -I"%UCRT_INC%" -I"%UM_INC%" -I"%SHARED_INC%" -w
+clang -O2 -c src\llvm_runtime.c -o build\seven_runtime_win.o -I"%MSVC_INC%" -I"%UCRT_INC%" -I"%UM_INC%" -I"%SHARED_INC%" -w
 if %ERRORLEVEL% neq 0 (
     echo ERROR: Runtime compilation failed
     exit /b 1
@@ -110,17 +110,17 @@ if %ERRORLEVEL% neq 0 (
 
 REM ---- Verify ----
 echo [3/3] Verifying...
-build\seven-llvm.exe --version
+build\seven.exe --version
 echo.
 echo   Build successful!
-echo   Binary: build\seven-llvm.exe
-echo   Runtime: build\seven_runtime.o
+echo   Binary: build\seven.exe
+echo   Runtime: build\seven_runtime_win.o
 
 echo.
 echo ====================================
 echo Usage:
-echo   build\seven-llvm.exe run app.seven
-echo   build\seven-llvm.exe build app.seven -o app.exe
+echo   seven run app.seven
+echo   seven build app.seven -o app.exe
 echo ====================================
 
 endlocal

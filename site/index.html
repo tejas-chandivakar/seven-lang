@@ -63,7 +63,44 @@
         pre code .fn { color: #67e8f9; }
         pre code .io { color: #f472b6; }
         pre code .op { color: #94a3b8; }
+        [data-theme="light"] { --bg: #ffffff; --bg-nav: rgba(255,255,255,0.8); --bg-card: #f4f5f7; --bg-code: #f0f2f5; --border: rgba(0,0,0,0.08); --text: #1a1a2e; --text-secondary: #4a5568; --text-muted: #718096; }
+        body { background: var(--bg, #09090b); color: var(--text, #e5e7eb); transition: background 0.3s, color 0.3s; }
+        [data-theme="light"] body { background: var(--bg); color: var(--text); }
+        [data-theme="light"] nav { background: var(--bg-nav) !important; border-color: var(--border) !important; }
+        [data-theme="light"] .code-block { background: var(--bg-code) !important; }
+        [data-theme="light"] .code-block pre code { color: #24292f; }
+        [data-theme="light"] .code-block pre code .cm { color: #6a737d; }
+        [data-theme="light"] .code-block pre code .kw { color: #8250df; }
+        [data-theme="light"] .code-block pre code .str { color: #0a8043; }
+        [data-theme="light"] .code-block pre code .num { color: #b35900; }
+        [data-theme="light"] .code-block pre code .fn { color: #0969da; }
+        [data-theme="light"] .code-block pre code .io { color: #cf222e; }
+        [data-theme="light"] .code-block pre code .op { color: #24292f; }
+        [data-theme="light"] h1, [data-theme="light"] h2, [data-theme="light"] h3, [data-theme="light"] h4 { color: #1a1a2e !important; }
+        [data-theme="light"] .text-white { color: #1a1a2e !important; }
+        [data-theme="light"] .text-gray-200 { color: #4a5568 !important; }
+        [data-theme="light"] .text-gray-300 { color: #4a5568 !important; }
+        [data-theme="light"] .text-gray-400 { color: #718096 !important; }
+        [data-theme="light"] .text-gray-500 { color: #a0aec0 !important; }
+        [data-theme="light"] .border-white\/5, [data-theme="light"] .border-white\/10 { border-color: var(--border) !important; }
+        [data-theme="light"] .bg-white\/\[0\.02\], [data-theme="light"] .bg-white\/\[0\.01\], [data-theme="light"] .bg-white\/\[0\.04\] { background: var(--bg-card) !important; }
+        [data-theme="light"] .bg-white\/5 { background: rgba(0,0,0,0.04) !important; }
+        [data-theme="light"] .bg-white\/10 { background: rgba(0,0,0,0.06) !important; }
+        [data-theme="light"] .bg-\[\#09090b\] { background: var(--bg) !important; }
+        [data-theme="light"] .bg-\[\#09090b\]\/80 { background: var(--bg-nav) !important; }
+        [data-theme="light"] footer { border-color: var(--border) !important; }
+        [data-theme="light"] .gradient-text { -webkit-text-fill-color: unset !important; background: none !important; color: #2570f5 !important; }
+        [data-theme="light"] .hero-glow { background: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(59,142,255,0.08), transparent); }
+        [data-theme="light"] #mobileMenu { background: #fff !important; }
+        [data-theme="light"] nav a.text-white { color: #1a1a2e !important; }
+        [data-theme="light"] nav .text-gray-400 { color: #718096 !important; }
+        [data-theme="light"] nav .text-gray-400:hover { color: #1a1a2e !important; }
+        #theme-toggle { cursor: pointer; background: none; border: none; padding: 0.375rem; border-radius: 0.5rem; color: inherit; transition: background 0.2s; }
+        #theme-toggle:hover { background: rgba(128,128,128,0.15); }
     </style>
+    <script>
+        (function(){try{var t=localStorage.getItem('seven-theme');if(t==='light')document.documentElement.setAttribute('data-theme','light')}catch(e){}})();
+    </script>
 </head>
 <body class="bg-[#09090b] text-gray-200 font-sans antialiased">
 
@@ -84,6 +121,10 @@
                         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
                         GitHub
                     </a>
+                    <button id="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">
+                        <svg id="icon-moon" class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+                        <svg id="icon-sun" class="w-5 h-5 text-amber-400" style="display:none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                    </button>
                 </div>
                 <button id="mobileMenuBtn" class="md:hidden text-gray-400 hover:text-white">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
@@ -98,6 +139,9 @@
                 <a href="install.html" class="block text-sm text-gray-400 hover:text-white py-2">Install</a>
                 <a href="playground.html" class="block text-sm text-gray-400 hover:text-white py-2">Playground</a>
                 <a href="https://github.com/tejas-chandivakar/seven-lang" target="_blank" class="block text-sm text-gray-400 hover:text-white py-2">GitHub</a>
+                <button onclick="toggleTheme()" class="flex items-center gap-2 text-sm text-gray-400 hover:text-white py-2 w-full text-left">
+                    <span id="mobile-theme-label">Light Mode</span>
+                </button>
             </div>
         </div>
     </nav>
@@ -119,6 +163,10 @@
                         <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
                         Windows
                     </div>
+                    <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-white/10 bg-white/5 text-gray-400 text-xs font-mono">
+                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+                        Browser (Wasm)
+                    </div>
                 </div>
                 <h1 class="text-5xl sm:text-7xl font-extrabold tracking-tight mb-6 fade-in" style="animation-delay:0.1s">
                     <span class="text-white">Write Simple.</span><br>
@@ -126,7 +174,7 @@
                 </h1>
                 <p class="text-lg sm:text-xl text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed fade-in" style="animation-delay:0.2s">
                     SEVEN is a compiled programming language with English-like syntax that compiles to native machine code via LLVM.
-                    Runs on <strong class="text-white">Linux</strong> and <strong class="text-white">Windows</strong>. No VM. No GC. No overhead.
+                    Runs on <strong class="text-white">Linux</strong>, <strong class="text-white">Windows</strong>, and the <strong class="text-white">Browser</strong>. No VM. No GC. No overhead.
                 </p>
                 <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16 fade-in" style="animation-delay:0.3s">
                     <a href="install.html" class="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-seven-600 hover:bg-seven-500 text-white font-medium transition-all shadow-lg shadow-seven-600/20 hover:shadow-seven-500/30 text-center">
@@ -218,8 +266,8 @@
                     <div class="w-12 h-12 rounded-xl bg-cyan-600/10 flex items-center justify-center mb-4">
                         <svg class="w-6 h-6 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
                     </div>
-                    <h3 class="text-lg font-semibold text-white mb-2">LLVM Backend</h3>
-                    <p class="text-gray-400 text-sm leading-relaxed">High-performance native compilation via LLVM. 33x faster than interpreted mode. Runs on <strong class="text-cyan-300">Linux</strong> and <strong class="text-cyan-300">Windows</strong>.</p>
+                    <h3 class="text-lg font-semibold text-white mb-2">WebAssembly + LLVM</h3>
+                    <p class="text-gray-400 text-sm leading-relaxed">Compile to native via LLVM with <code class="text-cyan-300 font-mono text-xs">-O2</code>/<code class="text-cyan-300 font-mono text-xs">-O3</code> optimization, or target <code class="text-cyan-300 font-mono text-xs">--target wasm32</code> to run in any browser. Cross-platform: <strong class="text-cyan-300">Linux</strong>, <strong class="text-cyan-300">Windows</strong>, <strong class="text-cyan-300">Browser</strong>.</p>
                 </div>
             </div>
         </div>
@@ -610,6 +658,30 @@
             });
             observer.observe(benchSection);
         }
+    </script>
+    <script>
+        function toggleTheme() {
+            var html = document.documentElement;
+            var isLight = html.getAttribute('data-theme') === 'light';
+            if (isLight) {
+                html.removeAttribute('data-theme');
+                try { localStorage.setItem('seven-theme', 'dark'); } catch(e) {}
+            } else {
+                html.setAttribute('data-theme', 'light');
+                try { localStorage.setItem('seven-theme', 'light'); } catch(e) {}
+            }
+            updateThemeIcons();
+        }
+        function updateThemeIcons() {
+            var isLight = document.documentElement.getAttribute('data-theme') === 'light';
+            var moon = document.getElementById('icon-moon');
+            var sun = document.getElementById('icon-sun');
+            var label = document.getElementById('mobile-theme-label');
+            if (moon) moon.style.display = isLight ? 'none' : 'block';
+            if (sun) sun.style.display = isLight ? 'block' : 'none';
+            if (label) label.textContent = isLight ? 'Dark Mode' : 'Light Mode';
+        }
+        updateThemeIcons();
     </script>
 </body>
 </html>

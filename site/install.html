@@ -26,7 +26,43 @@
     <style>
         .code-block { background: #0d1117; }
         .copy-btn:active { transform: scale(0.95); }
+        [data-theme="light"] { --bg: #ffffff; --bg-nav: rgba(255,255,255,0.8); --bg-card: #f4f5f7; --bg-code: #f0f2f5; --border: rgba(0,0,0,0.08); --text: #1a1a2e; --text-secondary: #4a5568; --text-muted: #718096; }
+        body { transition: background 0.3s, color 0.3s; }
+        [data-theme="light"] body { background: var(--bg) !important; color: var(--text) !important; }
+        [data-theme="light"] nav { background: var(--bg-nav) !important; border-color: var(--border) !important; }
+        [data-theme="light"] .code-block { background: var(--bg-code) !important; }
+        [data-theme="light"] .code-block pre code { color: #24292f; }
+        [data-theme="light"] .code-block .text-gray-300 { color: #24292f !important; }
+        [data-theme="light"] .code-block .text-gray-500 { color: #6a737d !important; }
+        [data-theme="light"] .code-block .text-emerald-400 { color: #0a8043 !important; }
+        [data-theme="light"] .code-block .text-pink-400 { color: #cf222e !important; }
+        [data-theme="light"] h1, [data-theme="light"] h2, [data-theme="light"] h3 { color: #1a1a2e !important; }
+        [data-theme="light"] .text-white { color: #1a1a2e !important; }
+        [data-theme="light"] .text-gray-200 { color: #4a5568 !important; }
+        [data-theme="light"] .text-gray-300 { color: #4a5568 !important; }
+        [data-theme="light"] .text-gray-400 { color: #718096 !important; }
+        [data-theme="light"] .text-gray-500 { color: #a0aec0 !important; }
+        [data-theme="light"] .border-white\/5, [data-theme="light"] .border-white\/10 { border-color: var(--border) !important; }
+        [data-theme="light"] .bg-white\/\[0\.02\], [data-theme="light"] .bg-white\/\[0\.03\] { background: var(--bg-card) !important; }
+        [data-theme="light"] .bg-white\/10 { background: rgba(0,0,0,0.06) !important; }
+        [data-theme="light"] .bg-\[\#09090b\] { background: var(--bg) !important; }
+        [data-theme="light"] .bg-\[\#09090b\]\/80 { background: var(--bg-nav) !important; }
+        [data-theme="light"] .border-seven-600\/30 { border-color: rgba(37,112,245,0.2) !important; }
+        [data-theme="light"] .bg-seven-600\/5 { background: rgba(37,112,245,0.05) !important; }
+        [data-theme="light"] .border-emerald-600\/30 { border-color: rgba(5,150,105,0.2) !important; }
+        [data-theme="light"] .bg-emerald-600\/5 { background: rgba(5,150,105,0.05) !important; }
+        [data-theme="light"] footer { border-color: var(--border) !important; }
+        [data-theme="light"] table th { color: #4a5568 !important; }
+        [data-theme="light"] table td { color: #24292f !important; }
+        [data-theme="light"] table .font-mono.text-seven-400 { color: #2570f5 !important; }
+        [data-theme="light"] nav a.text-white { color: #1a1a2e !important; }
+        [data-theme="light"] nav .text-gray-400:hover { color: #1a1a2e !important; }
+        #theme-toggle { cursor: pointer; background: none; border: none; padding: 0.375rem; border-radius: 0.5rem; color: inherit; transition: background 0.2s; }
+        #theme-toggle:hover { background: rgba(128,128,128,0.15); }
     </style>
+    <script>
+        (function(){try{var t=localStorage.getItem('seven-theme');if(t==='light')document.documentElement.setAttribute('data-theme','light')}catch(e){}})();
+    </script>
 </head>
 <body class="bg-[#09090b] text-gray-200 font-sans antialiased">
 
@@ -47,6 +83,10 @@
                         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
                         GitHub
                     </a>
+                    <button id="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">
+                        <svg id="icon-moon" class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+                        <svg id="icon-sun" class="w-5 h-5 text-amber-400" style="display:none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                    </button>
                 </div>
             </div>
         </div>
@@ -148,6 +188,49 @@ seven --version
 <span class="text-gray-500">!! See LLVM IR output</span>
 seven build myprogram.seven --emit-ir</code></pre>
                 </div>
+            </section>
+
+            <!-- Optimization -->
+            <section class="mb-12">
+                <h2 class="text-xl font-semibold text-white mb-4">Optimization Flags</h2>
+                <p class="text-gray-400 text-sm mb-4">SEVEN uses LLVM optimization passes. Default is <code class="text-gray-400 font-mono text-xs">-O2</code>.</p>
+                <div class="code-block rounded-xl border border-white/5 overflow-hidden mb-4">
+                    <div class="flex items-center justify-between px-4 py-2.5 border-b border-white/5">
+                        <span class="text-xs text-gray-500 font-mono">Command Prompt / PowerShell</span>
+                    </div>
+                    <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code><span class="text-gray-500">!! Default optimization (O2)</span>
+seven build app.seven -o app.exe
+
+<span class="text-gray-500">!! Maximum optimization</span>
+seven build app.seven -O3 -o app.exe
+
+<span class="text-gray-500">!! No optimization (faster compile)</span>
+seven build app.seven -O0 -o app.exe</code></pre>
+                </div>
+            </section>
+
+            <!-- WebAssembly -->
+            <section class="mb-12 p-6 rounded-2xl border border-emerald-600/30 bg-emerald-600/5">
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-emerald-600/20 text-emerald-400 border border-emerald-600/30">NEW</span>
+                    <h2 class="text-xl font-semibold text-white">Run in the Browser (WebAssembly)</h2>
+                </div>
+                <p class="text-gray-400 text-sm mb-4">Compile to WebAssembly using WSL and run in any browser.</p>
+                <div class="code-block rounded-xl border border-white/5 overflow-hidden mb-4">
+                    <div class="flex items-center justify-between px-4 py-2.5 border-b border-white/5">
+                        <span class="text-xs text-gray-500 font-mono">WSL Terminal</span>
+                        <button onclick="copyCode(this)" class="copy-btn text-xs text-gray-500 hover:text-white transition px-2 py-1 rounded">Copy</button>
+                    </div>
+                    <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code><span class="text-gray-500"># Install linker (one-time)</span>
+sudo apt install lld-21
+
+<span class="text-gray-500"># Compile to WebAssembly</span>
+./build/seven build app.seven --target wasm -o build/app
+
+<span class="text-gray-500"># Serve and open in browser</span>
+python3 -m http.server 8000 --directory build</code></pre>
+                </div>
+                <p class="text-sm text-gray-500">Open <code class="text-gray-400 font-mono text-xs">http://localhost:8000/app.html</code> in your browser. The compiler generates both <code class="text-gray-400 font-mono text-xs">.wasm</code> and <code class="text-gray-400 font-mono text-xs">.html</code> automatically.</p>
             </section>
 
             <!-- VS Code on Windows -->
@@ -286,6 +369,68 @@ make llvm</code></pre>
                 </div>
             </section>
 
+            <!-- Optimization -->
+            <section class="mb-12">
+                <h2 class="text-xl font-semibold text-white mb-4">Optimization Flags</h2>
+                <p class="text-gray-400 text-sm mb-4">SEVEN uses LLVM optimization passes. Default is <code class="text-gray-400 font-mono text-xs">-O2</code>.</p>
+                <div class="code-block rounded-xl border border-white/5 overflow-hidden mb-4">
+                    <div class="flex items-center justify-between px-4 py-2.5 border-b border-white/5">
+                        <span class="text-xs text-gray-500 font-mono">Terminal</span>
+                    </div>
+                    <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code><span class="text-gray-500">!! Default optimization (O2)</span>
+./build/seven build app.seven
+
+<span class="text-gray-500">!! Maximum optimization</span>
+./build/seven build app.seven -O3
+
+<span class="text-gray-500">!! No optimization (faster compile, slower output)</span>
+./build/seven build app.seven -O0</code></pre>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm border-collapse">
+                        <thead><tr class="border-b border-white/10"><th class="text-left py-2 pr-4 text-gray-400 font-medium">Flag</th><th class="text-left py-2 text-gray-400 font-medium">Description</th></tr></thead>
+                        <tbody class="text-gray-300">
+                            <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">-O0</td><td class="py-2">No optimization — fastest compile time</td></tr>
+                            <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">-O1</td><td class="py-2">Basic optimizations</td></tr>
+                            <tr class="border-b border-white/5"><td class="py-2 pr-4 font-mono text-xs text-seven-400">-O2</td><td class="py-2">Recommended (default) — good balance of speed</td></tr>
+                            <tr><td class="py-2 pr-4 font-mono text-xs text-seven-400">-O3</td><td class="py-2">Aggressive — maximum runtime speed</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- WebAssembly -->
+            <section class="mb-12 p-6 rounded-2xl border border-emerald-600/30 bg-emerald-600/5">
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-emerald-600/20 text-emerald-400 border border-emerald-600/30">NEW</span>
+                    <h2 class="text-xl font-semibold text-white">Run in the Browser (WebAssembly)</h2>
+                </div>
+                <p class="text-gray-400 text-sm mb-4">Compile any SEVEN program to WebAssembly and run it in any modern browser. No plugins needed.</p>
+                <div class="code-block rounded-xl border border-white/5 overflow-hidden mb-4">
+                    <div class="flex items-center justify-between px-4 py-2.5 border-b border-white/5">
+                        <span class="text-xs text-gray-500 font-mono">Step 1 — Install wasm-ld (one-time)</span>
+                        <button onclick="copyCode(this)" class="copy-btn text-xs text-gray-500 hover:text-white transition px-2 py-1 rounded">Copy</button>
+                    </div>
+                    <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>sudo apt install lld-21</code></pre>
+                </div>
+                <div class="code-block rounded-xl border border-white/5 overflow-hidden mb-4">
+                    <div class="flex items-center justify-between px-4 py-2.5 border-b border-white/5">
+                        <span class="text-xs text-gray-500 font-mono">Step 2 — Compile to WebAssembly</span>
+                        <button onclick="copyCode(this)" class="copy-btn text-xs text-gray-500 hover:text-white transition px-2 py-1 rounded">Copy</button>
+                    </div>
+                    <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>./build/seven build app.seven --target wasm -o build/app</code></pre>
+                </div>
+                <div class="code-block rounded-xl border border-white/5 overflow-hidden mb-4">
+                    <div class="flex items-center justify-between px-4 py-2.5 border-b border-white/5">
+                        <span class="text-xs text-gray-500 font-mono">Step 3 — Serve and open in browser</span>
+                        <button onclick="copyCode(this)" class="copy-btn text-xs text-gray-500 hover:text-white transition px-2 py-1 rounded">Copy</button>
+                    </div>
+                    <pre class="px-5 py-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>python3 -m http.server 8000 --directory build
+<span class="text-gray-500"># Open http://localhost:8000/app.html in your browser</span></code></pre>
+                </div>
+                <p class="text-sm text-gray-500">The compiler generates both <code class="text-gray-400 font-mono text-xs">app.wasm</code> and <code class="text-gray-400 font-mono text-xs">app.html</code> (with JavaScript bridge). Just open the HTML file to see output.</p>
+            </section>
+
             <!-- VS Code Extension -->
             <section class="p-6 rounded-2xl border border-white/5 bg-white/[0.02]">
                 <h2 class="text-xl font-semibold text-white mb-3">VS Code Extension</h2>
@@ -307,7 +452,7 @@ code --install-extension .</code></pre>
             <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div class="flex items-center gap-2.5">
                     <div class="w-6 h-6 rounded-md bg-seven-600 flex items-center justify-center font-mono font-bold text-white text-xs">7</div>
-                    <span class="text-sm text-gray-500">SEVEN Language &copy; 2024 Tejas Chandivakar</span>
+                    <span class="text-sm text-gray-500">SEVEN Language &copy; 2024-2026 Tejas Chandivakar</span>
                 </div>
                 <div class="flex items-center gap-6">
                     <a href="docs.html" class="text-sm text-gray-500 hover:text-gray-300 transition-colors">Docs</a>
@@ -326,6 +471,28 @@ code --install-extension .</code></pre>
                 setTimeout(() => btn.textContent = 'Copy', 2000);
             });
         }
+    </script>
+    <script>
+        function toggleTheme() {
+            var html = document.documentElement;
+            var isLight = html.getAttribute('data-theme') === 'light';
+            if (isLight) {
+                html.removeAttribute('data-theme');
+                try { localStorage.setItem('seven-theme', 'dark'); } catch(e) {}
+            } else {
+                html.setAttribute('data-theme', 'light');
+                try { localStorage.setItem('seven-theme', 'light'); } catch(e) {}
+            }
+            updateThemeIcons();
+        }
+        function updateThemeIcons() {
+            var isLight = document.documentElement.getAttribute('data-theme') === 'light';
+            var moon = document.getElementById('icon-moon');
+            var sun = document.getElementById('icon-sun');
+            if (moon) moon.style.display = isLight ? 'none' : 'block';
+            if (sun) sun.style.display = isLight ? 'block' : 'none';
+        }
+        updateThemeIcons();
     </script>
 </body>
 </html>

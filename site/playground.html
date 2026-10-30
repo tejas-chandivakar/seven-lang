@@ -38,7 +38,31 @@
         pre code .io { color: #f472b6; }
         pre code .op { color: #94a3b8; }
         .example-btn.active { background: rgba(37,112,245,0.15); border-color: rgba(59,142,255,0.4); color: #59b0ff; }
+        /* Light theme */
+        [data-theme="light"] { --bg: #ffffff; --bg-secondary: #f4f5f7; --text: #1a1a2e; --text-secondary: #4a5568; --border: #e2e8f0; --code-bg: #f1f5f9; }
+        [data-theme="light"] body { background: var(--bg); color: var(--text); }
+        [data-theme="light"] nav { background: rgba(255,255,255,0.85); border-color: var(--border); }
+        [data-theme="light"] .text-white { color: var(--text) !important; }
+        [data-theme="light"] .text-gray-200 { color: var(--text-secondary) !important; }
+        [data-theme="light"] .text-gray-400 { color: #64748b !important; }
+        [data-theme="light"] .text-gray-500 { color: #94a3b8 !important; }
+        [data-theme="light"] .code-block { background: var(--code-bg); }
+        [data-theme="light"] .border-white\/5 { border-color: var(--border) !important; }
+        [data-theme="light"] footer { border-color: var(--border); }
+        [data-theme="light"] pre code .kw { color: #7c3aed; }
+        [data-theme="light"] pre code .str { color: #059669; }
+        [data-theme="light"] pre code .num { color: #d97706; }
+        [data-theme="light"] pre code .cm { color: #9ca3af; }
+        [data-theme="light"] pre code .fn { color: #0891b2; }
+        [data-theme="light"] pre code .io { color: #db2777; }
+        [data-theme="light"] pre code .op { color: #475569; }
+        [data-theme="light"] .example-btn.active { background: rgba(37,112,245,0.1); color: #2570f5; }
+        [data-theme="light"] .text-emerald-300\/90 { color: #059669 !important; }
+        [data-theme="light"] .text-emerald-400 { color: #059669 !important; }
+        #themeToggle { background: none; border: none; cursor: pointer; padding: 0.5rem; border-radius: 0.5rem; transition: background 0.2s; }
+        #themeToggle:hover { background: rgba(128,128,128,0.15); }
     </style>
+    <script>try{if(localStorage.getItem('seven-theme')==='light')document.documentElement.setAttribute('data-theme','light')}catch(e){}</script>
 </head>
 <body class="bg-[#09090b] text-gray-200 font-sans antialiased">
 
@@ -59,6 +83,10 @@
                         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
                         GitHub
                     </a>
+                    <button id="themeToggle" title="Toggle theme">
+                        <svg id="sunIcon" class="w-5 h-5 text-amber-400 hidden" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z"/></svg>
+                        <svg id="moonIcon" class="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/></svg>
+                    </button>
                 </div>
                 <button id="mobileMenuBtn" class="md:hidden text-gray-400 hover:text-white">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
@@ -257,6 +285,25 @@
     document.getElementById('mobileMenuBtn').addEventListener('click', function() {
         document.getElementById('mobileMenu').classList.toggle('hidden');
     });
+    </script>
+    <script>
+    (function(){
+        const btn = document.getElementById('themeToggle');
+        const sun = document.getElementById('sunIcon');
+        const moon = document.getElementById('moonIcon');
+        function applyIcons() {
+            const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+            sun.classList.toggle('hidden', !isLight);
+            moon.classList.toggle('hidden', isLight);
+        }
+        applyIcons();
+        btn.addEventListener('click', function() {
+            const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+            if (isLight) { document.documentElement.removeAttribute('data-theme'); try{localStorage.setItem('seven-theme','dark')}catch(e){} }
+            else { document.documentElement.setAttribute('data-theme','light'); try{localStorage.setItem('seven-theme','light')}catch(e){} }
+            applyIcons();
+        });
+    })();
     </script>
 </body>
 </html>

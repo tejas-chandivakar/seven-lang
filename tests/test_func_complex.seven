@@ -1,0 +1,69 @@
+!! Test: complex function body registration
+
+func complex_func()
+    t = 1
+    v = 2
+
+    if t == 1
+        return 10
+    end
+
+    if t == 2
+        return 20
+    end
+
+    if t == 3 and v == 4
+        return 30
+    end
+
+    if t == 4
+        if v == 5
+            return 40
+        end
+        return 41
+    end
+
+    if t == 5
+        arr = []
+        if v == 0
+            push(arr, 1)
+            while v < 10
+                v = v + 1
+            end
+        end
+        return 50
+    end
+
+    if t == 6
+        while v > 0
+            if v == 3
+                return 60
+            end
+            v = v - 1
+        end
+        return 61
+    end
+
+    if t == 7
+        return 70
+    end
+
+    if t == 8
+        return 80
+    end
+
+    if t == 9
+        return 90
+    end
+
+    if t == 10
+        return 100
+    end
+
+    return 0
+end
+
+show "func defined"
+r = complex_func()
+show r
+show "done"

@@ -247,6 +247,12 @@ void seven_codegen_set_target(SevenModule *mod, const char *triple) {
     LLVMSetTarget(mod->module, triple);
 }
 
+void seven_codegen_set_opt(SevenModule *mod, int level) {
+    if (level < 0) level = 0;
+    if (level > 3) level = 3;
+    mod->opt_level = level;
+}
+
 // ---- Expression compiler ----
 // Returns LLVMValueRef (i64 for numbers, i8* for strings)
 
@@ -642,30 +648,27 @@ static void compile_show(SevenModule *mod) {
     Token *t = lexer_peek(mod->lex);
 
     if (t->type == TOK_STRING) {
-        // show "string"
         LLVMValueRef str = compile_expr(mod);
-        LLVMValueRef args[] = { mod->fmt_str_nl, str };
+        LLVMValueRef args[] = { str };
         LLVMBuildCall2(mod->builder,
-            LLVMFunctionType(LLVMInt32TypeInContext(mod->ctx),
-                (LLVMTypeRef[]){ LLVMPointerTypeInContext(mod->ctx, 0) }, 1, 1),
-            mod->fn_printf, args, 2, "");
+            LLVMFunctionType(LLVMVoidTypeInContext(mod->ctx),
+                (LLVMTypeRef[]){ LLVMPointerTypeInContext(mod->ctx, 0) }, 1, 0),
+            rt_show_str, args, 1, "");
     } else {
-        // show expression (integer)
         LLVMValueRef val = compile_expr(mod);
 
-        // Check if it's a pointer (string) or integer
         if (LLVMGetTypeKind(LLVMTypeOf(val)) == LLVMPointerTypeKind) {
-            LLVMValueRef args[] = { mod->fmt_str_nl, val };
+            LLVMValueRef args[] = { val };
             LLVMBuildCall2(mod->builder,
-                LLVMFunctionType(LLVMInt32TypeInContext(mod->ctx),
-                    (LLVMTypeRef[]){ LLVMPointerTypeInContext(mod->ctx, 0) }, 1, 1),
-                mod->fn_printf, args, 2, "");
+                LLVMFunctionType(LLVMVoidTypeInContext(mod->ctx),
+                    (LLVMTypeRef[]){ LLVMPointerTypeInContext(mod->ctx, 0) }, 1, 0),
+                rt_show_str, args, 1, "");
         } else {
-            LLVMValueRef args[] = { mod->fmt_int_nl, val };
+            LLVMValueRef args[] = { val };
             LLVMBuildCall2(mod->builder,
-                LLVMFunctionType(LLVMInt32TypeInContext(mod->ctx),
-                    (LLVMTypeRef[]){ LLVMPointerTypeInContext(mod->ctx, 0) }, 1, 1),
-                mod->fn_printf, args, 2, "");
+                LLVMFunctionType(LLVMVoidTypeInContext(mod->ctx),
+                    (LLVMTypeRef[]){ LLVMInt64TypeInContext(mod->ctx) }, 1, 0),
+                rt_show_int, args, 1, "");
         }
     }
 }
@@ -1395,6 +1398,7 @@ static void compile_statement(SevenModule *mod) {
         case TOK_WRITE:   compile_write_file(mod); break;
         case TOK_DELETE:   compile_delete_file(mod); break;
         case TOK_APPEND:   compile_append_file(mod); break;
+        case TOK_SET:     lexer_next(mod->lex); compile_assignment(mod); break;
         case TOK_RESULT:
         case TOK_IDENT:   compile_assignment(mod); break;
         case TOK_EOF:     break;
@@ -1473,11 +1477,33 @@ int seven_codegen_emit(SevenModule *mod, const char *output, int run_after) {
         return 0;
     }
 
+    LLVMCodeGenOptLevel cg_level;
+    switch (mod->opt_level) {
+        case 0:  cg_level = LLVMCodeGenLevelNone; break;
+        case 1:  cg_level = LLVMCodeGenLevelLess; break;
+        case 2:  cg_level = LLVMCodeGenLevelDefault; break;
+        default: cg_level = LLVMCodeGenLevelAggressive; break;
+    }
+
     LLVMTargetMachineRef machine = LLVMCreateTargetMachine(
         target, triple, "generic", "",
-        LLVMCodeGenLevelAggressive,
+        cg_level,
         LLVMRelocPIC,
         LLVMCodeModelDefault);
+
+    // Run optimization passes
+    if (mod->opt_level > 0) {
+        char passes[32];
+        snprintf(passes, sizeof(passes), "default<O%d>", mod->opt_level);
+        LLVMPassBuilderOptionsRef opts = LLVMCreatePassBuilderOptions();
+        LLVMErrorRef err = LLVMRunPasses(mod->module, passes, machine, opts);
+        if (err) {
+            char *msg = LLVMGetErrorMessage(err);
+            fprintf(stderr, "warning: optimization failed: %s\n", msg);
+            LLVMDisposeErrorMessage(msg);
+        }
+        LLVMDisposePassBuilderOptions(opts);
+    }
 
     // Emit object file
     char obj_path[512];
@@ -1489,6 +1515,185 @@ int seven_codegen_emit(SevenModule *mod, const char *output, int run_after) {
         LLVMDisposeMessage(error);
         LLVMDisposeTargetMachine(machine);
         return 0;
+    }
+
+    int is_wasm = (strstr(triple, "wasm") != NULL);
+
+    // WebAssembly target: different linking pipeline
+    if (is_wasm) {
+        // Compile wasm runtime
+        char rt_src[512], rt_wasm_obj[512];
+        char exe_dir_w[512] = "";
+#ifdef _WIN32
+        {
+            char exe_path[512];
+            DWORD elen = GetModuleFileNameA(NULL, exe_path, sizeof(exe_path));
+            if (elen > 0) {
+                strncpy(exe_dir_w, exe_path, sizeof(exe_dir_w) - 1);
+                char *sep = strrchr(exe_dir_w, '\\');
+                if (!sep) sep = strrchr(exe_dir_w, '/');
+                if (sep) *(sep + 1) = '\0';
+            }
+        }
+#else
+        {
+            ssize_t elen = readlink("/proc/self/exe", exe_dir_w, sizeof(exe_dir_w) - 1);
+            if (elen > 0) {
+                exe_dir_w[elen] = '\0';
+                char *slash = strrchr(exe_dir_w, '/');
+                if (slash) *(slash + 1) = '\0';
+            }
+        }
+#endif
+        // Find clang for wasm compilation
+        const char *clang_w = NULL;
+#ifdef _WIN32
+        if (system("clang --version >NUL 2>&1") == 0) clang_w = "clang";
+#else
+        if (system("clang-21 --version >/dev/null 2>&1") == 0) clang_w = "clang-21";
+        else if (system("clang --version >/dev/null 2>&1") == 0) clang_w = "clang";
+#endif
+        if (!clang_w) {
+            fprintf(stderr, "error: clang not found\n");
+            remove(obj_path);
+            LLVMDisposeTargetMachine(machine);
+            return 0;
+        }
+
+        // Find wasm runtime source next to our binary's source
+        // Look for llvm_runtime_wasm.c relative to exe dir, then in src/
+        snprintf(rt_src, sizeof(rt_src), "%s../src/llvm_runtime_wasm.c", exe_dir_w);
+        FILE *tf = fopen(rt_src, "r");
+        if (!tf) {
+            snprintf(rt_src, sizeof(rt_src), "%sllvm_runtime_wasm.c", exe_dir_w);
+            tf = fopen(rt_src, "r");
+        }
+        if (!tf) {
+            snprintf(rt_src, sizeof(rt_src), "src/llvm_runtime_wasm.c");
+            tf = fopen(rt_src, "r");
+        }
+        if (tf) fclose(tf);
+        else {
+            fprintf(stderr, "error: wasm runtime not found (llvm_runtime_wasm.c)\n");
+            remove(obj_path);
+            LLVMDisposeTargetMachine(machine);
+            return 0;
+        }
+
+        snprintf(rt_wasm_obj, sizeof(rt_wasm_obj), "%s_rt.o", output);
+
+        // Compile wasm runtime to .o
+        char cmd_w[2048];
+        snprintf(cmd_w, sizeof(cmd_w),
+            "%s --target=wasm32-unknown-unknown -O2 -c \"%s\" -o \"%s\" -nostdlib -ffreestanding 2>&1",
+            clang_w, rt_src, rt_wasm_obj);
+        if (system(cmd_w) != 0) {
+            fprintf(stderr, "error: wasm runtime compilation failed\n");
+            remove(obj_path);
+            LLVMDisposeTargetMachine(machine);
+            return 0;
+        }
+
+        // Ensure output ends with .wasm
+        char wasm_out[512];
+        strncpy(wasm_out, output, sizeof(wasm_out) - 6);
+        char *ext = strrchr(wasm_out, '.');
+        if (!ext || strcmp(ext, ".wasm") != 0) {
+            if (ext) *ext = '\0';
+            strcat(wasm_out, ".wasm");
+        }
+
+        // Find wasm-ld
+        const char *wasm_ld = NULL;
+#ifdef _WIN32
+        if (system("wasm-ld --version >NUL 2>&1") == 0) wasm_ld = "wasm-ld";
+#else
+        if (system("wasm-ld-21 --version >/dev/null 2>&1") == 0) wasm_ld = "wasm-ld-21";
+        else if (system("wasm-ld --version >/dev/null 2>&1") == 0) wasm_ld = "wasm-ld";
+#endif
+        if (!wasm_ld) {
+            fprintf(stderr, "error: wasm-ld not found. Install lld.\n");
+            remove(obj_path);
+            remove(rt_wasm_obj);
+            LLVMDisposeTargetMachine(machine);
+            return 0;
+        }
+
+        // Link with wasm-ld
+        snprintf(cmd_w, sizeof(cmd_w),
+            "%s --no-entry --export=main --export=__heap_base --export=__data_end "
+            "--allow-undefined \"%s\" \"%s\" -o \"%s\" 2>&1",
+            wasm_ld, obj_path, rt_wasm_obj, wasm_out);
+        int wret = system(cmd_w);
+        remove(obj_path);
+        remove(rt_wasm_obj);
+
+        if (wret != 0) {
+            fprintf(stderr, "error: wasm linking failed\n");
+            LLVMDisposeTargetMachine(machine);
+            return 0;
+        }
+
+        // Generate HTML wrapper
+        char html_out[512];
+        strncpy(html_out, wasm_out, sizeof(html_out) - 1);
+        ext = strrchr(html_out, '.');
+        if (ext) *ext = '\0';
+        strcat(html_out, ".html");
+
+        // Get just the wasm filename for the HTML
+        const char *wasm_name = strrchr(wasm_out, '/');
+#ifdef _WIN32
+        const char *wasm_name2 = strrchr(wasm_out, '\\');
+        if (wasm_name2 && (!wasm_name || wasm_name2 > wasm_name)) wasm_name = wasm_name2;
+#endif
+        if (wasm_name) wasm_name++; else wasm_name = wasm_out;
+
+        FILE *hf = fopen(html_out, "w");
+        if (hf) {
+            fprintf(hf,
+                "<!DOCTYPE html>\n"
+                "<html><head><meta charset=\"utf-8\"><title>SEVEN — %s</title>\n"
+                "<style>\n"
+                "body{background:#0d1117;color:#c9d1d9;font-family:'JetBrains Mono',monospace;padding:2rem}\n"
+                "#output{white-space:pre-wrap;font-size:14px;line-height:1.6}\n"
+                "h3{color:#58a6ff;margin-bottom:1rem}\n"
+                "</style></head><body>\n"
+                "<h3>SEVEN Program Output</h3>\n"
+                "<div id=\"output\"></div>\n"
+                "<script>\n"
+                "const out = document.getElementById('output');\n"
+                "const decoder = new TextDecoder();\n"
+                "let memory;\n"
+                "const importObject = { env: {\n"
+                "  js_print_int(val) { out.textContent += val + '\\n'; },\n"
+                "  js_print_str(ptr, len) {\n"
+                "    const bytes = new Uint8Array(memory.buffer, ptr, len);\n"
+                "    out.textContent += decoder.decode(bytes);\n"
+                "  },\n"
+                "  js_print_nl() { out.textContent += '\\n'; }\n"
+                "}};\n"
+                "fetch('%s').then(r => r.arrayBuffer()).then(bytes =>\n"
+                "  WebAssembly.instantiate(bytes, importObject)\n"
+                ").then(({instance}) => {\n"
+                "  memory = instance.exports.memory;\n"
+                "  instance.exports.main();\n"
+                "}).catch(e => { out.textContent = 'Error: ' + e; });\n"
+                "</script></body></html>\n",
+                wasm_name, wasm_name);
+            fclose(hf);
+        }
+
+        fprintf(stderr, "Compiled: %s\n", wasm_out);
+        if (hf) fprintf(stderr, "  HTML:   %s\n", html_out);
+
+        if (run_after) {
+            fprintf(stderr, "  Open %s in a browser to run.\n", html_out);
+            // Could auto-open browser here, but keep it simple
+        }
+
+        LLVMDisposeTargetMachine(machine);
+        return 1;
     }
 
     // Find runtime object next to our executable

@@ -1,0 +1,204 @@
+!! Test: does defining parse_primary hang?
+
+TOK_IDENT = 1
+TOK_INT = 2
+TOK_FLOAT = 3
+TOK_STRING = 4
+TOK_KEYWORD = 5
+TOK_OP = 6
+TOK_PUNCT = 7
+TOK_NEWLINE = 8
+TOK_EOF = 9
+
+p_types = []
+p_vals = []
+p_pos = 0
+p_len = 0
+
+func p_cur_type()
+    if p_pos >= p_len
+        return TOK_EOF
+    end
+    return p_types[p_pos]
+end
+
+func p_cur_val()
+    if p_pos >= p_len
+        return ""
+    end
+    return p_vals[p_pos]
+end
+
+func p_advance()
+    p_pos = p_pos + 1
+end
+
+func p_match_punct(ch)
+    if p_cur_type() == TOK_PUNCT and p_cur_val() == ch
+        return 1
+    end
+    return 0
+end
+
+func p_match_op(op)
+    if p_cur_type() == TOK_OP and p_cur_val() == op
+        return 1
+    end
+    return 0
+end
+
+func p_expect_val(val)
+    p_advance()
+end
+
+func mk(typ)
+    n = map_new()
+    n = map_set(n, "type", typ)
+    return n
+end
+
+show "step 1"
+
+func parse_expr()
+    return parse_or()
+end
+
+func parse_or()
+    return parse_and()
+end
+
+func parse_and()
+    return parse_cmp()
+end
+
+func parse_cmp()
+    return parse_add()
+end
+
+func parse_add()
+    left = parse_mul()
+    while p_match_op("+") == 1 or p_match_op("-") == 1
+        p_advance()
+        right = parse_mul()
+        left = right
+    end
+    return left
+end
+
+func parse_mul()
+    left = parse_primary()
+    while p_match_op("*") == 1 or p_match_op("/") == 1
+        p_advance()
+        right = parse_primary()
+        left = right
+    end
+    return left
+end
+
+show "step 2"
+
+func parse_primary()
+    t = p_cur_type()
+    v = p_cur_val()
+
+    if t == TOK_INT or t == TOK_FLOAT
+        p_advance()
+        n = mk("number")
+        n = map_set(n, "value", v)
+        return n
+    end
+
+    if t == TOK_STRING
+        p_advance()
+        n = mk("string")
+        n = map_set(n, "value", v)
+        return n
+    end
+
+    if t == TOK_KEYWORD and v == "true"
+        p_advance()
+        return mk("number")
+    end
+
+    if t == TOK_KEYWORD and v == "false"
+        p_advance()
+        return mk("number")
+    end
+
+    if t == TOK_KEYWORD and v == "not"
+        p_advance()
+        expr = parse_primary()
+        return mk("unary")
+    end
+
+    if t == TOK_OP and v == "-"
+        p_advance()
+        expr = parse_primary()
+        return mk("unary")
+    end
+
+    if t == TOK_PUNCT and v == "["
+        p_advance()
+        elems = []
+        if p_match_punct("]") == 0
+            el = parse_expr()
+            push(elems, el)
+            while p_match_punct(",") == 1
+                p_advance()
+                el = parse_expr()
+                push(elems, el)
+            end
+        end
+        p_expect_val("]")
+        return mk("array")
+    end
+
+    if t == TOK_PUNCT and v == "("
+        p_advance()
+        expr = parse_expr()
+        p_expect_val(")")
+        return expr
+    end
+
+    if t == TOK_IDENT
+        name = v
+        p_advance()
+        if p_match_punct("(") == 1
+            p_advance()
+            args = []
+            if p_match_punct(")") == 0
+                arg = parse_expr()
+                push(args, arg)
+                while p_match_punct(",") == 1
+                    p_advance()
+                    arg = parse_expr()
+                    push(args, arg)
+                end
+            end
+            p_expect_val(")")
+            return mk("call")
+        end
+        if p_match_punct("[") == 1
+            p_advance()
+            idx = parse_expr()
+            p_expect_val("]")
+            return mk("index")
+        end
+        return mk("ident")
+    end
+
+    p_advance()
+    return mk("error")
+end
+
+show "step 3"
+
+!! Quick test
+p_types = [TOK_INT, TOK_EOF]
+p_vals = ["42", ""]
+p_pos = 0
+p_len = 2
+n = parse_primary()
+t = map_get(n, "type")
+show "parsed: {t}"
+show "done"

@@ -1,0 +1,146 @@
+TOK_IDENT = 1
+TOK_INT = 2
+TOK_OP = 6
+TOK_EOF = 9
+
+kw = map_new()
+kw = map_set(kw, "show", 1)
+
+func is_alpha(c)
+    a = ord(c)
+    if a >= 65 and a <= 90
+        return 1
+    end
+    if a >= 97 and a <= 122
+        return 1
+    end
+    if a == 95
+        return 1
+    end
+    return 0
+end
+
+func is_digit(c)
+    a = ord(c)
+    if a >= 48 and a <= 57
+        return 1
+    end
+    return 0
+end
+
+func is_alnum(c)
+    if is_alpha(c) == 1
+        return 1
+    end
+    if is_digit(c) == 1
+        return 1
+    end
+    return 0
+end
+
+func is_space(c)
+    a = ord(c)
+    if a == 32 or a == 9 or a == 13
+        return 1
+    end
+    return 0
+end
+
+tok_types = []
+tok_vals  = []
+
+func lex_emit(typ, val)
+    push(tok_types, typ)
+    push(tok_vals, val)
+end
+
+func lex_run(source)
+    pos = 0
+    slen = len(source)
+    while pos < slen
+        c = char_at(source, pos)
+        a = ord(c)
+        if is_space(c) == 1
+            pos = pos + 1
+        elif is_digit(c) == 1
+            start = pos
+            pos = pos + 1
+            while pos < slen and is_digit(char_at(source, pos)) == 1
+                pos = pos + 1
+            end
+            nval = substr(source, start, pos - start)
+            lex_emit(TOK_INT, nval)
+        elif is_alpha(c) == 1
+            start = pos
+            pos = pos + 1
+            brk = 0
+            while pos < slen and brk == 0
+                ic = char_at(source, pos)
+                if is_alnum(ic) == 1
+                    pos = pos + 1
+                else
+                    brk = 1
+                end
+            end
+            word = substr(source, start, pos - start)
+            lex_emit(TOK_IDENT, word)
+        elif a == 61
+            lex_emit(TOK_OP, "=")
+            pos = pos + 1
+        elif a == 43
+            lex_emit(TOK_OP, "+")
+            pos = pos + 1
+        else
+            pos = pos + 1
+        end
+    end
+    lex_emit(TOK_EOF, "")
+end
+
+!! Now define 30 dummy functions
+func d1(x) return x end
+func d2(x) return x end
+func d3(x) return x end
+func d4(x) return x end
+func d5(x) return x end
+func d6(x) return x end
+func d7(x) return x end
+func d8(x) return x end
+func d9(x) return x end
+func d10(x) return x end
+func d11(x) return x end
+func d12(x) return x end
+func d13(x) return x end
+func d14(x) return x end
+func d15(x) return x end
+func d16(x) return x end
+func d17(x) return x end
+func d18(x) return x end
+func d19(x) return x end
+func d20(x) return x end
+func d21(x) return x end
+func d22(x) return x end
+func d23(x) return x end
+func d24(x) return x end
+func d25(x) return x end
+func d26(x) return x end
+func d27(x) return x end
+func d28(x) return x end
+func d29(x) return x end
+func d30(x) return x end
+
+show "before lex"
+tok_types = []
+tok_vals = []
+lex_run("x = 42")
+show "after lex"
+n = len(tok_types)
+show n
+i = 0
+while i < n
+    t = tok_types[i]
+    v = tok_vals[i]
+    show "{t}: {v}"
+    i = i + 1
+end
+show "done"

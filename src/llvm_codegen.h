@@ -10,6 +10,7 @@
 #include <llvm-c/Target.h>
 #include <llvm-c/TargetMachine.h>
 #include <llvm-c/BitWriter.h>
+#include <llvm-c/Transforms/PassBuilder.h>
 #include "llvm_lexer.h"
 
 #define MAX_VARS 1024
@@ -71,6 +72,9 @@ typedef struct {
     // Target
     const char *target_triple;
 
+    // Optimization level (0-3)
+    int opt_level;
+
     // Lexer ref
     Lexer *lex;
 } SevenModule;
@@ -80,6 +84,9 @@ void seven_codegen_init(SevenModule *mod, const char *name);
 
 // Set target triple for cross-compilation
 void seven_codegen_set_target(SevenModule *mod, const char *triple);
+
+// Set optimization level (0-3)
+void seven_codegen_set_opt(SevenModule *mod, int level);
 
 // Compile token stream to LLVM IR
 int seven_codegen_compile(SevenModule *mod, Lexer *lex);

@@ -1,0 +1,8 @@
+set n = 100000000
+set total = 0
+set i = 0
+repeat n
+    set total = total + i
+    set i = i + 1
+done
+show total

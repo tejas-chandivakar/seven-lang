@@ -77,7 +77,6 @@
         [data-theme="light"] .text-seven-400 { color: #1d4ed8 !important; }
         [data-theme="light"] .border-white\/10 { border-color: var(--border) !important; }
         [data-theme="light"] .bg-white\/5 { background: var(--bg-card) !important; }
-        [data-theme="light"] .code-block { background: var(--bg-code) !important; border: 2px solid var(--border) !important; box-shadow: 0 2px 8px rgba(0,0,0,0.08) !important; }
         [data-theme="light"] .code-block .border-white\/5 { border-color: var(--border-light) !important; }
         [data-theme="light"] .code-block pre code { color: #1e293b; }
         [data-theme="light"] .code-block pre code .cm { color: #64748b; }
@@ -91,9 +90,9 @@
         [data-theme="light"] .text-white { color: #0f172a !important; }
         [data-theme="light"] .text-gray-200 { color: #1e293b !important; }
         [data-theme="light"] .text-gray-300 { color: #334155 !important; }
-        [data-theme="light"] .text-gray-400 { color: #475569 !important; }
-        [data-theme="light"] .text-gray-500 { color: #64748b !important; }
-        [data-theme="light"] p, [data-theme="light"] li, [data-theme="light"] span { color: inherit; }
+        [data-theme="light"] .text-gray-400 { color: #374151 !important; }
+        [data-theme="light"] .text-gray-500 { color: #4b5563 !important; }
+        [data-theme="light"] p, [data-theme="light"] li { color: inherit; }
         [data-theme="light"] .border-white\/5 { border-color: var(--border-light) !important; }
         [data-theme="light"] .bg-white\/\[0\.02\], [data-theme="light"] .bg-white\/\[0\.01\], [data-theme="light"] .bg-white\/\[0\.04\] { background: var(--bg-secondary) !important; }
         [data-theme="light"] .bg-white\/10 { background: rgba(0,0,0,0.06) !important; }
@@ -102,10 +101,22 @@
         [data-theme="light"] a.border-white\/10 { border-color: var(--border) !important; color: #1e293b !important; }
         [data-theme="light"] a.border-white\/10:hover { border-color: #1d4ed8 !important; color: #1d4ed8 !important; background: rgba(29,78,216,0.05) !important; }
         [data-theme="light"] #benchmarks .bg-white\/5 { background: #dde3ec !important; }
-        [data-theme="light"] .tab-btn { color: #475569 !important; border-color: var(--border) !important; }
+        [data-theme="light"] .tab-btn { color: #374151 !important; border-color: var(--border) !important; }
         [data-theme="light"] .tab-btn:hover { color: #0f172a !important; background: rgba(0,0,0,0.03) !important; }
         [data-theme="light"] .tab-btn.bg-seven-600\/20 { background: rgba(29,78,216,0.12) !important; color: #1d4ed8 !important; border-color: rgba(29,78,216,0.35) !important; font-weight: 600; }
-        [data-theme="light"] .rounded-2xl.border { border-color: var(--border) !important; background: var(--bg-secondary) !important; box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important; }
+        /* Cards — white with visible border + shadow, code-block rule AFTER to override */
+        [data-theme="light"] .card-glow { background: #ffffff !important; border-color: #c8d5e3 !important; box-shadow: 0 2px 12px rgba(0,0,0,0.07) !important; }
+        [data-theme="light"] .card-glow:hover { box-shadow: 0 6px 24px rgba(29,78,216,0.14) !important; border-color: rgba(29,78,216,0.35) !important; }
+        [data-theme="light"] .rounded-2xl.border:not(.code-block) { border-color: #c8d5e3 !important; background: #ffffff !important; box-shadow: 0 2px 10px rgba(0,0,0,0.06) !important; }
+        /* code-block AFTER card rules so it wins */
+        [data-theme="light"] .code-block { background: var(--bg-code) !important; border: 2px solid var(--border) !important; box-shadow: 0 2px 8px rgba(0,0,0,0.08) !important; }
+        /* Icon containers inside cards — vibrant tints */
+        [data-theme="light"] .bg-seven-600\/10 { background: rgba(29,78,216,0.12) !important; }
+        [data-theme="light"] .bg-purple-600\/10 { background: rgba(124,58,237,0.12) !important; }
+        [data-theme="light"] .bg-pink-600\/10 { background: rgba(190,18,60,0.12) !important; }
+        [data-theme="light"] .bg-emerald-600\/10 { background: rgba(4,120,87,0.12) !important; }
+        [data-theme="light"] .bg-amber-600\/10 { background: rgba(180,83,9,0.12) !important; }
+        [data-theme="light"] .bg-cyan-600\/10 { background: rgba(3,105,161,0.12) !important; }
         [data-theme="light"] .text-emerald-400 { color: #047857 !important; }
         [data-theme="light"] .text-purple-400 { color: #7c3aed !important; }
         [data-theme="light"] .text-amber-400 { color: #b45309 !important; }

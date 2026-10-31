@@ -26,12 +26,8 @@ Source: "C:\Program Files\LLVM\bin\LLVM-C.dll"; DestDir: "{app}"; Flags: ignorev
 Name: "{group}\SEVEN Command Prompt"; Filename: "{cmd}"; Parameters: "/K set PATH={app};%PATH%"; WorkingDir: "{userdocs}"
 Name: "{group}\Uninstall SEVEN"; Filename: "{uninstallexe}"
 
-[Registry]
-Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"; ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}"; Check: NeedsAddPath('{app}')
-Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"; ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{code:GetLLVMBinPath}"; Check: NeedsAddPath('{code:GetLLVMBinPath}')
-
 [Code]
-function GetLLVMBinPath(Param: string): string;
+function GetLLVMBinPath(): string;
 begin
   if DirExists(ExpandConstant('{autopf}\LLVM\bin')) then
     Result := ExpandConstant('{autopf}\LLVM\bin')
@@ -41,22 +37,37 @@ begin
     Result := '';
 end;
 
-function NeedsAddPath(Param: string): Boolean;
-var
-  OrigPath: string;
+function PathContains(const Path, Dir: string): Boolean;
 begin
-  if Param = '' then begin
-    Result := False;
-    exit;
+  Result := Pos(';' + UpperCase(Dir) + ';', ';' + UpperCase(Path) + ';') > 0;
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  OrigPath, AppDir, LLVMDir, NewPath: string;
+begin
+  if CurStep = ssPostInstall then
+  begin
+    if not RegQueryStringValue(HKEY_LOCAL_MACHINE,
+      'SYSTEM\CurrentControlSet\Control\Session Manager\Environment',
+      'Path', OrigPath) then
+      OrigPath := '';
+
+    AppDir := ExpandConstant('{app}');
+    LLVMDir := GetLLVMBinPath();
+    NewPath := OrigPath;
+
+    if not PathContains(NewPath, AppDir) then
+      NewPath := NewPath + ';' + AppDir;
+
+    if (LLVMDir <> '') and not PathContains(NewPath, LLVMDir) then
+      NewPath := NewPath + ';' + LLVMDir;
+
+    if NewPath <> OrigPath then
+      RegWriteStringValue(HKEY_LOCAL_MACHINE,
+        'SYSTEM\CurrentControlSet\Control\Session Manager\Environment',
+        'Path', NewPath);
   end;
-  if not RegQueryStringValue(HKEY_LOCAL_MACHINE,
-    'SYSTEM\CurrentControlSet\Control\Session Manager\Environment',
-    'Path', OrigPath)
-  then begin
-    Result := True;
-    exit;
-  end;
-  Result := Pos(';' + UpperCase(Param) + ';', ';' + UpperCase(OrigPath) + ';') = 0;
 end;
 
 function InitializeSetup(): Boolean;

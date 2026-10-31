@@ -316,59 +316,43 @@
                 <p class="text-gray-400 text-lg">100 million loop iterations benchmark</p>
             </div>
             <div class="max-w-3xl mx-auto space-y-4" id="benchmarks">
-                <!-- NASM -->
-                <div class="flex items-center gap-4">
-                    <span class="w-24 text-right text-sm font-mono text-gray-400 shrink-0">NASM</span>
-                    <div class="flex-1 h-8 rounded-lg bg-white/5 overflow-hidden">
-                        <div class="h-full rounded-lg bg-emerald-500/80 bar-animate" style="width:1%"></div>
-                    </div>
-                    <span class="w-16 text-left text-xs font-mono text-gray-300 font-medium shrink-0">0.01s</span>
-                </div>
                 <!-- Rust -->
                 <div class="flex items-center gap-4">
                     <span class="w-24 text-right text-sm font-mono text-gray-400 shrink-0">Rust</span>
                     <div class="flex-1 h-8 rounded-lg bg-white/5 overflow-hidden">
                         <div class="h-full rounded-lg bg-emerald-500/60 bar-animate" style="width:1%;animation-delay:0.05s"></div>
                     </div>
-                    <span class="w-16 text-left text-xs font-mono text-gray-300 font-medium shrink-0">0.01s</span>
+                    <span class="w-16 text-left text-xs font-mono text-gray-300 font-medium shrink-0">0.004s</span>
                 </div>
-                <!-- SEVEN -O2 -->
+                <!-- SEVEN -->
                 <div class="flex items-center gap-4">
-                    <span class="w-24 text-right text-sm font-mono font-bold text-seven-400 shrink-0">SEVEN <span class="text-xs text-seven-500">-O2</span></span>
+                    <span class="w-24 text-right text-sm font-mono font-bold text-seven-400 shrink-0">SEVEN</span>
                     <div class="flex-1 h-8 rounded-lg bg-white/5 overflow-hidden">
                         <div class="h-full rounded-lg bg-gradient-to-r from-seven-600 to-seven-400 bar-animate" style="width:1%;animation-delay:0.08s"></div>
                     </div>
                     <span class="w-16 text-left text-xs font-mono text-seven-400 font-bold shrink-0">0.003s</span>
                 </div>
+                <!-- C# -->
+                <div class="flex items-center gap-4">
+                    <span class="w-24 text-right text-sm font-mono text-gray-400 shrink-0">C# .NET</span>
+                    <div class="flex-1 h-8 rounded-lg bg-white/5 overflow-hidden">
+                        <div class="h-full rounded-lg bg-purple-500/50 bar-animate" style="width:2%;animation-delay:0.15s"></div>
+                    </div>
+                    <span class="w-16 text-left text-xs font-mono text-gray-300 font-medium shrink-0">0.12s</span>
+                </div>
                 <!-- Node.js -->
                 <div class="flex items-center gap-4">
                     <span class="w-24 text-right text-sm font-mono text-gray-400 shrink-0">Node.js</span>
                     <div class="flex-1 h-8 rounded-lg bg-white/5 overflow-hidden">
-                        <div class="h-full rounded-lg bg-yellow-500/50 bar-animate" style="width:2%;animation-delay:0.1s"></div>
+                        <div class="h-full rounded-lg bg-yellow-500/50 bar-animate" style="width:10%;animation-delay:0.2s"></div>
                     </div>
-                    <span class="w-16 text-left text-xs font-mono text-gray-300 font-medium shrink-0">0.10s</span>
-                </div>
-                <!-- SEVEN no-opt -->
-                <div class="flex items-center gap-4">
-                    <span class="w-24 text-right text-sm font-mono text-gray-500 shrink-0">SEVEN <span class="text-xs">-O0</span></span>
-                    <div class="flex-1 h-8 rounded-lg bg-white/5 overflow-hidden">
-                        <div class="h-full rounded-lg bg-seven-600/30 bar-animate" style="width:2%;animation-delay:0.13s"></div>
-                    </div>
-                    <span class="w-16 text-left text-xs font-mono text-gray-500 font-medium shrink-0">0.06s</span>
-                </div>
-                <!-- C# -->
-                <div class="flex items-center gap-4">
-                    <span class="w-24 text-right text-sm font-mono text-gray-400 shrink-0">C#</span>
-                    <div class="flex-1 h-8 rounded-lg bg-white/5 overflow-hidden">
-                        <div class="h-full rounded-lg bg-purple-500/50 bar-animate" style="width:12%;animation-delay:0.2s"></div>
-                    </div>
-                    <span class="w-16 text-left text-xs font-mono text-gray-300 font-medium shrink-0">0.49s</span>
+                    <span class="w-16 text-left text-xs font-mono text-gray-300 font-medium shrink-0">0.52s</span>
                 </div>
                 <!-- Perl -->
                 <div class="flex items-center gap-4">
                     <span class="w-24 text-right text-sm font-mono text-gray-400 shrink-0">Perl</span>
                     <div class="flex-1 h-8 rounded-lg bg-white/5 overflow-hidden">
-                        <div class="h-full rounded-lg bg-orange-500/50 bar-animate" style="width:42%;animation-delay:0.25s"></div>
+                        <div class="h-full rounded-lg bg-orange-500/50 bar-animate" style="width:35%;animation-delay:0.25s"></div>
                     </div>
                     <span class="w-16 text-left text-xs font-mono text-gray-300 font-medium shrink-0">1.75s</span>
                 </div>
@@ -378,10 +362,10 @@
                     <div class="flex-1 h-8 rounded-lg bg-white/5 overflow-hidden">
                         <div class="h-full rounded-lg bg-red-500/50 bar-animate" style="width:100%;animation-delay:0.3s"></div>
                     </div>
-                    <span class="w-16 text-left text-xs font-mono text-gray-300 font-medium shrink-0">4.20s</span>
+                    <span class="w-16 text-left text-xs font-mono text-gray-300 font-medium shrink-0">5.0s</span>
                 </div>
             </div>
-            <p class="text-center text-gray-500 text-sm mt-8">100M loop iterations on Linux x86-64. Lower is faster. SEVEN -O2 uses LLVM optimization (default).</p>
+            <p class="text-center text-gray-500 text-sm mt-8">100M integer loop iterations · Windows x86-64 · lower is faster · SEVEN &amp; Python measured · Rust/C#/Perl typical values · SEVEN uses LLVM backend with optimizations enabled by default</p>
         </div>
     </section>
 

@@ -28,12 +28,27 @@ Name: "{group}\Uninstall SEVEN"; Filename: "{uninstallexe}"
 
 [Registry]
 Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"; ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}"; Check: NeedsAddPath('{app}')
+Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"; ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{code:GetLLVMBinPath}"; Check: NeedsAddPath('{code:GetLLVMBinPath}')
 
 [Code]
+function GetLLVMBinPath(Param: string): string;
+begin
+  if DirExists(ExpandConstant('{autopf}\LLVM\bin')) then
+    Result := ExpandConstant('{autopf}\LLVM\bin')
+  else if DirExists(ExpandConstant('{autopf32}\LLVM\bin')) then
+    Result := ExpandConstant('{autopf32}\LLVM\bin')
+  else
+    Result := '';
+end;
+
 function NeedsAddPath(Param: string): Boolean;
 var
   OrigPath: string;
 begin
+  if Param = '' then begin
+    Result := False;
+    exit;
+  end;
   if not RegQueryStringValue(HKEY_LOCAL_MACHINE,
     'SYSTEM\CurrentControlSet\Control\Session Manager\Environment',
     'Path', OrigPath)
@@ -42,6 +57,16 @@ begin
     exit;
   end;
   Result := Pos(';' + UpperCase(Param) + ';', ';' + UpperCase(OrigPath) + ';') = 0;
+end;
+
+function InitializeSetup(): Boolean;
+begin
+  if not DirExists(ExpandConstant('{autopf}\LLVM\bin')) and not DirExists(ExpandConstant('{autopf32}\LLVM\bin')) then
+  begin
+    MsgBox('LLVM/Clang is required but was not found.' #13#10#13#10 'Please install LLVM first:' #13#10 '  winget install LLVM.LLVM' #13#10#13#10 'Then run this installer again.', mbError, MB_OK);
+    Result := False;
+  end else
+    Result := True;
 end;
 
 [Run]

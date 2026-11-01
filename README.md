@@ -1,6 +1,6 @@
 # SEVEN Language
 
-> **Fast as Assembly. Simple as Python. Powerful as C++. Ready for everything.**
+> **Fast as Assembly. Simple as Python. Powered by LLVM.**
 
 **S**peed · **E**asy · **V**ersatile · **E**fficient · **N**ative
 

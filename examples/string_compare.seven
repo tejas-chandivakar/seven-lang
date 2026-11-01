@@ -17,13 +17,13 @@ show "--- 1. English Word Style ---"
 color = "red"
 
 if color is "red"
-    show "Rang: Lal (Red)"
+    show "Color: Red"
 elif color is "blue"
-    show "Rang: Nilo (Blue)"
+    show "Color: Blue"
 elif color is "green"
-    show "Rang: Lilo (Green)"
+    show "Color: Green"
 else
-    show "Rang: Khabhar nathi"
+    show "Color: Unknown"
 end
 
 show ""
@@ -32,13 +32,13 @@ show ""
 season = "winter"
 
 if season is "summer"
-    show "Garmi chhe!"
+    show "It's hot!"
 elif season is "winter"
-    show "Thand chhe!"
+    show "It's cold!"
 elif season is "monsoon"
-    show "Varsa chhe!"
+    show "It's raining!"
 else
-    show "Season khabhar nathi"
+    show "Unknown season"
 end
 
 show ""
@@ -70,36 +70,36 @@ if day.equals("Saturday")
 elif day.equals("Sunday")
     show "Weekend!"
 elif day.equals("Monday")
-    show "Kaam shuru!"
+    show "Work begins!"
 else
-    show "Weekday chhe"
+    show "It's a weekday"
 end
 
 show ""
 
 !! ----------------------------------------
-!! 3. Banne sathe — not sathe
+!! 3. Using 'not' with comparisons
 !! ----------------------------------------
-show "--- 3. not sathe ---"
+show "--- 3. Using not ---"
 
 fruit = "mango"
 
 if not fruit is "apple"
-    show "Apple nathi"
+    show "Not an apple"
 end
 
 if not fruit.equals("banana")
-    show "Banana nathi"
+    show "Not a banana"
 end
 
 if fruit is "mango"
-    show "Mango chhe!"
+    show "It's a mango!"
 end
 
 show ""
 
 !! ----------------------------------------
-!! 4. Array ma words check
+!! 4. Array with word checks
 !! ----------------------------------------
 show "--- 4. Array + is ---"
 
@@ -118,9 +118,9 @@ end
 show ""
 
 !! ----------------------------------------
-!! 5. Function ma string check
+!! 5. Functions with string checks
 !! ----------------------------------------
-show "--- 5. Function sathe ---"
+show "--- 5. With Functions ---"
 
 func greet_lang(name)
     if name is "Gujarati"
@@ -142,7 +142,7 @@ func check_grade(grade)
     elif grade.equals("C")
         show "Average"
     else
-        show "Improve karo"
+        show "Needs improvement"
     end
 end
 

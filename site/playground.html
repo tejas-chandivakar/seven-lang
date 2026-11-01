@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Playground — SEVEN Language</title>
-    <meta name="description" content="Try SEVEN code examples interactively. See code and output side by side.">
+    <meta name="description" content="Write and run SEVEN code directly in your browser. Interactive playground with live output.">
     <script src="https://cdn.tailwindcss.com/3.4.16"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -30,14 +30,30 @@
     </script>
     <style>
         .code-block { background: #0d1117; }
-        pre code .kw { color: #c084fc; }
-        pre code .str { color: #86efac; }
-        pre code .num { color: #fbbf24; }
-        pre code .cm { color: #6b7280; }
-        pre code .fn { color: #67e8f9; }
-        pre code .io { color: #f472b6; }
-        pre code .op { color: #94a3b8; }
         .example-btn.active { background: rgba(37,112,245,0.15); border-color: rgba(59,142,255,0.4); color: #59b0ff; }
+        #codeEditor {
+            background: transparent;
+            color: #e2e8f0;
+            caret-color: #59b0ff;
+            resize: none;
+            outline: none;
+            tab-size: 4;
+            line-height: 1.6;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.875rem;
+        }
+        #codeEditor::selection { background: rgba(59,142,255,0.3); }
+        .run-btn {
+            background: linear-gradient(135deg, #2570f5, #3b8eff);
+            transition: all 0.2s;
+        }
+        .run-btn:hover { box-shadow: 0 0 20px rgba(37,112,245,0.4); transform: translateY(-1px); }
+        .run-btn:active { transform: translateY(0); }
+        .output-line { white-space: pre-wrap; word-break: break-word; }
+        .output-error { color: #f87171; }
+        .output-success { color: #34d399; }
+        .output-info { color: #94a3b8; }
+
         /* Light theme */
         [data-theme="light"] { --bg: #f8fafc; --bg-secondary: #e9edf3; --bg-nav: #ffffff; --bg-card: #e2e7ee; --bg-code: #e8ecf2; --border: #b8c4d0; --border-light: #cdd6e0; --text: #0f172a; --text-secondary: #1e293b; }
         [data-theme="light"] body { background: var(--bg) !important; color: var(--text) !important; }
@@ -55,19 +71,18 @@
         [data-theme="light"] .bg-white\/\[0\.02\] { background: var(--bg-secondary) !important; }
         [data-theme="light"] .bg-\[\#09090b\] { background: var(--bg) !important; }
         [data-theme="light"] footer { background: var(--bg-secondary) !important; border-color: var(--border) !important; }
-        [data-theme="light"] pre code .kw { color: #7c3aed; font-weight: 600; }
-        [data-theme="light"] pre code .str { color: #047857; }
-        [data-theme="light"] pre code .num { color: #b45309; }
-        [data-theme="light"] pre code .cm { color: #64748b; }
-        [data-theme="light"] pre code .fn { color: #0369a1; }
-        [data-theme="light"] pre code .io { color: #be123c; }
-        [data-theme="light"] pre code .op { color: #334155; }
         [data-theme="light"] .shadow-2xl { box-shadow: 0 4px 24px rgba(0,0,0,0.1) !important; }
         [data-theme="light"] .text-emerald-300\/90 { color: #047857 !important; }
         [data-theme="light"] .text-emerald-400 { color: #047857 !important; }
         [data-theme="light"] .example-btn { color: #475569 !important; border: 2px solid var(--border) !important; background: var(--bg-secondary) !important; font-weight: 500; }
         [data-theme="light"] .example-btn:hover { color: #0f172a !important; background: var(--bg-card) !important; }
         [data-theme="light"] .example-btn.active { background: rgba(29,78,216,0.12) !important; border-color: rgba(29,78,216,0.4) !important; color: #1d4ed8 !important; font-weight: 600; }
+        [data-theme="light"] #codeEditor { color: #1e293b; caret-color: #2570f5; }
+        [data-theme="light"] #codeEditor::placeholder { color: #94a3b8; }
+        [data-theme="light"] .output-error { color: #dc2626; }
+        [data-theme="light"] .output-success { color: #047857; }
+        [data-theme="light"] .output-info { color: #64748b; }
+        [data-theme="light"] .run-btn { background: linear-gradient(135deg, #1d4ed8, #2563eb); }
         #themeToggle { background: none; border: none; cursor: pointer; padding: 0.5rem; border-radius: 0.5rem; transition: background 0.2s; }
         #themeToggle:hover { background: rgba(128,128,128,0.15); }
     </style>
@@ -118,13 +133,13 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-10">
                 <h1 class="text-3xl sm:text-4xl font-bold text-white mb-3">Playground</h1>
-                <p class="text-gray-400 text-lg">Explore SEVEN code examples with pre-computed output</p>
-                <p class="text-gray-500 text-sm mt-2">Select an example to see the code and its output side by side</p>
+                <p class="text-gray-400 text-lg">Write and run SEVEN code directly in your browser</p>
+                <p class="text-gray-500 text-sm mt-2">Select an example or write your own code, then hit Run</p>
             </div>
 
             <div class="flex flex-col lg:flex-row gap-6">
                 <!-- Example selector sidebar -->
-                <div class="lg:w-64 shrink-0">
+                <div class="lg:w-56 shrink-0">
                     <div class="lg:sticky lg:top-24 space-y-1.5" id="exampleList">
                         <button class="example-btn active w-full text-left px-4 py-2.5 rounded-lg text-sm border border-white/5 hover:border-white/10 transition" data-example="hello">Hello World</button>
                         <button class="example-btn w-full text-left px-4 py-2.5 rounded-lg text-sm text-gray-400 border border-white/5 hover:border-white/10 transition" data-example="variables">Variables & Math</button>
@@ -143,9 +158,9 @@
                 </div>
 
                 <!-- Code + Output panels -->
-                <div class="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="flex-1 flex flex-col gap-4">
                     <!-- Code panel -->
-                    <div class="code-block rounded-2xl border border-white/5 overflow-hidden">
+                    <div class="code-block rounded-2xl border border-white/5 overflow-hidden flex flex-col">
                         <div class="flex items-center gap-2 px-4 py-3 border-b border-white/5">
                             <div class="flex gap-1.5">
                                 <div class="w-3 h-3 rounded-full bg-red-500/70"></div>
@@ -153,8 +168,15 @@
                                 <div class="w-3 h-3 rounded-full bg-green-500/70"></div>
                             </div>
                             <span class="text-xs text-gray-500 font-mono ml-2" id="codeFilename">hello.seven</span>
+                            <div class="ml-auto flex items-center gap-2">
+                                <button id="clearBtn" class="text-xs text-gray-500 hover:text-gray-300 px-2 py-1 rounded transition" title="Clear code">Clear</button>
+                                <button id="runBtn" class="run-btn text-white text-sm font-medium px-5 py-1.5 rounded-lg flex items-center gap-2">
+                                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/></svg>
+                                    Run
+                                </button>
+                            </div>
                         </div>
-                        <pre class="px-5 py-4 text-sm font-mono leading-relaxed overflow-x-auto min-h-[300px]" id="codePanel"><code></code></pre>
+                        <textarea id="codeEditor" class="px-5 py-4 w-full min-h-[300px] font-mono" spellcheck="false" placeholder="!! Write your SEVEN code here..."></textarea>
                     </div>
 
                     <!-- Output panel -->
@@ -166,16 +188,16 @@
                                 <div class="w-3 h-3 rounded-full bg-green-500/70"></div>
                             </div>
                             <span class="text-xs text-gray-500 font-mono ml-2">Output</span>
-                            <span class="ml-auto text-xs text-emerald-400 font-mono">&#10003; exit code 0</span>
+                            <span class="ml-auto text-xs font-mono" id="exitStatus"></span>
                         </div>
-                        <pre class="px-5 py-4 text-sm font-mono leading-relaxed overflow-x-auto min-h-[300px] text-emerald-300/90" id="outputPanel"></pre>
+                        <pre class="px-5 py-4 text-sm font-mono leading-relaxed overflow-x-auto min-h-[150px] max-h-[400px] overflow-y-auto" id="outputPanel"></pre>
                     </div>
                 </div>
             </div>
 
             <!-- Install CTA -->
             <div class="text-center mt-16 pt-10 border-t border-white/5">
-                <p class="text-gray-400 mb-4">Want to run your own SEVEN code?</p>
+                <p class="text-gray-400 mb-4">Want native compilation speed? Install SEVEN locally.</p>
                 <a href="install.html" class="inline-block px-8 py-3 rounded-xl bg-seven-600 hover:bg-seven-500 text-white font-medium transition-all shadow-lg shadow-seven-600/20">
                     Install SEVEN
                 </a>
@@ -203,92 +225,1215 @@
     </footer>
 
     <script>
+    // ============================================================
+    // SEVEN Language Interpreter (Browser Edition)
+    // ============================================================
+    const SevenInterpreter = (function() {
+
+    // --- Tokenizer ---
+    function tokenize(source) {
+        const tokens = [];
+        const lines = source.split('\n');
+        for (let li = 0; li < lines.length; li++) {
+            let line = lines[li];
+            // strip comments
+            const commentIdx = line.indexOf('!!');
+            if (commentIdx !== -1) line = line.substring(0, commentIdx);
+            line = line.trimEnd();
+            if (line.trim() === '') continue;
+
+            const indent = line.length - line.trimStart().length;
+            const trimmed = line.trimStart();
+            tokens.push({ line: li + 1, indent, text: trimmed });
+        }
+        return tokens;
+    }
+
+    // --- Parser ---
+    function parse(tokens) {
+        let pos = 0;
+        function peek() { return pos < tokens.length ? tokens[pos] : null; }
+        function advance() { return tokens[pos++]; }
+
+        function parseBlock(endKeywords) {
+            const stmts = [];
+            while (pos < tokens.length) {
+                const t = peek();
+                if (!t) break;
+                const first = firstWord(t.text);
+                if (endKeywords && endKeywords.includes(first)) break;
+                // also break on these when they appear as block terminators
+                if (endKeywords && (first === 'else' || first === 'elif' || first === 'orif' || first === 'catch' || first === 'case' || first === 'when')) {
+                    if (endKeywords.includes(first)) break;
+                }
+                // check for "or if"
+                if (endKeywords && t.text.startsWith('or if')) {
+                    if (endKeywords.includes('or if')) break;
+                }
+                stmts.push(parseStatement());
+            }
+            return stmts;
+        }
+
+        function firstWord(text) {
+            const m = text.match(/^(\S+)/);
+            return m ? m[1] : '';
+        }
+
+        function parseStatement() {
+            const t = peek();
+            if (!t) return { type: 'noop' };
+            const text = t.text;
+            const fw = firstWord(text);
+
+            if (fw === 'show') { advance(); return { type: 'show', expr: text.substring(5).trim(), line: t.line }; }
+            if (fw === 'ask') { advance(); return { type: 'ask', expr: text.substring(4).trim(), line: t.line }; }
+            if (fw === 'if') return parseIf();
+            if (fw === 'match') return parseMatch();
+            if (fw === 'repeat') return parseRepeat();
+            if (fw === 'while') return parseWhile();
+            if (fw === 'each') return parseEach();
+            if (fw === 'func') return parseFunc();
+            if (fw === 'return') { advance(); return { type: 'return', expr: text.substring(7).trim(), line: t.line }; }
+            if (fw === 'try') return parseTryCatch();
+            if (fw === 'error') { advance(); return { type: 'error', expr: text.substring(6).trim(), line: t.line }; }
+            if (fw === 'mode') { advance(); return { type: 'mode', value: text.substring(5).trim(), line: t.line }; }
+            if (fw === 'assert') { advance(); return { type: 'assert', expr: text.substring(7).trim(), line: t.line }; }
+            if (fw === 'end' || fw === 'done') { advance(); return { type: 'noop' }; }
+            // assignment or expression
+            advance();
+            const eqIdx = text.indexOf('=');
+            if (eqIdx > 0 && text[eqIdx - 1] !== '!' && text[eqIdx - 1] !== '<' && text[eqIdx - 1] !== '>' && text[eqIdx + 1] !== '=') {
+                const lhs = text.substring(0, eqIdx).trim();
+                const rhs = text.substring(eqIdx + 1).trim();
+                // check for array index assignment: name[expr]
+                const arrMatch = lhs.match(/^(\w+)\[(.+)\]$/);
+                if (arrMatch) {
+                    return { type: 'array_assign', name: arrMatch[1], index: arrMatch[2], expr: rhs, line: t.line };
+                }
+                return { type: 'assign', name: lhs, expr: rhs, line: t.line };
+            }
+            return { type: 'expr', expr: text, line: t.line };
+        }
+
+        function parseIf() {
+            const t = advance(); // consume 'if'
+            const condition = t.text.substring(3).trim();
+            const body = parseBlock(['elif', 'orif', 'or if', 'else', 'end', 'done']);
+            const branches = [{ condition, body }];
+            while (pos < tokens.length) {
+                const p = peek();
+                if (!p) break;
+                if (p.text.startsWith('or if ')) {
+                    advance();
+                    const cond = p.text.substring(6).trim();
+                    const b = parseBlock(['elif', 'orif', 'or if', 'else', 'end', 'done']);
+                    branches.push({ condition: cond, body: b });
+                } else if (firstWord(p.text) === 'orif') {
+                    advance();
+                    const cond = p.text.substring(5).trim();
+                    const b = parseBlock(['elif', 'orif', 'or if', 'else', 'end', 'done']);
+                    branches.push({ condition: cond, body: b });
+                } else if (firstWord(p.text) === 'elif') {
+                    advance();
+                    const cond = p.text.substring(5).trim();
+                    const b = parseBlock(['elif', 'orif', 'or if', 'else', 'end', 'done']);
+                    branches.push({ condition: cond, body: b });
+                } else if (firstWord(p.text) === 'else') {
+                    advance();
+                    const b = parseBlock(['end', 'done']);
+                    branches.push({ condition: null, body: b });
+                    break;
+                } else break;
+            }
+            // consume end/done
+            if (pos < tokens.length && (firstWord(peek().text) === 'end' || firstWord(peek().text) === 'done')) advance();
+            return { type: 'if', branches, line: t.line };
+        }
+
+        function parseMatch() {
+            const t = advance(); // consume 'match'
+            const subject = t.text.substring(6).trim();
+            const cases = [];
+            let elseBody = null;
+            // consume case/when/else until end
+            while (pos < tokens.length) {
+                const p = peek();
+                if (!p) break;
+                const fw = firstWord(p.text);
+                if (fw === 'end' || fw === 'done') { advance(); break; }
+                if (fw === 'case' || fw === 'when') {
+                    advance();
+                    const val = p.text.substring(fw.length + 1).trim();
+                    const body = parseBlock(['case', 'when', 'else', 'end', 'done']);
+                    cases.push({ value: val, body });
+                } else if (fw === 'else') {
+                    advance();
+                    elseBody = parseBlock(['end', 'done']);
+                } else {
+                    advance(); // skip unexpected
+                }
+            }
+            return { type: 'match', subject, cases, elseBody, line: t.line };
+        }
+
+        function parseRepeat() {
+            const t = advance();
+            const rest = t.text.substring(7).trim();
+            // repeat N times as i
+            const m = rest.match(/^(.+?)\s+times\s+as\s+(\w+)$/);
+            if (m) {
+                const body = parseBlock(['end', 'done']);
+                if (pos < tokens.length && (firstWord(peek().text) === 'end' || firstWord(peek().text) === 'done')) advance();
+                return { type: 'repeat', count: m[1], varName: m[2], body, line: t.line };
+            }
+            // repeat N times
+            const m2 = rest.match(/^(.+?)\s+times$/);
+            if (m2) {
+                const body = parseBlock(['end', 'done']);
+                if (pos < tokens.length && (firstWord(peek().text) === 'end' || firstWord(peek().text) === 'done')) advance();
+                return { type: 'repeat', count: m2[1], varName: null, body, line: t.line };
+            }
+            // repeat N
+            const body = parseBlock(['end', 'done']);
+            if (pos < tokens.length && (firstWord(peek().text) === 'end' || firstWord(peek().text) === 'done')) advance();
+            return { type: 'repeat', count: rest, varName: null, body, line: t.line };
+        }
+
+        function parseWhile() {
+            const t = advance();
+            const condition = t.text.substring(6).trim();
+            const body = parseBlock(['end', 'done']);
+            if (pos < tokens.length && (firstWord(peek().text) === 'end' || firstWord(peek().text) === 'done')) advance();
+            return { type: 'while', condition, body, line: t.line };
+        }
+
+        function parseEach() {
+            const t = advance();
+            const rest = t.text.substring(5).trim();
+            // each arr as i, v  OR  each arr as v
+            const m = rest.match(/^(.+?)\s+as\s+(\w+)\s*,\s*(\w+)$/);
+            if (m) {
+                const body = parseBlock(['end', 'done']);
+                if (pos < tokens.length && (firstWord(peek().text) === 'end' || firstWord(peek().text) === 'done')) advance();
+                return { type: 'each', collection: m[1], indexVar: m[2], itemVar: m[3], body, line: t.line };
+            }
+            const m2 = rest.match(/^(.+?)\s+as\s+(\w+)$/);
+            if (m2) {
+                const body = parseBlock(['end', 'done']);
+                if (pos < tokens.length && (firstWord(peek().text) === 'end' || firstWord(peek().text) === 'done')) advance();
+                return { type: 'each', collection: m2[1], indexVar: null, itemVar: m2[2], body, line: t.line };
+            }
+            return { type: 'noop', line: t.line };
+        }
+
+        function parseFunc() {
+            const t = advance();
+            const rest = t.text.substring(5).trim();
+            const m = rest.match(/^(\w+)\s*\(([^)]*)\)$/);
+            if (!m) return { type: 'noop', line: t.line };
+            const name = m[1];
+            const paramStr = m[2].trim();
+            const params = [];
+            let isVariadic = false;
+            let variadicName = '';
+            if (paramStr) {
+                for (const p of paramStr.split(',')) {
+                    const pt = p.trim();
+                    if (pt.startsWith('many ')) {
+                        isVariadic = true;
+                        variadicName = pt.substring(5).trim();
+                    } else if (pt.includes('=')) {
+                        const [pn, pv] = pt.split('=').map(x => x.trim());
+                        params.push({ name: pn, default: pv });
+                    } else {
+                        params.push({ name: pt, default: null });
+                    }
+                }
+            }
+            const body = parseBlock(['end', 'done']);
+            if (pos < tokens.length && (firstWord(peek().text) === 'end' || firstWord(peek().text) === 'done')) advance();
+            return { type: 'func', name, params, isVariadic, variadicName, body, line: t.line };
+        }
+
+        function parseTryCatch() {
+            const t = advance(); // consume 'try'
+            const tryBody = parseBlock(['catch', 'end', 'done']);
+            let catchVar = 'e';
+            let catchBody = [];
+            if (pos < tokens.length && firstWord(peek().text) === 'catch') {
+                const ct = advance();
+                catchVar = ct.text.substring(6).trim() || 'e';
+                catchBody = parseBlock(['end', 'done']);
+            }
+            if (pos < tokens.length && (firstWord(peek().text) === 'end' || firstWord(peek().text) === 'done')) advance();
+            return { type: 'trycatch', tryBody, catchVar, catchBody, line: t.line };
+        }
+
+        return parseBlock(null);
+    }
+
+    // --- Expression Evaluator ---
+    function evalExpr(expr, env) {
+        expr = expr.trim();
+        if (expr === '') return '';
+
+        // String literal with interpolation
+        if ((expr.startsWith('"') && expr.endsWith('"')) || (expr.startsWith("'") && expr.endsWith("'"))) {
+            const inner = expr.slice(1, -1);
+            return inner.replace(/\\n/g, '\n').replace(/\\t/g, '\t').replace(/\\\\/g, '\\')
+                .replace(/\{([^}]+)\}/g, (_, varName) => {
+                    return stringify(evalExpr(varName.trim(), env));
+                });
+        }
+
+        // Array literal
+        if (expr.startsWith('[')) {
+            const end = findMatchingBracket(expr, 0, '[', ']');
+            if (end === expr.length - 1) {
+                const inner = expr.slice(1, -1).trim();
+                if (inner === '') return [];
+                const elems = splitArgs(inner);
+                return elems.map(e => evalExpr(e.trim(), env));
+            }
+        }
+
+        // Parenthesized expression
+        if (expr.startsWith('(') && findMatchingBracket(expr, 0, '(', ')') === expr.length - 1) {
+            return evalExpr(expr.slice(1, -1), env);
+        }
+
+        // Boolean/null literals
+        if (expr === 'true') return 1;
+        if (expr === 'false') return 0;
+        if (expr === 'null' || expr === 'none') return 0;
+
+        // Number
+        if (/^-?\d+(\.\d+)?$/.test(expr)) return parseFloat(expr);
+
+        // Handle 'not' prefix
+        if (expr.startsWith('not ')) {
+            const val = evalExpr(expr.substring(4), env);
+            return val ? 0 : 1;
+        }
+
+        // Binary operators (lowest precedence first)
+        // or / and
+        let split;
+        split = splitBinaryOp(expr, [' or ', ' and ']);
+        if (split) {
+            const left = evalExpr(split.left, env);
+            if (split.op === ' or ') return left ? left : evalExpr(split.right, env);
+            if (split.op === ' and ') return left ? evalExpr(split.right, env) : left;
+        }
+
+        // 'in' operator: val in [array]  or  val in varName
+        split = splitBinaryOp(expr, [' in ']);
+        if (split) {
+            const val = evalExpr(split.left, env);
+            const col = evalExpr(split.right, env);
+            if (Array.isArray(col)) return col.some(x => x === val || String(x) === String(val)) ? 1 : 0;
+            if (typeof col === 'string') return col.includes(String(val)) ? 1 : 0;
+            return 0;
+        }
+
+        // 'is' operator (equality)
+        split = splitBinaryOp(expr, [' is ']);
+        if (split) {
+            const l = evalExpr(split.left, env);
+            const r = evalExpr(split.right, env);
+            return l == r ? 1 : 0;
+        }
+
+        // Comparison
+        split = splitBinaryOp(expr, ['==', '!=', '>=', '<=', '>', '<']);
+        if (split) {
+            const l = evalExpr(split.left, env);
+            const r = evalExpr(split.right, env);
+            switch (split.op) {
+                case '==': return l == r ? 1 : 0;
+                case '!=': return l != r ? 1 : 0;
+                case '>=': return l >= r ? 1 : 0;
+                case '<=': return l <= r ? 1 : 0;
+                case '>': return l > r ? 1 : 0;
+                case '<': return l < r ? 1 : 0;
+            }
+        }
+
+        // Concatenation / addition / subtraction
+        split = splitBinaryOp(expr, [' + ', ' - ']);
+        if (split) {
+            const l = evalExpr(split.left, env);
+            const r = evalExpr(split.right, env);
+            if (split.op === ' + ') {
+                if (typeof l === 'string' || typeof r === 'string') return stringify(l) + stringify(r);
+                return l + r;
+            }
+            return l - r;
+        }
+
+        // Multiplication, division, modulo
+        split = splitBinaryOp(expr, [' * ', ' / ', ' % ']);
+        if (split) {
+            const l = evalExpr(split.left, env);
+            const r = evalExpr(split.right, env);
+            if (split.op === ' * ') return l * r;
+            if (split.op === ' / ') {
+                if (r === 0) throw new Error('division by zero');
+                return l / r;
+            }
+            return l % r;
+        }
+
+        // Unary minus
+        if (expr.startsWith('-') && /^-\w/.test(expr)) {
+            return -evalExpr(expr.substring(1), env);
+        }
+
+        // Method call: obj.method(args)
+        const methodMatch = expr.match(/^(.+?)\.(\w+)\(([^)]*)\)$/);
+        if (methodMatch) {
+            const obj = evalExpr(methodMatch[1], env);
+            const method = methodMatch[2];
+            const args = methodMatch[3].trim() ? splitArgs(methodMatch[3]).map(a => evalExpr(a.trim(), env)) : [];
+            return callMethod(obj, method, args, env);
+        }
+
+        // Function call: name(args)
+        const funcMatch = expr.match(/^(\w+)\((.*)?\)$/);
+        if (funcMatch) {
+            const name = funcMatch[1];
+            const argStr = (funcMatch[2] || '').trim();
+            const args = argStr ? splitArgs(argStr).map(a => evalExpr(a.trim(), env)) : [];
+            return callFunction(name, args, env);
+        }
+
+        // Array indexing: name[expr] or expr[expr]
+        const idxMatch = expr.match(/^(\w+)\[(.+)\]$/);
+        if (idxMatch) {
+            const arr = env.get(idxMatch[1]);
+            const idx = evalExpr(idxMatch[2], env);
+            if (Array.isArray(arr)) {
+                const i = idx < 0 ? arr.length + idx : idx;
+                return arr[i] !== undefined ? arr[i] : 0;
+            }
+            if (typeof arr === 'string') {
+                const i = idx < 0 ? arr.length + idx : idx;
+                return arr[i] || '';
+            }
+            return 0;
+        }
+
+        // Variable
+        if (/^[a-zA-Z_]\w*$/.test(expr)) {
+            return env.get(expr);
+        }
+
+        return expr;
+    }
+
+    function stringify(val) {
+        if (val === null || val === undefined) return '';
+        if (Array.isArray(val)) return '[' + val.map(stringify).join(', ') + ']';
+        return String(val);
+    }
+
+    function findMatchingBracket(s, start, open, close) {
+        let depth = 0;
+        let inStr = false, strChar = '';
+        for (let i = start; i < s.length; i++) {
+            if (inStr) { if (s[i] === strChar && s[i-1] !== '\\') inStr = false; continue; }
+            if (s[i] === '"' || s[i] === "'") { inStr = true; strChar = s[i]; continue; }
+            if (s[i] === open) depth++;
+            else if (s[i] === close) { depth--; if (depth === 0) return i; }
+        }
+        return -1;
+    }
+
+    function splitArgs(s) {
+        const args = [];
+        let depth = 0, inStr = false, strChar = '', current = '';
+        for (let i = 0; i < s.length; i++) {
+            const ch = s[i];
+            if (inStr) {
+                current += ch;
+                if (ch === strChar && s[i-1] !== '\\') inStr = false;
+                continue;
+            }
+            if (ch === '"' || ch === "'") { inStr = true; strChar = ch; current += ch; continue; }
+            if (ch === '(' || ch === '[') { depth++; current += ch; continue; }
+            if (ch === ')' || ch === ']') { depth--; current += ch; continue; }
+            if (ch === ',' && depth === 0) { args.push(current); current = ''; continue; }
+            current += ch;
+        }
+        if (current.trim()) args.push(current);
+        return args;
+    }
+
+    function splitBinaryOp(expr, ops) {
+        // scan right-to-left for lowest-precedence, skipping strings and brackets
+        for (const op of ops) {
+            let depth = 0, sqDepth = 0, inStr = false, strChar = '';
+            // For comparison ops without spaces, search left-to-right for first match
+            const leftToRight = !op.startsWith(' ');
+            if (leftToRight) {
+                for (let i = 0; i < expr.length - op.length + 1; i++) {
+                    const ch = expr[i];
+                    if (inStr) { if (ch === strChar && expr[i-1] !== '\\') inStr = false; continue; }
+                    if (ch === '"' || ch === "'") { inStr = true; strChar = ch; continue; }
+                    if (ch === '(' || ch === '[') { depth++; continue; }
+                    if (ch === ')' || ch === ']') { depth--; continue; }
+                    if (depth === 0 && expr.substring(i, i + op.length) === op) {
+                        const left = expr.substring(0, i).trim();
+                        const right = expr.substring(i + op.length).trim();
+                        if (left && right) return { left, op, right };
+                    }
+                }
+            } else {
+                for (let i = expr.length - 1; i >= op.length - 1; i--) {
+                    const ch = expr[i];
+                    if (inStr) { if (ch === strChar && (i === 0 || expr[i-1] !== '\\')) inStr = false; continue; }
+                    if (ch === '"' || ch === "'") { inStr = true; strChar = ch; continue; }
+                    if (ch === ')' || ch === ']') { depth++; continue; }
+                    if (ch === '(' || ch === '[') { depth--; continue; }
+                    const start = i - op.length + 1;
+                    if (depth === 0 && start >= 0 && expr.substring(start, i + 1) === op) {
+                        const left = expr.substring(0, start).trim();
+                        const right = expr.substring(i + 1).trim();
+                        if (left && right) return { left, op, right };
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    // --- Built-in Functions ---
+    function callFunction(name, args, env) {
+        // user-defined
+        const fn = env.getFunc(name);
+        if (fn) return callUserFunc(fn, args, env);
+
+        switch (name) {
+            case 'len':
+                if (typeof args[0] === 'string') return args[0].length;
+                if (Array.isArray(args[0])) return args[0].length;
+                return 0;
+            case 'abs': return Math.abs(args[0]);
+            case 'min': return Math.min(...args);
+            case 'max': return Math.max(...args);
+            case 'pow': return Math.pow(args[0], args[1]);
+            case 'sqrt': return Math.sqrt(args[0]);
+            case 'round': return Math.round(args[0]);
+            case 'floor': return Math.floor(args[0]);
+            case 'ceil': return Math.ceil(args[0]);
+            case 'sort': {
+                const arr = Array.isArray(args[0]) ? [...args[0]] : [];
+                return arr.sort((a, b) => {
+                    if (typeof a === 'number' && typeof b === 'number') return a - b;
+                    return String(a).localeCompare(String(b));
+                });
+            }
+            case 'reverse': return Array.isArray(args[0]) ? [...args[0]].reverse() : String(args[0]).split('').reverse().join('');
+            case 'sum': {
+                const arr = Array.isArray(args[0]) ? args[0] : args;
+                return arr.reduce((a, b) => a + (typeof b === 'number' ? b : parseFloat(b) || 0), 0);
+            }
+            case 'avg': {
+                const arr = Array.isArray(args[0]) ? args[0] : args;
+                const s = arr.reduce((a, b) => a + (typeof b === 'number' ? b : parseFloat(b) || 0), 0);
+                return arr.length ? s / arr.length : 0;
+            }
+            case 'unique': {
+                const arr = Array.isArray(args[0]) ? args[0] : args;
+                return [...new Set(arr)];
+            }
+            case 'push': {
+                if (Array.isArray(args[0])) { args[0].push(args[1]); return args[0]; }
+                return args[0];
+            }
+            case 'pop': {
+                if (Array.isArray(args[0])) return args[0].pop();
+                return 0;
+            }
+            case 'join': {
+                if (Array.isArray(args[0])) return args[0].map(stringify).join(args[1] !== undefined ? String(args[1]) : ',');
+                return '';
+            }
+            case 'split': return String(args[0]).split(args[1] !== undefined ? String(args[1]) : ' ');
+            case 'slice': {
+                const arr = args[0];
+                const start = args[1] || 0;
+                const end = args[2] !== undefined ? args[2] : undefined;
+                if (Array.isArray(arr)) return arr.slice(start, end);
+                return String(arr).slice(start, end);
+            }
+            case 'upper': return String(args[0]).toUpperCase();
+            case 'lower': return String(args[0]).toLowerCase();
+            case 'trim': return String(args[0]).trim();
+            case 'replace': return String(args[0]).replaceAll(String(args[1]), String(args[2]));
+            case 'contains': return String(args[0]).includes(String(args[1])) ? 1 : 0;
+            case 'startswith': return String(args[0]).startsWith(String(args[1])) ? 1 : 0;
+            case 'endswith': return String(args[0]).endsWith(String(args[1])) ? 1 : 0;
+            case 'index': return String(args[0]).indexOf(String(args[1]));
+            case 'str': return stringify(args[0]);
+            case 'int': return parseInt(args[0]) || 0;
+            case 'float': return parseFloat(args[0]) || 0;
+            case 'type': {
+                if (Array.isArray(args[0])) return 'array';
+                return typeof args[0];
+            }
+            case 'ord': return typeof args[0] === 'string' ? args[0].charCodeAt(0) : 0;
+            case 'chr': return String.fromCharCode(args[0]);
+            case 'range': {
+                const result = [];
+                const start = args.length > 1 ? args[0] : 0;
+                const end = args.length > 1 ? args[1] : args[0];
+                const step = args[2] || 1;
+                for (let i = start; i < end; i += step) result.push(i);
+                return result;
+            }
+            case 'map': return Array.isArray(args[0]) ? args[0].map(x => callFunction(stringify(args[1]), [x], env)) : [];
+            case 'filter': return Array.isArray(args[0]) ? args[0].filter(x => callFunction(stringify(args[1]), [x], env)) : [];
+            case 'input': {
+                const msg = args[0] !== undefined ? stringify(args[0]) : '';
+                return prompt(msg) || '';
+            }
+            case 'assert': {
+                if (!args[0]) throw new Error('Assertion failed: ' + (args[1] || ''));
+                return 1;
+            }
+            case 'random': return Math.random();
+            case 'char_at': {
+                const s = String(args[0]);
+                const i = args[1] || 0;
+                return s[i] || '';
+            }
+            case 'substr': return String(args[0]).substring(args[1] || 0, args[2]);
+            case 'repeat_str': return String(args[0]).repeat(args[1] || 1);
+            default:
+                throw new Error("Unknown function: " + name);
+        }
+    }
+
+    function callMethod(obj, method, args, env) {
+        if (typeof obj === 'string') {
+            switch (method) {
+                case 'upper': return obj.toUpperCase();
+                case 'lower': return obj.toLowerCase();
+                case 'trim': return obj.trim();
+                case 'split': return obj.split(args[0] !== undefined ? String(args[0]) : ' ');
+                case 'replace': return obj.replaceAll(String(args[0]), String(args[1]));
+                case 'startswith': return obj.startsWith(String(args[0])) ? 1 : 0;
+                case 'endswith': return obj.endsWith(String(args[0])) ? 1 : 0;
+                case 'contains': return obj.includes(String(args[0])) ? 1 : 0;
+                case 'index': return obj.indexOf(String(args[0]));
+                case 'repeat': return obj.repeat(args[0] || 1);
+                case 'len': return obj.length;
+                case 'slice': return obj.slice(args[0] || 0, args[1]);
+                case 'char_at': return obj[args[0] || 0] || '';
+                case 'substr': return obj.substring(args[0] || 0, args[1]);
+                default: throw new Error("Unknown string method: " + method);
+            }
+        }
+        if (Array.isArray(obj)) {
+            switch (method) {
+                case 'push': obj.push(args[0]); return obj;
+                case 'pop': return obj.pop();
+                case 'len': return obj.length;
+                case 'sort': return [...obj].sort((a, b) => typeof a === 'number' && typeof b === 'number' ? a - b : String(a).localeCompare(String(b)));
+                case 'reverse': return [...obj].reverse();
+                case 'join': return obj.map(stringify).join(args[0] !== undefined ? String(args[0]) : ',');
+                case 'slice': return obj.slice(args[0] || 0, args[1]);
+                case 'contains': return obj.includes(args[0]) ? 1 : 0;
+                default: throw new Error("Unknown array method: " + method);
+            }
+        }
+        throw new Error("Cannot call method on " + typeof obj);
+    }
+
+    function callUserFunc(fn, args, env) {
+        const childEnv = env.child();
+        if (fn.isVariadic) {
+            for (let i = 0; i < fn.params.length; i++) {
+                childEnv.set(fn.params[i].name, i < args.length ? args[i] :
+                    (fn.params[i].default !== null ? evalExpr(fn.params[i].default, env) : 0));
+            }
+            childEnv.set(fn.variadicName, args.slice(fn.params.length));
+        } else {
+            for (let i = 0; i < fn.params.length; i++) {
+                childEnv.set(fn.params[i].name, i < args.length ? args[i] :
+                    (fn.params[i].default !== null ? evalExpr(fn.params[i].default, env) : 0));
+            }
+        }
+        try {
+            execBlock(fn.body, childEnv);
+        } catch (e) {
+            if (e instanceof ReturnValue) return e.value;
+            throw e;
+        }
+        return 0;
+    }
+
+    class ReturnValue {
+        constructor(value) { this.value = value; }
+    }
+
+    class SevenError {
+        constructor(message) { this.message = message; }
+    }
+
+    // --- Environment ---
+    class Environment {
+        constructor(parent, outputFn) {
+            this.vars = {};
+            this.funcs = parent ? null : {};
+            this.parent = parent;
+            this.output = outputFn || (parent ? parent.output : console.log);
+            this.stepCount = 0;
+            this.maxSteps = 100000;
+        }
+        get(name) {
+            if (name in this.vars) return this.vars[name];
+            if (this.parent) return this.parent.get(name);
+            return 0;
+        }
+        set(name, value) {
+            // set in closest scope that has it, or current
+            if (this.parent && this.parent.has(name)) {
+                this.parent.set(name, value);
+            } else {
+                this.vars[name] = value;
+            }
+        }
+        setLocal(name, value) { this.vars[name] = value; }
+        has(name) {
+            if (name in this.vars) return true;
+            if (this.parent) return this.parent.has(name);
+            return false;
+        }
+        getFunc(name) {
+            if (this.funcs && name in this.funcs) return this.funcs[name];
+            if (this.parent) return this.parent.getFunc(name);
+            return null;
+        }
+        setFunc(name, fn) {
+            let e = this;
+            while (e.parent) e = e.parent;
+            e.funcs[name] = fn;
+        }
+        child() { return new Environment(this, this.output); }
+        tick() {
+            let root = this;
+            while (root.parent) root = root.parent;
+            root.stepCount++;
+            if (root.stepCount > root.maxSteps) throw new Error('Execution limit reached (infinite loop?)');
+        }
+    }
+
+    // --- Executor ---
+    function execBlock(stmts, env) {
+        for (const stmt of stmts) {
+            env.tick();
+            execStmt(stmt, env);
+        }
+    }
+
+    function execStmt(stmt, env) {
+        switch (stmt.type) {
+            case 'noop': break;
+            case 'mode': break;
+            case 'show': {
+                const val = evalExpr(stmt.expr, env);
+                env.output(stringify(val));
+                break;
+            }
+            case 'ask': {
+                const val = evalExpr(stmt.expr, env);
+                const answer = prompt(stringify(val)) || '';
+                // ask is like: name = ask "prompt"
+                // but in our AST it's just an expression; the result is lost unless assigned
+                // Handle: name = ask "prompt" is parsed as assign with rhs starting with ask
+                break;
+            }
+            case 'assign': {
+                let val;
+                if (stmt.expr.startsWith('ask ')) {
+                    const promptMsg = evalExpr(stmt.expr.substring(4).trim(), env);
+                    val = prompt(stringify(promptMsg)) || '';
+                } else {
+                    val = evalExpr(stmt.expr, env);
+                }
+                env.set(stmt.name, val);
+                break;
+            }
+            case 'array_assign': {
+                const arr = env.get(stmt.name);
+                const idx = evalExpr(stmt.index, env);
+                const val = evalExpr(stmt.expr, env);
+                if (Array.isArray(arr)) {
+                    const i = idx < 0 ? arr.length + idx : idx;
+                    arr[i] = val;
+                }
+                break;
+            }
+            case 'if': {
+                for (const branch of stmt.branches) {
+                    if (branch.condition === null) {
+                        execBlock(branch.body, env);
+                        break;
+                    }
+                    if (evalExpr(branch.condition, env)) {
+                        execBlock(branch.body, env);
+                        break;
+                    }
+                }
+                break;
+            }
+            case 'match': {
+                const subject = evalExpr(stmt.subject, env);
+                let matched = false;
+                for (const c of stmt.cases) {
+                    const val = evalExpr(c.value, env);
+                    if (subject == val || stringify(subject) === stringify(val)) {
+                        execBlock(c.body, env);
+                        matched = true;
+                        break;
+                    }
+                }
+                if (!matched && stmt.elseBody) execBlock(stmt.elseBody, env);
+                break;
+            }
+            case 'repeat': {
+                const count = evalExpr(stmt.count, env);
+                const n = Math.min(Math.floor(count), 10000);
+                for (let i = 0; i < n; i++) {
+                    env.tick();
+                    if (stmt.varName) env.set(stmt.varName, i);
+                    execBlock(stmt.body, env);
+                }
+                break;
+            }
+            case 'while': {
+                let safety = 0;
+                while (evalExpr(stmt.condition, env) && safety < 100000) {
+                    env.tick();
+                    execBlock(stmt.body, env);
+                    safety++;
+                }
+                if (safety >= 100000) throw new Error('While loop limit reached (infinite loop?)');
+                break;
+            }
+            case 'each': {
+                const col = evalExpr(stmt.collection, env);
+                if (Array.isArray(col)) {
+                    for (let i = 0; i < col.length; i++) {
+                        env.tick();
+                        if (stmt.indexVar) env.set(stmt.indexVar, i);
+                        env.set(stmt.itemVar, col[i]);
+                        execBlock(stmt.body, env);
+                    }
+                }
+                break;
+            }
+            case 'func': {
+                env.setFunc(stmt.name, {
+                    params: stmt.params,
+                    isVariadic: stmt.isVariadic,
+                    variadicName: stmt.variadicName,
+                    body: stmt.body,
+                });
+                break;
+            }
+            case 'return': {
+                throw new ReturnValue(evalExpr(stmt.expr, env));
+            }
+            case 'trycatch': {
+                try {
+                    execBlock(stmt.tryBody, env);
+                } catch (e) {
+                    if (e instanceof ReturnValue) throw e;
+                    env.set(stmt.catchVar, e.message || String(e));
+                    execBlock(stmt.catchBody, env);
+                }
+                break;
+            }
+            case 'error': {
+                throw new Error(stringify(evalExpr(stmt.expr, env)));
+            }
+            case 'assert': {
+                // assert(expr, msg) — parsed as function-like
+                const inner = stmt.expr;
+                if (inner.startsWith('(') && inner.endsWith(')')) {
+                    const argStr = inner.slice(1, -1);
+                    const args = splitArgs(argStr);
+                    const val = evalExpr(args[0].trim(), env);
+                    const msg = args[1] ? evalExpr(args[1].trim(), env) : 'assertion failed';
+                    if (!val) throw new Error('Assertion failed: ' + stringify(msg));
+                } else {
+                    const val = evalExpr(inner, env);
+                    if (!val) throw new Error('Assertion failed');
+                }
+                break;
+            }
+            case 'expr': {
+                evalExpr(stmt.expr, env);
+                break;
+            }
+        }
+    }
+
+    // --- Public API ---
+    function run(source, outputFn) {
+        const output = [];
+        const outFn = outputFn || function(line) { output.push(line); };
+        const tokens = tokenize(source);
+        const ast = parse(tokens);
+        const env = new Environment(null, outFn);
+        try {
+            execBlock(ast, env);
+            return { output, error: null };
+        } catch (e) {
+            if (e instanceof ReturnValue) {
+                return { output, error: null };
+            }
+            return { output, error: e.message || String(e) };
+        }
+    }
+
+    return { run };
+    })();
+
+    // ============================================================
+    // Examples (plain text, no HTML spans)
+    // ============================================================
     const examples = {
         hello: {
             file: "hello.seven",
-            code: `<span class="cm">!! Hello World in SEVEN</span>\n<span class="io">show</span> <span class="str">"Hello, World!"</span>\n\n<span class="cm">!! String interpolation</span>\n<span class="op">name</span> = <span class="str">"SEVEN"</span>\n<span class="io">show</span> <span class="str">"Welcome to {name}!"</span>\n<span class="io">show</span> <span class="str">"Version: 1.2"</span>`,
-            output: `Hello, World!\nWelcome to SEVEN!\nVersion: 1.2`
+            code: `!! Hello World in SEVEN
+show "Hello, World!"
+
+!! String interpolation
+name = "SEVEN"
+show "Welcome to {name}!"
+show "Version: 1.2"`,
         },
         variables: {
             file: "variables.seven",
-            code: `<span class="cm">!! Variables and math</span>\n<span class="op">x</span> = <span class="num">10</span>\n<span class="op">y</span> = <span class="num">3</span>\n\n<span class="io">show</span> <span class="op">x</span> + <span class="op">y</span>\n<span class="io">show</span> <span class="op">x</span> - <span class="op">y</span>\n<span class="io">show</span> <span class="op">x</span> * <span class="op">y</span>\n<span class="io">show</span> <span class="op">x</span> / <span class="op">y</span>\n<span class="io">show</span> <span class="op">x</span> % <span class="op">y</span>\n\n<span class="cm">!! Math builtins</span>\n<span class="io">show</span> <span class="fn">abs</span>(-<span class="num">42</span>)\n<span class="io">show</span> <span class="fn">min</span>(<span class="num">5</span>, <span class="num">9</span>)\n<span class="io">show</span> <span class="fn">max</span>(<span class="num">5</span>, <span class="num">9</span>)\n<span class="io">show</span> <span class="fn">pow</span>(<span class="num">2</span>, <span class="num">10</span>)`,
-            output: `13\n7\n30\n3\n1\n42\n5\n9\n1024`
+            code: `!! Variables and math
+x = 10
+y = 3
+
+show x + y
+show x - y
+show x * y
+show x / y
+show x % y
+
+!! Math builtins
+show abs(-42)
+show min(5, 9)
+show max(5, 9)
+show pow(2, 10)`,
         },
         conditionals: {
             file: "conditionals.seven",
-            code: `<span class="op">age</span> = <span class="num">18</span>\n\n<span class="kw">if</span> <span class="op">age</span> >= <span class="num">18</span>\n    <span class="io">show</span> <span class="str">"You can vote!"</span>\n<span class="kw">else</span>\n    <span class="io">show</span> <span class="str">"Too young to vote."</span>\n<span class="kw">end</span>\n\n<span class="cm">!! Match statement</span>\n<span class="op">day</span> = <span class="str">"Monday"</span>\n<span class="kw">match</span> <span class="op">day</span>\n    <span class="kw">when</span> <span class="str">"Monday"</span>\n        <span class="io">show</span> <span class="str">"Start of the week"</span>\n    <span class="kw">when</span> <span class="str">"Friday"</span>\n        <span class="io">show</span> <span class="str">"Weekend coming!"</span>\n    <span class="kw">else</span>\n        <span class="io">show</span> <span class="str">"Regular day"</span>\n<span class="kw">end</span>`,
-            output: `You can vote!\nStart of the week`
+            code: `age = 18
+
+if age >= 18
+    show "You can vote!"
+else
+    show "Too young to vote."
+end
+
+!! Match statement
+day = "Monday"
+match day
+    case "Monday"
+        show "Start of the week"
+    case "Friday"
+        show "Weekend coming!"
+    else
+        show "Regular day"
+end`,
         },
         loops: {
             file: "loops.seven",
-            code: `<span class="cm">!! Repeat with counter</span>\n<span class="kw">repeat</span> <span class="num">5</span> <span class="kw">times</span> <span class="kw">as</span> <span class="op">i</span>\n    <span class="io">show</span> <span class="str">"i = "</span> + <span class="op">i</span>\n<span class="kw">end</span>\n\n<span class="cm">!! While loop</span>\n<span class="op">x</span> = <span class="num">1</span>\n<span class="kw">while</span> <span class="op">x</span> <= <span class="num">4</span>\n    <span class="io">show</span> <span class="str">"x = "</span> + <span class="op">x</span>\n    <span class="op">x</span> = <span class="op">x</span> + <span class="num">1</span>\n<span class="kw">end</span>\n\n<span class="cm">!! Each loop</span>\n<span class="op">fruits</span> = [<span class="str">"apple"</span>, <span class="str">"banana"</span>, <span class="str">"cherry"</span>]\n<span class="kw">each</span> <span class="op">fruits</span> <span class="kw">as</span> <span class="op">f</span>\n    <span class="io">show</span> <span class="op">f</span>\n<span class="kw">end</span>`,
-            output: `i = 0\ni = 1\ni = 2\ni = 3\ni = 4\nx = 1\nx = 2\nx = 3\nx = 4\napple\nbanana\ncherry`
+            code: `!! Repeat with counter
+repeat 5 times as i
+    show "i = " + i
+end
+
+!! While loop
+x = 1
+while x <= 4
+    show "x = " + x
+    x = x + 1
+end
+
+!! Each loop
+fruits = ["apple", "banana", "cherry"]
+each fruits as f
+    show f
+end`,
         },
         functions: {
             file: "functions.seven",
-            code: `<span class="kw">func</span> <span class="fn">greet</span>(<span class="op">name</span>)\n    <span class="io">show</span> <span class="str">"Hello, "</span> + <span class="op">name</span> + <span class="str">"!"</span>\n<span class="kw">end</span>\n\n<span class="kw">func</span> <span class="fn">add</span>(<span class="op">a</span>, <span class="op">b</span>)\n    <span class="kw">return</span> <span class="op">a</span> + <span class="op">b</span>\n<span class="kw">end</span>\n\n<span class="kw">func</span> <span class="fn">sum_all</span>(<span class="kw">many</span> <span class="op">nums</span>)\n    <span class="op">total</span> = <span class="num">0</span>\n    <span class="kw">each</span> <span class="op">nums</span> <span class="kw">as</span> <span class="op">n</span>\n        <span class="op">total</span> = <span class="op">total</span> + <span class="op">n</span>\n    <span class="kw">end</span>\n    <span class="kw">return</span> <span class="op">total</span>\n<span class="kw">end</span>\n\n<span class="fn">greet</span>(<span class="str">"World"</span>)\n<span class="io">show</span> <span class="fn">add</span>(<span class="num">3</span>, <span class="num">7</span>)\n<span class="io">show</span> <span class="fn">sum_all</span>(<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>, <span class="num">4</span>, <span class="num">5</span>)`,
-            output: `Hello, World!\n10\n15`
+            code: `func greet(name)
+    show "Hello, " + name + "!"
+end
+
+func add(a, b)
+    return a + b
+end
+
+func sum_all(many nums)
+    total = 0
+    each nums as n
+        total = total + n
+    end
+    return total
+end
+
+greet("World")
+show add(3, 7)
+show sum_all(1, 2, 3, 4, 5)`,
         },
         arrays: {
             file: "arrays.seven",
-            code: `<span class="op">nums</span> = [<span class="num">50</span>, <span class="num">10</span>, <span class="num">30</span>, <span class="num">20</span>, <span class="num">40</span>]\n<span class="io">show</span> <span class="str">"Length: "</span> + <span class="fn">len</span>(<span class="op">nums</span>)\n\n<span class="cm">!! Sort and show</span>\n<span class="op">sorted</span> = <span class="fn">sort</span>(<span class="op">nums</span>)\n<span class="kw">each</span> <span class="op">sorted</span> <span class="kw">as</span> <span class="op">n</span>\n    <span class="io">show</span> <span class="op">n</span>\n<span class="kw">end</span>\n\n<span class="cm">!! Other operations</span>\n<span class="io">show</span> <span class="str">"Sum: "</span> + <span class="fn">sum</span>(<span class="op">nums</span>)\n<span class="io">show</span> <span class="str">"Avg: "</span> + <span class="fn">avg</span>(<span class="op">nums</span>)\n\n<span class="op">u</span> = <span class="fn">unique</span>([<span class="num">1</span>, <span class="num">2</span>, <span class="num">2</span>, <span class="num">3</span>, <span class="num">3</span>])\n<span class="io">show</span> <span class="str">"Unique count: "</span> + <span class="fn">len</span>(<span class="op">u</span>)`,
-            output: `Length: 5\n10\n20\n30\n40\n50\nSum: 150\nAvg: 30\nUnique count: 3`
+            code: `nums = [50, 10, 30, 20, 40]
+show "Length: " + len(nums)
+
+!! Sort and show
+sorted = sort(nums)
+each sorted as n
+    show n
+end
+
+!! Other operations
+show "Sum: " + sum(nums)
+show "Avg: " + avg(nums)
+
+u = unique([1, 2, 2, 3, 3])
+show "Unique count: " + len(u)`,
         },
         strings: {
             file: "strings.seven",
-            code: `<span class="op">s</span> = <span class="str">"Hello, World!"</span>\n\n<span class="io">show</span> <span class="fn">upper</span>(<span class="op">s</span>)\n<span class="io">show</span> <span class="fn">lower</span>(<span class="op">s</span>)\n<span class="io">show</span> <span class="fn">len</span>(<span class="op">s</span>)\n\n<span class="cm">!! Method syntax</span>\n<span class="io">show</span> <span class="op">s</span>.<span class="fn">startswith</span>(<span class="str">"Hello"</span>)\n<span class="io">show</span> <span class="op">s</span>.<span class="fn">index</span>(<span class="str">"World"</span>)\n\n<span class="cm">!! String functions</span>\n<span class="io">show</span> <span class="fn">replace</span>(<span class="op">s</span>, <span class="str">"World"</span>, <span class="str">"SEVEN"</span>)\n<span class="io">show</span> <span class="fn">trim</span>(<span class="str">"  spaces  "</span>)\n<span class="io">show</span> <span class="str">"ha"</span>.<span class="fn">repeat</span>(<span class="num">3</span>)\n<span class="io">show</span> <span class="fn">ord</span>(<span class="str">"A"</span>)\n<span class="io">show</span> <span class="fn">chr</span>(<span class="num">65</span>)`,
-            output: `HELLO, WORLD!\nhello, world!\n13\n1\n7\nHello, SEVEN!\nspaces\nhahaha\n65\nA`
+            code: `s = "Hello, World!"
+
+show upper(s)
+show lower(s)
+show len(s)
+
+!! Method syntax
+show s.startswith("Hello")
+show s.index("World")
+
+!! String functions
+show replace(s, "World", "SEVEN")
+show trim("  spaces  ")
+show "ha".repeat(3)
+show ord("A")
+show chr(65)`,
         },
         fizzbuzz: {
             file: "fizzbuzz.seven",
-            code: `<span class="cm">!! Classic FizzBuzz</span>\n<span class="kw">repeat</span> <span class="num">20</span> <span class="kw">times</span> <span class="kw">as</span> <span class="op">i</span>\n    <span class="op">n</span> = <span class="op">i</span> + <span class="num">1</span>\n    <span class="kw">if</span> <span class="op">n</span> % <span class="num">15</span> == <span class="num">0</span>\n        <span class="io">show</span> <span class="str">"FizzBuzz"</span>\n    <span class="kw">orif</span> <span class="op">n</span> % <span class="num">3</span> == <span class="num">0</span>\n        <span class="io">show</span> <span class="str">"Fizz"</span>\n    <span class="kw">orif</span> <span class="op">n</span> % <span class="num">5</span> == <span class="num">0</span>\n        <span class="io">show</span> <span class="str">"Buzz"</span>\n    <span class="kw">else</span>\n        <span class="io">show</span> <span class="op">n</span>\n    <span class="kw">end</span>\n<span class="kw">end</span>`,
-            output: `1\n2\nFizz\n4\nBuzz\nFizz\n7\n8\nFizz\nBuzz\n11\nFizz\n13\n14\nFizzBuzz\n16\n17\nFizz\n19\nBuzz`
+            code: `!! Classic FizzBuzz
+repeat 20 times as i
+    n = i + 1
+    if n % 15 == 0
+        show "FizzBuzz"
+    orif n % 3 == 0
+        show "Fizz"
+    orif n % 5 == 0
+        show "Buzz"
+    else
+        show n
+    end
+end`,
         },
         factorial: {
             file: "factorial.seven",
-            code: `<span class="cm">!! Recursive factorial</span>\n<span class="kw">func</span> <span class="fn">factorial</span>(<span class="op">n</span>)\n    <span class="kw">if</span> <span class="op">n</span> <= <span class="num">1</span>\n        <span class="kw">return</span> <span class="num">1</span>\n    <span class="kw">end</span>\n    <span class="kw">return</span> <span class="op">n</span> * <span class="fn">factorial</span>(<span class="op">n</span> - <span class="num">1</span>)\n<span class="kw">end</span>\n\n<span class="kw">repeat</span> <span class="num">10</span> <span class="kw">times</span> <span class="kw">as</span> <span class="op">i</span>\n    <span class="op">n</span> = <span class="op">i</span> + <span class="num">1</span>\n    <span class="io">show</span> <span class="fn">str</span>(<span class="op">n</span>) + <span class="str">"! = "</span> + <span class="fn">factorial</span>(<span class="op">n</span>)\n<span class="kw">end</span>`,
-            output: `1! = 1\n2! = 2\n3! = 6\n4! = 24\n5! = 120\n6! = 720\n7! = 5040\n8! = 40320\n9! = 362880\n10! = 3628800`
+            code: `!! Recursive factorial
+func factorial(n)
+    if n <= 1
+        return 1
+    end
+    return n * factorial(n - 1)
+end
+
+repeat 10 times as i
+    n = i + 1
+    show str(n) + "! = " + factorial(n)
+end`,
         },
         sorting: {
             file: "sorting.seven",
-            code: `<span class="cm">!! Sort and manipulate arrays</span>\n<span class="op">data</span> = [<span class="num">42</span>, <span class="num">17</span>, <span class="num">93</span>, <span class="num">5</span>, <span class="num">68</span>, <span class="num">31</span>]\n<span class="io">show</span> <span class="str">"Original:"</span>\n<span class="io">show</span> <span class="fn">join</span>(<span class="op">data</span>, <span class="str">", "</span>)\n\n<span class="op">sorted</span> = <span class="fn">sort</span>(<span class="op">data</span>)\n<span class="io">show</span> <span class="str">"Sorted:"</span>\n<span class="io">show</span> <span class="fn">join</span>(<span class="op">sorted</span>, <span class="str">", "</span>)\n\n<span class="op">rev</span> = <span class="fn">reverse</span>(<span class="op">sorted</span>)\n<span class="io">show</span> <span class="str">"Reversed:"</span>\n<span class="io">show</span> <span class="fn">join</span>(<span class="op">rev</span>, <span class="str">", "</span>)\n\n<span class="io">show</span> <span class="str">"Min: "</span> + <span class="op">sorted</span>[<span class="num">0</span>]\n<span class="io">show</span> <span class="str">"Max: "</span> + <span class="op">rev</span>[<span class="num">0</span>]`,
-            output: `Original:\n42, 17, 93, 5, 68, 31\nSorted:\n5, 17, 31, 42, 68, 93\nReversed:\n93, 68, 42, 31, 17, 5\nMin: 5\nMax: 93`
+            code: `!! Sort and manipulate arrays
+data = [42, 17, 93, 5, 68, 31]
+show "Original:"
+show join(data, ", ")
+
+sorted = sort(data)
+show "Sorted:"
+show join(sorted, ", ")
+
+rev = reverse(sorted)
+show "Reversed:"
+show join(rev, ", ")
+
+show "Min: " + sorted[0]
+show "Max: " + rev[0]`,
         },
         testing: {
             file: "test_example.seven",
-            code: `<span class="cm">!! Assert-based testing</span>\n<span class="op">x</span> = <span class="num">5</span> + <span class="num">3</span>\n<span class="fn">assert</span>(<span class="op">x</span> == <span class="num">8</span>, <span class="str">"addition works"</span>)\n\n<span class="fn">assert</span>(<span class="fn">abs</span>(-<span class="num">7</span>) == <span class="num">7</span>, <span class="str">"abs works"</span>)\n<span class="fn">assert</span>(<span class="fn">len</span>(<span class="str">"hello"</span>) == <span class="num">5</span>, <span class="str">"len works"</span>)\n\n<span class="op">nums</span> = [<span class="num">3</span>, <span class="num">1</span>, <span class="num">2</span>]\n<span class="op">s</span> = <span class="fn">sort</span>(<span class="op">nums</span>)\n<span class="fn">assert</span>(<span class="op">s</span>[<span class="num">0</span>] == <span class="num">1</span>, <span class="str">"sort works"</span>)\n\n<span class="kw">func</span> <span class="fn">double</span>(<span class="op">n</span>)\n    <span class="kw">return</span> <span class="op">n</span> * <span class="num">2</span>\n<span class="kw">end</span>\n<span class="fn">assert</span>(<span class="fn">double</span>(<span class="num">5</span>) == <span class="num">10</span>, <span class="str">"functions work"</span>)\n\n<span class="io">show</span> <span class="str">"All tests passed!"</span>`,
-            output: `All tests passed!`
+            code: `!! Assert-based testing
+x = 5 + 3
+assert(x == 8, "addition works")
+
+assert(abs(-7) == 7, "abs works")
+assert(len("hello") == 5, "len works")
+
+nums = [3, 1, 2]
+s = sort(nums)
+assert(s[0] == 1, "sort works")
+
+func double(n)
+    return n * 2
+end
+assert(double(5) == 10, "functions work")
+
+show "All tests passed!"`,
         },
         errorhandling: {
             file: "errors.seven",
-            code: `<span class="cm">!! Try-catch error handling</span>\n<span class="kw">try</span>\n    <span class="op">result</span> = <span class="num">100</span> / <span class="num">0</span>\n    <span class="io">show</span> <span class="op">result</span>\n<span class="kw">catch</span> <span class="op">e</span>\n    <span class="io">show</span> <span class="str">"Caught: "</span> + <span class="op">e</span>\n<span class="kw">done</span>\n\n<span class="io">show</span> <span class="str">"Program continues!"</span>\n\n<span class="cm">!! Custom errors</span>\n<span class="kw">func</span> <span class="fn">safe_div</span>(<span class="op">a</span>, <span class="op">b</span>)\n    <span class="kw">if</span> <span class="op">b</span> == <span class="num">0</span>\n        <span class="kw">error</span> <span class="str">"division by zero"</span>\n    <span class="kw">end</span>\n    <span class="kw">return</span> <span class="op">a</span> / <span class="op">b</span>\n<span class="kw">end</span>\n\n<span class="io">show</span> <span class="fn">safe_div</span>(<span class="num">10</span>, <span class="num">2</span>)`,
-            output: `Caught: division by zero\nProgram continues!\n5`
+            code: `!! Try-catch error handling
+try
+    result = 100 / 0
+    show result
+catch e
+    show "Caught: " + e
+end
+
+show "Program continues!"
+
+!! Custom errors
+func safe_div(a, b)
+    if b == 0
+        error "division by zero"
+    end
+    return a / b
+end
+
+show safe_div(10, 2)`,
         },
         natural: {
             file: "natural.seven",
-            code: `<span class="kw">mode natural</span>\n\n<span class="cm">!! English-like syntax</span>\n<span class="op">fruits</span> = [<span class="str">"apple"</span>, <span class="str">"banana"</span>, <span class="str">"cherry"</span>]\n\n<span class="io">show</span> <span class="str">"I have "</span> + <span class="fn">len</span>(<span class="op">fruits</span>) + <span class="str">" fruits"</span>\n\n<span class="kw">each</span> <span class="op">fruits</span> <span class="kw">as</span> <span class="op">i</span>, <span class="op">fruit</span>\n    <span class="io">show</span> <span class="fn">str</span>(<span class="op">i</span> + <span class="num">1</span>) + <span class="str">". "</span> + <span class="op">fruit</span>\n<span class="kw">end</span>\n\n<span class="fn">push</span>(<span class="op">fruits</span>, <span class="str">"date"</span>)\n<span class="io">show</span> <span class="str">"Now I have "</span> + <span class="fn">len</span>(<span class="op">fruits</span>)`,
-            output: `I have 3 fruits\n1. apple\n2. banana\n3. cherry\nNow I have 4`
-        }
+            code: `mode natural
+
+!! English-like syntax
+fruits = ["apple", "banana", "cherry"]
+
+show "I have " + len(fruits) + " fruits"
+
+each fruits as i, fruit
+    show str(i + 1) + ". " + fruit
+end
+
+push(fruits, "date")
+show "Now I have " + len(fruits)`,
+        },
     };
+
+    // ============================================================
+    // UI Logic
+    // ============================================================
+    const editor = document.getElementById('codeEditor');
+    const outputPanel = document.getElementById('outputPanel');
+    const exitStatus = document.getElementById('exitStatus');
+    const runBtn = document.getElementById('runBtn');
+    const clearBtn = document.getElementById('clearBtn');
 
     function loadExample(name) {
         const ex = examples[name];
         if (!ex) return;
         document.getElementById('codeFilename').textContent = ex.file;
-        document.getElementById('codePanel').querySelector('code').innerHTML = ex.code;
-        document.getElementById('outputPanel').textContent = ex.output;
+        editor.value = ex.code;
+        // clear output
+        outputPanel.innerHTML = '';
+        exitStatus.innerHTML = '';
+        // highlight button
         document.querySelectorAll('.example-btn').forEach(b => {
             b.className = 'example-btn w-full text-left px-4 py-2.5 rounded-lg text-sm text-gray-400 border border-white/5 hover:border-white/10 transition';
         });
-        document.querySelector(`[data-example="${name}"]`).className = 'example-btn active w-full text-left px-4 py-2.5 rounded-lg text-sm border border-white/5 transition';
+        const activeBtn = document.querySelector(`[data-example="${name}"]`);
+        if (activeBtn) activeBtn.className = 'example-btn active w-full text-left px-4 py-2.5 rounded-lg text-sm border border-white/5 transition';
     }
+
+    function runCode() {
+        const code = editor.value;
+        outputPanel.innerHTML = '';
+        exitStatus.innerHTML = '';
+        if (!code.trim()) {
+            outputPanel.innerHTML = '<span class="output-info">No code to run.</span>';
+            return;
+        }
+        const lines = [];
+        const startTime = performance.now();
+        const result = SevenInterpreter.run(code, function(line) {
+            lines.push(line);
+        });
+        const elapsed = ((performance.now() - startTime) / 1000).toFixed(3);
+        // show output
+        const allLines = result.output.length ? result.output : lines;
+        if (allLines.length) {
+            outputPanel.textContent = allLines.join('\n');
+        }
+        if (result.error) {
+            const errSpan = document.createElement('div');
+            errSpan.className = 'output-error';
+            errSpan.textContent = 'Error: ' + result.error;
+            outputPanel.appendChild(errSpan);
+            exitStatus.innerHTML = '<span class="text-red-400">&#10007; error</span> <span class="text-gray-600 ml-2">' + elapsed + 's</span>';
+        } else {
+            exitStatus.innerHTML = '<span class="text-emerald-400">&#10003; exit code 0</span> <span class="text-gray-600 ml-2">' + elapsed + 's</span>';
+        }
+    }
+
+    // Tab key inserts 4 spaces
+    editor.addEventListener('keydown', function(e) {
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            const start = this.selectionStart;
+            const end = this.selectionEnd;
+            this.value = this.value.substring(0, start) + '    ' + this.value.substring(end);
+            this.selectionStart = this.selectionEnd = start + 4;
+        }
+        // Ctrl+Enter or Cmd+Enter runs code
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            e.preventDefault();
+            runCode();
+        }
+    });
+
+    runBtn.addEventListener('click', runCode);
+    clearBtn.addEventListener('click', function() {
+        editor.value = '';
+        outputPanel.innerHTML = '';
+        exitStatus.innerHTML = '';
+        document.getElementById('codeFilename').textContent = 'untitled.seven';
+        document.querySelectorAll('.example-btn').forEach(b => {
+            b.className = 'example-btn w-full text-left px-4 py-2.5 rounded-lg text-sm text-gray-400 border border-white/5 hover:border-white/10 transition';
+        });
+    });
 
     document.querySelectorAll('.example-btn').forEach(btn => {
         btn.addEventListener('click', () => loadExample(btn.dataset.example));
     });
 
-    // Load first example
+    // Load first example and auto-run it
     loadExample('hello');
+    runCode();
 
     // Mobile menu
     document.getElementById('mobileMenuBtn').addEventListener('click', function() {

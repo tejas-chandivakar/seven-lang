@@ -20,6 +20,8 @@ MinVersion=10.0
 
 [Files]
 Source: "..\build\seven.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\build\seven_runtime_win.o"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\build\seven_runtime.o"; DestDir: "{app}"; Flags: ignoreversion
 Source: "C:\Program Files\LLVM\bin\LLVM-C.dll"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]

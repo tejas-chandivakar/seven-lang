@@ -26,7 +26,7 @@ show prod
 !! --- 2. String Operations ---
 show ""
 show "--- 2. Strings ---"
-name = "Tejas"
+name = "SEVEN"
 lang = "SEVEN"
 show "Welcome to {lang} language!"
 up = name.upper()

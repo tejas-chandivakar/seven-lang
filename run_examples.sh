@@ -52,7 +52,7 @@ show x % y'
 
 # 2. String Interpolation
 run_example "2. String Interpolation" \
-'name = "Tejas"
+'name = "SEVEN"
 lang = "SEVEN"
 show "Hello {name}!"
 show "Language: {lang}"'

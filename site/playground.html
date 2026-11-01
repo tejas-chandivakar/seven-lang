@@ -286,8 +286,20 @@
             const text = t.text;
             const fw = firstWord(text);
 
+            if (fw === 'show.raw') { advance(); return { type: 'show_raw', expr: text.substring(9).trim(), line: t.line }; }
             if (fw === 'show') { advance(); return { type: 'show', expr: text.substring(5).trim(), line: t.line }; }
             if (fw === 'ask') { advance(); return { type: 'ask', expr: text.substring(4).trim(), line: t.line }; }
+            if (fw === 'secret') { advance(); return { type: 'ask', expr: text.substring(7).trim(), line: t.line }; }
+            if (fw === 'err') { advance(); return { type: 'err_out', expr: text.substring(4).trim(), line: t.line }; }
+            if (fw === 'skip') { advance(); return { type: 'skip', line: t.line }; }
+            if (fw === 'stop') { advance(); return { type: 'stop', line: t.line }; }
+            if (fw === 'const') {
+                advance();
+                const rest = text.substring(6).trim();
+                const ci = rest.indexOf('=');
+                if (ci > 0) return { type: 'assign', name: rest.substring(0, ci).trim(), expr: rest.substring(ci + 1).trim(), line: t.line };
+                return { type: 'noop' };
+            }
             if (fw === 'if') return parseIf();
             if (fw === 'match') return parseMatch();
             if (fw === 'repeat') return parseRepeat();
@@ -300,6 +312,15 @@
             if (fw === 'mode') { advance(); return { type: 'mode', value: text.substring(5).trim(), line: t.line }; }
             if (fw === 'assert') { advance(); return { type: 'assert', expr: text.substring(7).trim(), line: t.line }; }
             if (fw === 'end' || fw === 'done') { advance(); return { type: 'noop' }; }
+            // Natural mode commands
+            { const nm = text.match(/^add\s+(.+)\s+to\s+(\w+)$/);
+              if (nm) { advance(); return { type: 'nat_add', value: nm[1], target: nm[2], line: t.line }; } }
+            { const nm = text.match(/^pop\s+from\s+(\w+)$/);
+              if (nm) { advance(); return { type: 'nat_pop', target: nm[1], line: t.line }; } }
+            { const nm = text.match(/^insert\s+(.+)\s+at\s+(.+)\s+in\s+(\w+)$/);
+              if (nm) { advance(); return { type: 'nat_insert', value: nm[1], index: nm[2], target: nm[3], line: t.line }; } }
+            { const nm = text.match(/^remove\s+(.+)\s+from\s+(\w+)$/);
+              if (nm) { advance(); return { type: 'nat_remove', index: nm[1], target: nm[2], line: t.line }; } }
             // assignment or expression
             advance();
             const eqIdx = text.indexOf('=');
@@ -478,13 +499,20 @@
         expr = expr.trim();
         if (expr === '') return '';
 
-        // String literal with interpolation
-        if ((expr.startsWith('"') && expr.endsWith('"')) || (expr.startsWith("'") && expr.endsWith("'"))) {
-            const inner = expr.slice(1, -1);
-            return inner.replace(/\\n/g, '\n').replace(/\\t/g, '\t').replace(/\\\\/g, '\\')
-                .replace(/\{([^}]+)\}/g, (_, varName) => {
-                    return stringify(evalExpr(varName.trim(), env));
-                });
+        // String literal with interpolation — find actual closing quote
+        if (expr[0] === '"' || expr[0] === "'") {
+            const quote = expr[0];
+            let ei = 1;
+            while (ei < expr.length) {
+                if (expr[ei] === '\\') { ei += 2; continue; }
+                if (expr[ei] === quote) break;
+                ei++;
+            }
+            if (ei === expr.length - 1) {
+                const inner = expr.slice(1, -1);
+                return inner.replace(/\\n/g, '\n').replace(/\\t/g, '\t').replace(/\\\\/g, '\\')
+                    .replace(/\{([^}]+)\}/g, (_, e) => stringify(evalExpr(e.trim(), env)));
+            }
         }
 
         // Array literal
@@ -583,6 +611,12 @@
                 return l / r;
             }
             return l % r;
+        }
+
+        // Power operator
+        split = splitBinaryOp(expr, [' ** ']);
+        if (split) {
+            return Math.pow(evalExpr(split.left, env), evalExpr(split.right, env));
         }
 
         // Unary minus
@@ -804,6 +838,27 @@
                 return 1;
             }
             case 'random': return Math.random();
+            case 'insert': {
+                if (Array.isArray(args[0])) { args[0].splice(args[1], 0, args[2]); return args[0]; }
+                return args[0];
+            }
+            case 'remove': {
+                if (Array.isArray(args[0])) return args[0].splice(args[1], 1)[0];
+                return 0;
+            }
+            case 'step': {
+                if (Array.isArray(args[0])) {
+                    const res = []; const s = args[1] || 1;
+                    for (let i = 0; i < args[0].length; i += s) res.push(args[0][i]);
+                    return res;
+                }
+                return [];
+            }
+            case 'find': {
+                if (Array.isArray(args[0])) return args[0].indexOf(args[1]);
+                if (typeof args[0] === 'string') return args[0].indexOf(String(args[1]));
+                return -1;
+            }
             case 'char_at': {
                 const s = String(args[0]);
                 const i = args[1] || 0;
@@ -882,6 +937,8 @@
     class SevenError {
         constructor(message) { this.message = message; }
     }
+    class SkipSignal {}
+    class StopSignal {}
 
     // --- Environment ---
     class Environment {
@@ -944,23 +1001,29 @@
             case 'noop': break;
             case 'mode': break;
             case 'show': {
-                const val = evalExpr(stmt.expr, env);
-                env.output(stringify(val));
+                const parts = splitArgs(stmt.expr);
+                if (parts.length > 1) {
+                    env.output(parts.map(p => stringify(evalExpr(p.trim(), env))).join(' '));
+                } else {
+                    env.output(stringify(evalExpr(stmt.expr, env)));
+                }
                 break;
             }
             case 'ask': {
                 const val = evalExpr(stmt.expr, env);
-                const answer = prompt(stringify(val)) || '';
-                // ask is like: name = ask "prompt"
-                // but in our AST it's just an expression; the result is lost unless assigned
-                // Handle: name = ask "prompt" is parsed as assign with rhs starting with ask
+                try { prompt(stringify(val)); } catch(e) {}
                 break;
             }
             case 'assign': {
                 let val;
-                if (stmt.expr.startsWith('ask ')) {
-                    const promptMsg = evalExpr(stmt.expr.substring(4).trim(), env);
-                    val = prompt(stringify(promptMsg)) || '';
+                if (stmt.expr.startsWith('ask ') || stmt.expr.startsWith('secret ')) {
+                    const offset = stmt.expr.startsWith('ask ') ? 4 : 7;
+                    const promptMsg = evalExpr(stmt.expr.substring(offset).trim(), env);
+                    let raw = '';
+                    try { raw = prompt(stringify(promptMsg)) || ''; } catch(e) { raw = ''; }
+                    if (/^-?\d+$/.test(raw)) val = parseInt(raw);
+                    else if (/^-?\d+\.\d+$/.test(raw)) val = parseFloat(raw);
+                    else val = raw;
                 } else {
                     val = evalExpr(stmt.expr, env);
                 }
@@ -1010,7 +1073,8 @@
                 for (let i = 0; i < n; i++) {
                     env.tick();
                     if (stmt.varName) env.set(stmt.varName, i);
-                    execBlock(stmt.body, env);
+                    try { execBlock(stmt.body, env); }
+                    catch (e) { if (e instanceof SkipSignal) continue; if (e instanceof StopSignal) break; throw e; }
                 }
                 break;
             }
@@ -1018,7 +1082,8 @@
                 let safety = 0;
                 while (evalExpr(stmt.condition, env) && safety < 100000) {
                     env.tick();
-                    execBlock(stmt.body, env);
+                    try { execBlock(stmt.body, env); }
+                    catch (e) { if (e instanceof SkipSignal) { safety++; continue; } if (e instanceof StopSignal) break; throw e; }
                     safety++;
                 }
                 if (safety >= 100000) throw new Error('While loop limit reached (infinite loop?)');
@@ -1031,7 +1096,8 @@
                         env.tick();
                         if (stmt.indexVar) env.set(stmt.indexVar, i);
                         env.set(stmt.itemVar, col[i]);
-                        execBlock(stmt.body, env);
+                        try { execBlock(stmt.body, env); }
+                        catch (e) { if (e instanceof SkipSignal) continue; if (e instanceof StopSignal) break; throw e; }
                     }
                 }
                 break;
@@ -1076,6 +1142,43 @@
                 }
                 break;
             }
+            case 'show_raw': {
+                const parts = splitArgs(stmt.expr);
+                const text = parts.map(p => stringify(evalExpr(p.trim(), env))).join(' ');
+                env.outputRaw ? env.outputRaw(text) : env.output(text);
+                break;
+            }
+            case 'err_out': {
+                const val = evalExpr(stmt.expr, env);
+                env.outputErr ? env.outputErr(stringify(val)) : env.output('[stderr] ' + stringify(val));
+                break;
+            }
+            case 'skip': throw new SkipSignal();
+            case 'stop': throw new StopSignal();
+            case 'nat_add': {
+                const arr = env.get(stmt.target);
+                const val = evalExpr(stmt.value, env);
+                if (Array.isArray(arr)) arr.push(val);
+                break;
+            }
+            case 'nat_pop': {
+                const arr = env.get(stmt.target);
+                if (Array.isArray(arr)) arr.pop();
+                break;
+            }
+            case 'nat_insert': {
+                const arr = env.get(stmt.target);
+                const val = evalExpr(stmt.value, env);
+                const idx = evalExpr(stmt.index, env);
+                if (Array.isArray(arr)) arr.splice(idx, 0, val);
+                break;
+            }
+            case 'nat_remove': {
+                const arr = env.get(stmt.target);
+                const idx = evalExpr(stmt.index, env);
+                if (Array.isArray(arr)) arr.splice(idx, 1);
+                break;
+            }
             case 'expr': {
                 evalExpr(stmt.expr, env);
                 break;
@@ -1083,10 +1186,40 @@
         }
     }
 
+    // --- Multi-line string preprocessing ---
+    function preprocessMultiline(source) {
+        let result = '', i = 0;
+        while (i < source.length) {
+            if (source[i] === '"' && source[i+1] === '"' && source[i+2] === '"') {
+                const start = i + 3;
+                const end = source.indexOf('"""', start);
+                if (end !== -1) {
+                    const content = source.substring(start, end).replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
+                    result += '"' + content + '"';
+                    i = end + 3;
+                } else { result += source[i]; i++; }
+            } else { result += source[i]; i++; }
+        }
+        return result;
+    }
+
+    // --- Multi-line comment preprocessing ---
+    function preprocessComments(source) {
+        let result = '', i = 0;
+        while (i < source.length) {
+            if (source[i] === '!' && source[i+1] === '!' && source[i+2] === '!') {
+                const end = source.indexOf('!!!', i + 3);
+                if (end !== -1) { i = end + 3; } else { result += source[i]; i++; }
+            } else { result += source[i]; i++; }
+        }
+        return result;
+    }
+
     // --- Public API ---
     function run(source, outputFn) {
         const output = [];
         const outFn = outputFn || function(line) { output.push(line); };
+        source = preprocessComments(preprocessMultiline(source));
         const tokens = tokenize(source);
         const ast = parse(tokens);
         const env = new Environment(null, outFn);

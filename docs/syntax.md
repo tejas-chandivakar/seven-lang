@@ -31,7 +31,7 @@ x = 10  !! inline comment
 ## Variables
 ```
 x = 10                !! int (auto)
-name = "Tejas"        !! string (auto)
+name = "SEVEN"        !! string (auto)
 pi = 3.14             !! float (auto)
 flag = true           !! bool
 nothing = null

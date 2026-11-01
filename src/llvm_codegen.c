@@ -268,7 +268,66 @@ static LLVMValueRef compile_primary(SevenModule *mod) {
 
         case TOK_STRING: {
             lexer_next(mod->lex);
-            return LLVMBuildGlobalStringPtr(mod->builder, t->value, "str");
+            const char *sv = t->value;
+            // Check for interpolation: contains '{'
+            if (strchr(sv, '{') != NULL) {
+                LLVMTypeRef pt = LLVMPointerTypeInContext(mod->ctx, 0);
+                LLVMTypeRef i64t = LLVMInt64TypeInContext(mod->ctx);
+                LLVMValueRef result = NULL;
+                const char *p = sv;
+                while (*p) {
+                    if (*p == '{') {
+                        // Extract variable name between { and }
+                        const char *start = p + 1;
+                        const char *end = strchr(start, '}');
+                        if (!end) break;
+                        char varname[256];
+                        int vlen = (int)(end - start);
+                        if (vlen >= 256) vlen = 255;
+                        memcpy(varname, start, vlen);
+                        varname[vlen] = '\0';
+                        // Look up variable and convert to string if needed
+                        VarInfo *vi = find_var(mod, varname);
+                        LLVMValueRef val;
+                        if (vi) {
+                            val = load_var(mod, vi);
+                            if (vi->is_string != 1) {
+                                // Convert int to string
+                                val = LLVMBuildCall2(mod->builder,
+                                    LLVMFunctionType(pt, (LLVMTypeRef[]){i64t}, 1, 0),
+                                    rt_str_from_int, (LLVMValueRef[]){val}, 1, "itos");
+                            }
+                        } else {
+                            val = LLVMBuildGlobalStringPtr(mod->builder, "", "empty");
+                        }
+                        if (result)
+                            result = LLVMBuildCall2(mod->builder,
+                                LLVMFunctionType(pt, (LLVMTypeRef[]){pt, pt}, 2, 0),
+                                rt_str_concat, (LLVMValueRef[]){result, val}, 2, "concat");
+                        else
+                            result = val;
+                        p = end + 1;
+                    } else {
+                        // Collect literal segment until next '{' or end
+                        const char *seg_start = p;
+                        while (*p && *p != '{') p++;
+                        char seg[4096];
+                        int slen = (int)(p - seg_start);
+                        if (slen >= 4096) slen = 4095;
+                        memcpy(seg, seg_start, slen);
+                        seg[slen] = '\0';
+                        LLVMValueRef sval = LLVMBuildGlobalStringPtr(mod->builder, seg, "seg");
+                        if (result)
+                            result = LLVMBuildCall2(mod->builder,
+                                LLVMFunctionType(pt, (LLVMTypeRef[]){pt, pt}, 2, 0),
+                                rt_str_concat, (LLVMValueRef[]){result, sval}, 2, "concat");
+                        else
+                            result = sval;
+                    }
+                }
+                return result ? result : LLVMBuildGlobalStringPtr(mod->builder, "", "empty");
+            }
+            return LLVMBuildGlobalStringPtr(mod->builder, sv, "str");
         }
 
         case TOK_TRUE: {

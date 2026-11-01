@@ -13,7 +13,7 @@ show s2
 show s3
 
 !! Simple interpolation
-name = "Tejas"
+name = "SEVEN"
 show "Hello {name}!"
 
 !! Method style

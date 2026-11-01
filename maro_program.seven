@@ -1,4 +1,4 @@
-name = "Tejas"
+name = "SEVEN"
 show "Hello {name}!"
 x = 10
 y = 20

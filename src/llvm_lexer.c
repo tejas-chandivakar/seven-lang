@@ -43,6 +43,8 @@ static const Keyword keywords[] = {
     {"push", TOK_PUSH}, {"pop", TOK_POP},
     {"write", TOK_WRITE}, {"read", TOK_READ},
     {"delete", TOK_DELETE}, {"append", TOK_APPEND},
+    {"mode", TOK_MODE}, {"hybrid", TOK_HYBRID}, {"natural", TOK_NATURAL},
+    {"add", TOK_ADD}, {"from", TOK_FROM}, {"at", TOK_AT}, {"times", TOK_TIMES},
     {NULL, 0}
 };
 
@@ -274,6 +276,13 @@ const char *token_type_name(SevenTokenType t) {
         case TOK_AND: return "and";
         case TOK_OR: return "or";
         case TOK_NOT: return "not";
+        case TOK_MODE: return "mode";
+        case TOK_HYBRID: return "hybrid";
+        case TOK_NATURAL: return "natural";
+        case TOK_ADD: return "add";
+        case TOK_FROM: return "from";
+        case TOK_AT: return "at";
+        case TOK_TIMES: return "times";
         case TOK_NEWLINE: return "newline";
         case TOK_EOF: return "EOF";
         default: return "?";

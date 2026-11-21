@@ -85,6 +85,15 @@ typedef enum {
     TOK_DELETE,       // delete (file)
     TOK_APPEND,       // append (file)
 
+    // Natural mode
+    TOK_MODE,         // mode
+    TOK_HYBRID,       // hybrid
+    TOK_NATURAL,      // natural
+    TOK_ADD,          // add
+    TOK_FROM,         // from
+    TOK_AT,           // at
+    TOK_TIMES,        // times
+
     TOK_NEWLINE,      // end of statement
     TOK_EOF,          // end of input
 } SevenTokenType;

@@ -55,6 +55,10 @@ static void compile_assert(SevenModule *mod);
 static void compile_each(SevenModule *mod);
 static void compile_push(SevenModule *mod);
 static void compile_pop(SevenModule *mod);
+static void compile_nat_add(SevenModule *mod);
+static void compile_nat_pop(SevenModule *mod);
+static void compile_nat_insert(SevenModule *mod);
+static void compile_nat_remove(SevenModule *mod);
 static void compile_write_file(SevenModule *mod);
 static void compile_read_file(SevenModule *mod);
 static void compile_delete_file(SevenModule *mod);
@@ -761,6 +765,17 @@ static void compile_assignment(SevenModule *mod) {
     const char *name = name_tok->value;
 
     Token *op = lexer_peek(mod->lex);
+
+    // Natural mode: insert X at I in arr
+    if (strcmp(name, "insert") == 0 && op->type != TOK_LPAREN) {
+        compile_nat_insert(mod);
+        return;
+    }
+    // Natural mode: remove I from arr
+    if (strcmp(name, "remove") == 0 && op->type != TOK_LPAREN) {
+        compile_nat_remove(mod);
+        return;
+    }
 
     if (op->type == TOK_LPAREN) {
         // name(...) — function call as statement
@@ -1517,6 +1532,8 @@ static void compile_push(SevenModule *mod) {
 // ---- Pop statement: pop arr ----
 static void compile_pop(SevenModule *mod) {
     lexer_next(mod->lex); // skip 'pop'
+    if (lexer_peek(mod->lex)->type == TOK_FROM)
+        lexer_next(mod->lex); // skip 'from' in natural mode
     Token *arr_tok = lexer_expect(mod->lex, TOK_IDENT);
     VarInfo *v = find_var(mod, arr_tok->value);
     if (!v) { fprintf(stderr, "error: undefined '%s'\n", arr_tok->value); return; }
@@ -1524,6 +1541,54 @@ static void compile_pop(SevenModule *mod) {
     LLVMTypeRef pt = LLVMPointerTypeInContext(mod->ctx, 0);
     LLVMTypeRef i64 = LLVMInt64TypeInContext(mod->ctx);
     LLVMBuildCall2(mod->builder, LLVMFunctionType(i64, (LLVMTypeRef[]){pt}, 1, 0), rt_arr_pop, (LLVMValueRef[]){arr}, 1, "pop");
+}
+
+// ---- Natural mode commands ----
+// add X to arr
+static void compile_nat_add(SevenModule *mod) {
+    lexer_next(mod->lex); // skip 'add'
+    LLVMValueRef val = compile_expr(mod);
+    lexer_expect(mod->lex, TOK_TO);
+    Token *arr_tok = lexer_expect(mod->lex, TOK_IDENT);
+    VarInfo *v = find_var(mod, arr_tok->value);
+    if (!v) { fprintf(stderr, "error: undefined '%s'\n", arr_tok->value); return; }
+    LLVMValueRef arr = load_var(mod, v);
+    LLVMTypeRef pt = LLVMPointerTypeInContext(mod->ctx, 0);
+    LLVMTypeRef i64 = LLVMInt64TypeInContext(mod->ctx);
+    LLVMBuildCall2(mod->builder, LLVMFunctionType(LLVMVoidTypeInContext(mod->ctx), (LLVMTypeRef[]){pt, i64}, 2, 0),
+        rt_arr_push, (LLVMValueRef[]){arr, val_to_i64(mod, val)}, 2, "");
+}
+
+// pop from arr — handled in compile_pop with TOK_FROM check
+
+// insert X at I in arr
+static void compile_nat_insert(SevenModule *mod) {
+    LLVMValueRef val = compile_expr(mod);
+    lexer_expect(mod->lex, TOK_AT);
+    LLVMValueRef idx = compile_expr(mod);
+    lexer_expect(mod->lex, TOK_IN);
+    Token *arr_tok = lexer_expect(mod->lex, TOK_IDENT);
+    VarInfo *v = find_var(mod, arr_tok->value);
+    if (!v) { fprintf(stderr, "error: undefined '%s'\n", arr_tok->value); return; }
+    LLVMValueRef arr = load_var(mod, v);
+    LLVMTypeRef pt = LLVMPointerTypeInContext(mod->ctx, 0);
+    LLVMTypeRef i64 = LLVMInt64TypeInContext(mod->ctx);
+    LLVMBuildCall2(mod->builder, LLVMFunctionType(LLVMVoidTypeInContext(mod->ctx), (LLVMTypeRef[]){pt, i64, i64}, 3, 0),
+        rt_arr_insert, (LLVMValueRef[]){arr, val_to_i64(mod, idx), val_to_i64(mod, val)}, 3, "");
+}
+
+// remove I from arr
+static void compile_nat_remove(SevenModule *mod) {
+    LLVMValueRef idx = compile_expr(mod);
+    lexer_expect(mod->lex, TOK_FROM);
+    Token *arr_tok = lexer_expect(mod->lex, TOK_IDENT);
+    VarInfo *v = find_var(mod, arr_tok->value);
+    if (!v) { fprintf(stderr, "error: undefined '%s'\n", arr_tok->value); return; }
+    LLVMValueRef arr = load_var(mod, v);
+    LLVMTypeRef pt = LLVMPointerTypeInContext(mod->ctx, 0);
+    LLVMTypeRef i64 = LLVMInt64TypeInContext(mod->ctx);
+    LLVMBuildCall2(mod->builder, LLVMFunctionType(LLVMVoidTypeInContext(mod->ctx), (LLVMTypeRef[]){pt, i64}, 2, 0),
+        rt_arr_remove, (LLVMValueRef[]){arr, val_to_i64(mod, idx)}, 2, "");
 }
 
 // ---- File I/O statements ----
@@ -1582,6 +1647,14 @@ static void compile_statement(SevenModule *mod) {
         case TOK_WRITE:   compile_write_file(mod); break;
         case TOK_DELETE:   compile_delete_file(mod); break;
         case TOK_APPEND:   compile_append_file(mod); break;
+        case TOK_MODE: {
+            lexer_next(mod->lex); // skip 'mode'
+            Token *mt = lexer_next(mod->lex);
+            if (mt->type == TOK_NATURAL) mod->mode = 1;
+            else mod->mode = 0;
+            break;
+        }
+        case TOK_ADD:     compile_nat_add(mod); break;
         case TOK_SET:     lexer_next(mod->lex); compile_assignment(mod); break;
         case TOK_RESULT:
         case TOK_IDENT:   compile_assignment(mod); break;

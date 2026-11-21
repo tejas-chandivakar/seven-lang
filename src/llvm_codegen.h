@@ -75,6 +75,9 @@ typedef struct {
     // Optimization level (0-3)
     int opt_level;
 
+    // Mode: 0=hybrid (default), 1=natural
+    int mode;
+
     // Lexer ref
     Lexer *lex;
 } SevenModule;

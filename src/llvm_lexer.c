@@ -43,6 +43,7 @@ static const Keyword keywords[] = {
     {"push", TOK_PUSH}, {"pop", TOK_POP},
     {"write", TOK_WRITE}, {"read", TOK_READ},
     {"delete", TOK_DELETE}, {"append", TOK_APPEND},
+    {"class", TOK_CLASS}, {"new", TOK_NEW},
     {"mode", TOK_MODE}, {"hybrid", TOK_HYBRID}, {"natural", TOK_NATURAL},
     {"add", TOK_ADD}, {"from", TOK_FROM}, {"at", TOK_AT}, {"times", TOK_TIMES},
     {NULL, 0}
@@ -174,7 +175,21 @@ void lexer_tokenize(Lexer *lex) {
             case ',': lexer_add(lex, TOK_COMMA, ",", line, col); break;
             case '.': lexer_add(lex, TOK_DOT, ".", line, col); break;
             case ':': lexer_add(lex, TOK_COLON, ":", line, col); break;
-            case '=': lexer_add(lex, TOK_ASSIGN, "=", line, col); break;
+            case '=':
+                if (src[i+1] == '=') { lexer_add(lex, TOK_EQ, "==", line, col); i++; col++; }
+                else lexer_add(lex, TOK_ASSIGN, "=", line, col);
+                break;
+            case '!':
+                if (src[i+1] == '=') { lexer_add(lex, TOK_NEQ, "!=", line, col); i++; col++; }
+                break;
+            case '<':
+                if (src[i+1] == '=') { lexer_add(lex, TOK_LTE, "<=", line, col); i++; col++; }
+                else lexer_add(lex, TOK_LT, "<", line, col);
+                break;
+            case '>':
+                if (src[i+1] == '=') { lexer_add(lex, TOK_GTE, ">=", line, col); i++; col++; }
+                else lexer_add(lex, TOK_GT, ">", line, col);
+                break;
             default:
                 fprintf(stderr, "%s:%d:%d: warning: unexpected character '%c'\n",
                         lex->filename, line, col, src[i]);
@@ -267,6 +282,12 @@ const char *token_type_name(SevenTokenType t) {
         case TOK_DOT: return ".";
         case TOK_COLON: return ":";
         case TOK_ASSIGN: return "=";
+        case TOK_EQ: return "==";
+        case TOK_NEQ: return "!=";
+        case TOK_LT: return "<";
+        case TOK_GT: return ">";
+        case TOK_LTE: return "<=";
+        case TOK_GTE: return ">=";
         case TOK_IS: return "is";
         case TOK_ISNT: return "isnt";
         case TOK_ABOVE: return "above";
@@ -277,6 +298,8 @@ const char *token_type_name(SevenTokenType t) {
         case TOK_OR: return "or";
         case TOK_NOT: return "not";
         case TOK_EQUALS: return "equals";
+        case TOK_CLASS: return "class";
+        case TOK_NEW: return "new";
         case TOK_MODE: return "mode";
         case TOK_HYBRID: return "hybrid";
         case TOK_NATURAL: return "natural";

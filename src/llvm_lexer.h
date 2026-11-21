@@ -54,6 +54,12 @@ typedef enum {
     TOK_DOT,          // .
     TOK_COLON,        // :
     TOK_ASSIGN,       // =
+    TOK_EQ,           // ==
+    TOK_NEQ,          // !=
+    TOK_LT,           // <
+    TOK_GT,           // >
+    TOK_LTE,          // <=
+    TOK_GTE,          // >=
 
     // Comparison (word-based)
     TOK_EQUALS,       // equals
@@ -85,6 +91,10 @@ typedef enum {
     TOK_READ,         // read (file)
     TOK_DELETE,       // delete (file)
     TOK_APPEND,       // append (file)
+
+    // OOP
+    TOK_CLASS,        // class
+    TOK_NEW,          // new
 
     // Natural mode
     TOK_MODE,         // mode

@@ -245,30 +245,51 @@ error Error("with details")
 
 No `assert` — use `if + error`.
 
-## Classes
+## Classes & OOP
 ```
-class Dog
-    name = ""
-    sound = ""
+class Counter
+    set count to 0
 
-    func bark()
-        show "{this.name} says {this.sound}"
+    func init(start)
+        this.count = start
+    end
+
+    func inc()
+        this.count = this.count + 1
+    end
+
+    func get()
+        return this.count
     end
 end
+
+c = Counter(5)      !! creates object, calls init(5)
+show c.count        !! property access → 5
+c.inc()             !! method call as statement
+show c.get()        !! method call in expression → 6
 
 !! Inheritance
-class Puppy extends Dog
-    age = 0
-end
+class Shape
+    set sides to 0
 
-!! Static method (shared)
-class Math
-    shared func pi()
-        return 3.14
+    func getSides()
+        return this.sides
     end
 end
 
-Math.pi()
+class Triangle from Shape
+    func init()
+        this.sides = 3
+    end
+
+    func area(base, height)
+        return base * height / 2
+    end
+end
+
+t = Triangle()
+show t.getSides()   !! inherited method → 3
+show t.area(10, 6)  !! own method → 30
 ```
 
 ---
@@ -277,6 +298,9 @@ Math.pi()
 
 **New keywords (Batch 1):**
 `err`, `secret`, `in`, `not in`, `many`, `error`, `this`, `shared`
+
+**OOP keywords:**
+`class`, `from`, `new`, `this`
 
 **Mode system keywords:**
 `mode`, `hybrid`, `natural`

@@ -66,6 +66,10 @@ static void compile_append_file(SevenModule *mod);
 static LLVMValueRef compile_builtin_call(SevenModule *mod, const char *name);
 static LLVMValueRef compile_array_literal(SevenModule *mod);
 static LLVMValueRef compile_dict_literal(SevenModule *mod);
+static void compile_class_def(SevenModule *mod);
+static ClassInfo *find_class(SevenModule *mod, const char *name);
+static MethodInfo *find_method(SevenModule *mod, ClassInfo *cls, const char *name);
+static LLVMValueRef compile_new_object(SevenModule *mod, ClassInfo *cls);
 
 static void skip_newlines(SevenModule *mod) {
     while (lexer_peek(mod->lex)->type == TOK_NEWLINE)
@@ -360,12 +364,20 @@ static LLVMValueRef compile_primary(SevenModule *mod) {
             return LLVMConstInt(LLVMInt64TypeInContext(mod->ctx), 0, 0);
         }
 
+        case TOK_ADD:
+        case TOK_FROM:
+        case TOK_AT:
+        case TOK_TIMES:
         case TOK_IDENT: {
             lexer_next(mod->lex);
             const char *name = t->value;
 
             // Check for function call: ident(
             if (lexer_peek(mod->lex)->type == TOK_LPAREN) {
+                // Check for class constructor: ClassName(args)
+                ClassInfo *cls = find_class(mod, name);
+                if (cls) return compile_new_object(mod, cls);
+
                 // Try builtin first
                 LLVMValueRef bv = compile_builtin_call(mod, name);
                 if (bv) return bv;
@@ -377,7 +389,7 @@ static LLVMValueRef compile_primary(SevenModule *mod) {
                 return last;
             }
 
-            // Check for method call: ident.method(args)
+            // Check for dot access: ident.method(args) or ident.field
             if (lexer_peek(mod->lex)->type == TOK_DOT) {
                 VarInfo *v = find_var(mod, name);
                 if (!v) {
@@ -386,9 +398,50 @@ static LLVMValueRef compile_primary(SevenModule *mod) {
                 }
                 LLVMValueRef obj = load_var(mod, v);
                 lexer_next(mod->lex); // skip .
-                Token *method = lexer_expect(mod->lex, TOK_IDENT);
+                Token *method = lexer_next(mod->lex);
                 const char *mname = method->value;
-                lexer_expect(mod->lex, TOK_LPAREN);
+
+                // Property access (no parens) → dict get
+                if (lexer_peek(mod->lex)->type != TOK_LPAREN) {
+                    LLVMTypeRef pt = LLVMPointerTypeInContext(mod->ctx, 0);
+                    LLVMTypeRef i64 = LLVMInt64TypeInContext(mod->ctx);
+                    LLVMValueRef key = LLVMBuildGlobalStringPtr(mod->builder, mname, "prop_key");
+                    return LLVMBuildCall2(mod->builder,
+                        LLVMFunctionType(i64, (LLVMTypeRef[]){pt, pt}, 2, 0),
+                        rt_dict_get, (LLVMValueRef[]){obj, key}, 2, "prop_val");
+                }
+                lexer_next(mod->lex); // skip (
+
+                // For objects (is_string==4), try class methods first
+                if (v->is_string == 4) {
+                    ClassInfo *cls = NULL;
+                    for (int ci = 0; ci < mod->class_count; ci++) {
+                        MethodInfo *mi = find_method(mod, &mod->classes[ci], mname);
+                        if (mi) { cls = &mod->classes[ci]; break; }
+                    }
+                    if (cls) {
+                        MethodInfo *mi = find_method(mod, cls, mname);
+                        if (mi) {
+                            LLVMTypeRef pt2 = LLVMPointerTypeInContext(mod->ctx, 0);
+                            LLVMTypeRef i642 = LLVMInt64TypeInContext(mod->ctx);
+                            LLVMValueRef call_args[33];
+                            call_args[0] = obj;
+                            int call_argc = 1;
+                            if (lexer_peek(mod->lex)->type != TOK_RPAREN) {
+                                call_args[call_argc++] = compile_expr(mod);
+                                while (lexer_match(mod->lex, TOK_COMMA))
+                                    call_args[call_argc++] = compile_expr(mod);
+                            }
+                            lexer_expect(mod->lex, TOK_RPAREN);
+                            LLVMTypeRef ptypes[33];
+                            ptypes[0] = pt2;
+                            for (int pi = 1; pi < call_argc; pi++) ptypes[pi] = i642;
+                            return LLVMBuildCall2(mod->builder,
+                                LLVMFunctionType(i642, ptypes, call_argc, 0),
+                                mi->func, call_args, call_argc, "mcall");
+                        }
+                    }
+                }
 
                 // String methods
                 if (strcmp(mname, "len") == 0) {
@@ -523,6 +576,38 @@ static LLVMValueRef compile_primary(SevenModule *mod) {
                     LLVMValueRef args[] = { obj, val_to_i64(mod, a1) };
                     return LLVMBuildCall2(mod->builder, LLVMFunctionType(pt, (LLVMTypeRef[]){pt, i64}, 2, 0), rt_str_char_at, args, 2, "char_at");
                 } else {
+                    // Try class method dispatch: obj.method(args)
+                    if (v->is_string == 4 || v->is_string == 3) {
+                        // Look up class from variable type
+                        ClassInfo *cls = NULL;
+                        for (int ci = 0; ci < mod->class_count; ci++) {
+                            // Try all classes — at runtime __class__ field determines
+                            MethodInfo *mi = find_method(mod, &mod->classes[ci], mname);
+                            if (mi) { cls = &mod->classes[ci]; break; }
+                        }
+                        if (cls) {
+                            MethodInfo *mi = find_method(mod, cls, mname);
+                            if (mi) {
+                                LLVMTypeRef pt2 = LLVMPointerTypeInContext(mod->ctx, 0);
+                                LLVMTypeRef i642 = LLVMInt64TypeInContext(mod->ctx);
+                                LLVMValueRef call_args[33];
+                                call_args[0] = obj; // this
+                                int call_argc = 1;
+                                if (lexer_peek(mod->lex)->type != TOK_RPAREN) {
+                                    call_args[call_argc++] = compile_expr(mod);
+                                    while (lexer_match(mod->lex, TOK_COMMA))
+                                        call_args[call_argc++] = compile_expr(mod);
+                                }
+                                lexer_expect(mod->lex, TOK_RPAREN);
+                                LLVMTypeRef ptypes[33];
+                                ptypes[0] = pt2;
+                                for (int pi = 1; pi < call_argc; pi++) ptypes[pi] = i642;
+                                return LLVMBuildCall2(mod->builder,
+                                    LLVMFunctionType(i642, ptypes, call_argc, 0),
+                                    mi->func, call_args, call_argc, "mcall");
+                            }
+                        }
+                    }
                     fprintf(stderr, "error: unknown method '%s'\n", mname);
                     return LLVMConstInt(LLVMInt64TypeInContext(mod->ctx), 0, 0);
                 }
@@ -579,6 +664,17 @@ static LLVMValueRef compile_primary(SevenModule *mod) {
             LLVMTypeRef pt = LLVMPointerTypeInContext(mod->ctx, 0);
             LLVMValueRef args[] = { prompt };
             return LLVMBuildCall2(mod->builder, LLVMFunctionType(pt, (LLVMTypeRef[]){pt}, 1, 0), rt_ask, args, 1, "ask");
+        }
+
+        case TOK_NEW: {
+            lexer_next(mod->lex); // skip 'new'
+            Token *cls_tok = lexer_next(mod->lex);
+            ClassInfo *cls = find_class(mod, cls_tok->value);
+            if (!cls) {
+                fprintf(stderr, "error: unknown class '%s'\n", cls_tok->value);
+                return LLVMConstInt(LLVMInt64TypeInContext(mod->ctx), 0, 0);
+            }
+            return compile_new_object(mod, cls);
         }
 
         case TOK_NOT: {
@@ -670,11 +766,17 @@ static LLVMValueRef compile_comparison(SevenModule *mod) {
     switch (t->type) {
         case TOK_IS:      pred = LLVMIntEQ; break;
         case TOK_EQUALS:  pred = LLVMIntEQ; break;
+        case TOK_EQ:      pred = LLVMIntEQ; break;
         case TOK_ISNT:    pred = LLVMIntNE; break;
+        case TOK_NEQ:     pred = LLVMIntNE; break;
         case TOK_ABOVE:   pred = LLVMIntSGT; break;
+        case TOK_GT:      pred = LLVMIntSGT; break;
         case TOK_BELOW:   pred = LLVMIntSLT; break;
+        case TOK_LT:      pred = LLVMIntSLT; break;
         case TOK_ATLEAST: pred = LLVMIntSGE; break;
+        case TOK_GTE:     pred = LLVMIntSGE; break;
         case TOK_ATMOST:  pred = LLVMIntSLE; break;
+        case TOK_LTE:     pred = LLVMIntSLE; break;
         default: is_cmp = 0; break;
     }
 
@@ -787,6 +889,66 @@ static void compile_assignment(SevenModule *mod) {
         return;
     }
 
+    if (op->type == TOK_DOT) {
+        lexer_next(mod->lex); // skip .
+        Token *field_tok = lexer_next(mod->lex);
+        const char *fname = field_tok->value;
+
+        if (lexer_peek(mod->lex)->type == TOK_LPAREN) {
+            // name.method(args) — method call as statement
+            lexer_next(mod->lex); // skip (
+            VarInfo *v = find_var(mod, name);
+            if (!v) { fprintf(stderr, "error: undefined '%s'\n", name); return; }
+            LLVMValueRef obj = load_var(mod, v);
+            LLVMTypeRef pt = LLVMPointerTypeInContext(mod->ctx, 0);
+            LLVMTypeRef i64 = LLVMInt64TypeInContext(mod->ctx);
+            ClassInfo *cls = NULL;
+            for (int ci = 0; ci < mod->class_count; ci++) {
+                MethodInfo *mi = find_method(mod, &mod->classes[ci], fname);
+                if (mi) { cls = &mod->classes[ci]; break; }
+            }
+            if (cls) {
+                MethodInfo *mi = find_method(mod, cls, fname);
+                if (mi) {
+                    LLVMValueRef call_args[33];
+                    call_args[0] = obj;
+                    int call_argc = 1;
+                    if (lexer_peek(mod->lex)->type != TOK_RPAREN) {
+                        call_args[call_argc++] = compile_expr(mod);
+                        while (lexer_match(mod->lex, TOK_COMMA))
+                            call_args[call_argc++] = compile_expr(mod);
+                    }
+                    lexer_expect(mod->lex, TOK_RPAREN);
+                    LLVMTypeRef ptypes[33];
+                    ptypes[0] = pt;
+                    for (int pi = 1; pi < call_argc; pi++) ptypes[pi] = i64;
+                    LLVMBuildCall2(mod->builder,
+                        LLVMFunctionType(i64, ptypes, call_argc, 0),
+                        mi->func, call_args, call_argc, "mcall");
+                    return;
+                }
+            }
+            fprintf(stderr, "error: unknown method '%s'\n", fname);
+            return;
+        }
+
+        // name.field = val — property assignment
+        lexer_expect(mod->lex, TOK_ASSIGN);
+        LLVMValueRef val = compile_expr(mod);
+
+        VarInfo *v = find_var(mod, name);
+        if (!v) { fprintf(stderr, "error: undefined '%s'\n", name); return; }
+        LLVMValueRef obj = load_var(mod, v);
+        LLVMTypeRef pt = LLVMPointerTypeInContext(mod->ctx, 0);
+        LLVMTypeRef i64 = LLVMInt64TypeInContext(mod->ctx);
+        LLVMTypeRef vt = LLVMVoidTypeInContext(mod->ctx);
+        LLVMValueRef key = LLVMBuildGlobalStringPtr(mod->builder, fname, "pkey");
+        LLVMBuildCall2(mod->builder,
+            LLVMFunctionType(vt, (LLVMTypeRef[]){pt, pt, i64}, 3, 0),
+            rt_dict_set, (LLVMValueRef[]){obj, key, val_to_i64(mod, val)}, 3, "");
+        return;
+    }
+
     if (op->type == TOK_LBRACKET) {
         // name[key] = val — indexed assignment for array or dict
         lexer_next(mod->lex); // skip [
@@ -823,7 +985,9 @@ static void compile_assignment(SevenModule *mod) {
         // Detect array literal for type tracking
         int rhs_is_array = (lexer_peek(mod->lex)->type == TOK_LBRACKET);
         int rhs_is_dict = (lexer_peek(mod->lex)->type == TOK_LBRACE);
-        // Detect array/dict-returning builtins
+        // Detect array/dict-returning builtins and class constructors
+        int rhs_is_obj = 0;
+        if (lexer_peek(mod->lex)->type == TOK_NEW) rhs_is_obj = 1;
         if (lexer_peek(mod->lex)->type == TOK_IDENT) {
             const char *fn = lexer_peek(mod->lex)->value;
             if (strcmp(fn, "range") == 0 || strcmp(fn, "fill") == 0 ||
@@ -832,12 +996,13 @@ static void compile_assignment(SevenModule *mod) {
                 rhs_is_array = 1;
             if (strcmp(fn, "merge") == 0)
                 rhs_is_dict = 1;
+            if (find_class(mod, fn)) rhs_is_obj = 1;
         }
 
         LLVMValueRef val = compile_expr(mod);
 
         int is_ptr = (LLVMGetTypeKind(LLVMTypeOf(val)) == LLVMPointerTypeKind);
-        int vtype = is_ptr ? (rhs_is_dict ? 3 : (rhs_is_array ? 2 : 1)) : 0;
+        int vtype = is_ptr ? (rhs_is_obj ? 4 : (rhs_is_dict ? 3 : (rhs_is_array ? 2 : 1))) : 0;
         VarInfo *v = create_var(mod, name, vtype);
 
         if (is_ptr) {
@@ -1666,6 +1831,251 @@ static void compile_append_file(SevenModule *mod) {
         rt_file_append, (LLVMValueRef[]){path, data}, 2, "");
 }
 
+// ---- OOP ----
+static ClassInfo *find_class(SevenModule *mod, const char *name) {
+    for (int i = 0; i < mod->class_count; i++)
+        if (strcmp(mod->classes[i].name, name) == 0)
+            return &mod->classes[i];
+    return NULL;
+}
+
+static MethodInfo *find_method(SevenModule *mod, ClassInfo *cls, const char *name) {
+    for (int i = 0; i < cls->method_count; i++)
+        if (strcmp(cls->methods[i].name, name) == 0)
+            return &cls->methods[i];
+    if (cls->parent) {
+        ClassInfo *parent = find_class(mod, cls->parent);
+        if (parent) return find_method(mod, parent, name);
+    }
+    return NULL;
+}
+
+static void compile_class_def(SevenModule *mod) {
+    lexer_next(mod->lex); // skip 'class'
+    Token *name_tok = lexer_next(mod->lex);
+    const char *class_name = name_tok->value;
+
+    ClassInfo *ci = &mod->classes[mod->class_count++];
+    ci->name = strdup(class_name);
+    ci->parent = NULL;
+    ci->field_count = 0;
+    ci->method_count = 0;
+
+    // Check for 'from Parent'
+    if (lexer_peek(mod->lex)->type == TOK_FROM) {
+        lexer_next(mod->lex);
+        Token *parent_tok = lexer_next(mod->lex);
+        ci->parent = strdup(parent_tok->value);
+
+        // Copy parent fields
+        ClassInfo *parent = find_class(mod, ci->parent);
+        if (parent) {
+            for (int i = 0; i < parent->field_count; i++) {
+                ci->fields[ci->field_count] = parent->fields[i];
+                ci->fields[ci->field_count].name = strdup(parent->fields[i].name);
+                ci->fields[ci->field_count].default_val = parent->fields[i].default_val ? strdup(parent->fields[i].default_val) : NULL;
+                ci->field_count++;
+            }
+        }
+    }
+
+    skip_newlines(mod);
+
+    // Save compiler state
+    LLVMValueRef prev_func = mod->current_func;
+    int prev_var_count = mod->var_count;
+
+    while (1) {
+        Token *t = lexer_peek(mod->lex);
+        if (t->type == TOK_END || t->type == TOK_EOF) break;
+
+        if (t->type == TOK_FUNC) {
+            // Compile method as ClassName__methodName(this, args...)
+            lexer_next(mod->lex); // skip 'func'
+            Token *mname_tok = lexer_next(mod->lex);
+            const char *mname = mname_tok->value;
+
+            lexer_expect(mod->lex, TOK_LPAREN);
+            char *params[32];
+            int param_count = 0;
+            if (lexer_peek(mod->lex)->type != TOK_RPAREN) {
+                params[param_count++] = strdup(lexer_next(mod->lex)->value);
+                while (lexer_match(mod->lex, TOK_COMMA))
+                    params[param_count++] = strdup(lexer_next(mod->lex)->value);
+            }
+            lexer_expect(mod->lex, TOK_RPAREN);
+
+            // Build mangled name: ClassName__method
+            char fname[512];
+            snprintf(fname, sizeof(fname), "%s__%s", class_name, mname);
+
+            // Create function: first param is 'this' (ptr), rest are i64
+            LLVMTypeRef i64 = LLVMInt64TypeInContext(mod->ctx);
+            LLVMTypeRef pt = LLVMPointerTypeInContext(mod->ctx, 0);
+            LLVMTypeRef ptypes[33];
+            ptypes[0] = pt; // this
+            for (int i = 0; i < param_count; i++) ptypes[i + 1] = i64;
+            LLVMTypeRef fn_type = LLVMFunctionType(i64, ptypes, param_count + 1, 0);
+            LLVMValueRef func = LLVMAddFunction(mod->module, fname, fn_type);
+
+            // Store method info
+            MethodInfo *mi = &ci->methods[ci->method_count++];
+            mi->name = strdup(mname);
+            mi->func = func;
+            mi->param_count = param_count;
+
+            // Also register as a FuncInfo for general lookup
+            FuncInfo *fi = &mod->funcs[mod->func_count++];
+            fi->name = strdup(fname);
+            fi->func = func;
+            fi->param_count = param_count + 1;
+
+            // Compile body
+            mod->current_func = func;
+            LLVMBasicBlockRef entry = LLVMAppendBasicBlockInContext(mod->ctx, func, "entry");
+            LLVMPositionBuilderAtEnd(mod->builder, entry);
+
+            // 'this' param → variable with is_string=4 (object)
+            VarInfo *this_var = create_var(mod, "this", 4);
+            LLVMValueRef this_ptr = LLVMGetParam(func, 0);
+            LLVMValueRef this_as_i64 = LLVMBuildPtrToInt(mod->builder, this_ptr, i64, "this_i64");
+            LLVMBuildStore(mod->builder, this_as_i64, this_var->alloca);
+            this_var->is_string = 4;
+
+            // Other params
+            for (int i = 0; i < param_count; i++) {
+                VarInfo *v = create_var(mod, params[i], 0);
+                LLVMBuildStore(mod->builder, LLVMGetParam(func, i + 1), v->alloca);
+                free(params[i]);
+            }
+
+            // Result variable
+            create_var(mod, "result", 0);
+
+            skip_newlines(mod);
+            while (1) {
+                Token *bt = lexer_peek(mod->lex);
+                if (bt->type == TOK_END || bt->type == TOK_EOF) break;
+                compile_statement(mod);
+                skip_newlines(mod);
+            }
+            lexer_expect(mod->lex, TOK_END);
+
+            if (!LLVMGetBasicBlockTerminator(LLVMGetInsertBlock(mod->builder))) {
+                VarInfo *rv = find_var(mod, "result");
+                LLVMValueRef ret_val = rv ?
+                    LLVMBuildLoad2(mod->builder, i64, rv->alloca, "retval") :
+                    LLVMConstInt(i64, 0, 0);
+                LLVMBuildRet(mod->builder, ret_val);
+            }
+
+            // Restore state
+            mod->var_count = prev_var_count;
+            mod->current_func = prev_func;
+
+        } else if (t->type == TOK_SET) {
+            // Field declaration: set name to value
+            lexer_next(mod->lex); // skip 'set'
+            Token *fname_tok = lexer_next(mod->lex);
+            lexer_expect(mod->lex, TOK_TO);
+            Token *val_tok = lexer_next(mod->lex);
+
+            // Check if field already exists (inherited), update it
+            int found = 0;
+            for (int i = 0; i < ci->field_count; i++) {
+                if (strcmp(ci->fields[i].name, fname_tok->value) == 0) {
+                    free(ci->fields[i].default_val);
+                    ci->fields[i].default_val = val_tok->value ? strdup(val_tok->value) : NULL;
+                    found = 1;
+                    break;
+                }
+            }
+            if (!found) {
+                FieldInfo *fi = &ci->fields[ci->field_count++];
+                fi->name = strdup(fname_tok->value);
+                fi->default_val = val_tok->value ? strdup(val_tok->value) : NULL;
+            }
+        } else {
+            lexer_next(mod->lex); // skip unknown
+        }
+        skip_newlines(mod);
+    }
+    lexer_expect(mod->lex, TOK_END);
+
+    // Restore builder to main
+    LLVMPositionBuilderAtEnd(mod->builder, LLVMGetLastBasicBlock(prev_func));
+}
+
+static LLVMValueRef compile_new_object(SevenModule *mod, ClassInfo *cls) {
+    LLVMTypeRef pt = LLVMPointerTypeInContext(mod->ctx, 0);
+    LLVMTypeRef i64 = LLVMInt64TypeInContext(mod->ctx);
+    LLVMTypeRef vt = LLVMVoidTypeInContext(mod->ctx);
+
+    // Create new dict for object
+    LLVMValueRef obj = LLVMBuildCall2(mod->builder,
+        LLVMFunctionType(pt, NULL, 0, 0),
+        rt_dict_new, NULL, 0, "obj");
+
+    // Set __class__ field
+    LLVMValueRef class_key = LLVMBuildGlobalStringPtr(mod->builder, "__class__", "cls_key");
+    LLVMValueRef class_val_str = LLVMBuildGlobalStringPtr(mod->builder, cls->name, "cls_name");
+    LLVMValueRef class_val = LLVMBuildPtrToInt(mod->builder, class_val_str, i64, "cls_i64");
+    LLVMBuildCall2(mod->builder,
+        LLVMFunctionType(vt, (LLVMTypeRef[]){pt, pt, i64}, 3, 0),
+        rt_dict_set, (LLVMValueRef[]){obj, class_key, class_val}, 3, "");
+
+    // Set default fields
+    for (int i = 0; i < cls->field_count; i++) {
+        LLVMValueRef key = LLVMBuildGlobalStringPtr(mod->builder, cls->fields[i].name, "fkey");
+        LLVMValueRef val;
+        if (cls->fields[i].default_val) {
+            if (cls->fields[i].default_val[0] == '"') {
+                // String default — strip quotes
+                char buf[256];
+                strncpy(buf, cls->fields[i].default_val + 1, sizeof(buf) - 1);
+                buf[sizeof(buf) - 1] = '\0';
+                char *endq = strrchr(buf, '"');
+                if (endq) *endq = '\0';
+                LLVMValueRef s = LLVMBuildGlobalStringPtr(mod->builder, buf, "fval_s");
+                val = LLVMBuildPtrToInt(mod->builder, s, i64, "fval_i64");
+            } else {
+                long long iv = atoll(cls->fields[i].default_val);
+                val = LLVMConstInt(i64, iv, 1);
+            }
+        } else {
+            val = LLVMConstInt(i64, 0, 0);
+        }
+        LLVMBuildCall2(mod->builder,
+            LLVMFunctionType(vt, (LLVMTypeRef[]){pt, pt, i64}, 3, 0),
+            rt_dict_set, (LLVMValueRef[]){obj, key, val}, 3, "");
+    }
+
+    // Parse constructor args
+    lexer_expect(mod->lex, TOK_LPAREN);
+    LLVMValueRef args[33];
+    args[0] = obj; // this
+    int argc = 1;
+    if (lexer_peek(mod->lex)->type != TOK_RPAREN) {
+        args[argc++] = val_to_i64(mod, compile_expr(mod));
+        while (lexer_match(mod->lex, TOK_COMMA))
+            args[argc++] = val_to_i64(mod, compile_expr(mod));
+    }
+    lexer_expect(mod->lex, TOK_RPAREN);
+
+    // Call init if exists
+    MethodInfo *init = find_method(mod, cls, "init");
+    if (init) {
+        LLVMTypeRef ptypes[33];
+        ptypes[0] = pt;
+        for (int i = 1; i < argc; i++) ptypes[i] = i64;
+        LLVMBuildCall2(mod->builder,
+            LLVMFunctionType(i64, ptypes, argc, 0),
+            init->func, args, argc, "init_ret");
+    }
+
+    return obj;
+}
+
 // ---- Main statement dispatcher ----
 static void compile_statement(SevenModule *mod) {
     skip_newlines(mod);
@@ -1678,6 +2088,7 @@ static void compile_statement(SevenModule *mod) {
         case TOK_REPEAT:  compile_repeat(mod); break;
         case TOK_EACH:    compile_each(mod); break;
         case TOK_FUNC:    compile_func_def(mod); break;
+        case TOK_CLASS:   compile_class_def(mod); break;
         case TOK_ASSERT:  compile_assert(mod); break;
         case TOK_PUSH:    compile_push(mod); break;
         case TOK_POP:     compile_pop(mod); break;
@@ -1701,6 +2112,12 @@ static void compile_statement(SevenModule *mod) {
             }
             break;
         case TOK_SET:     lexer_next(mod->lex); compile_assignment(mod); break;
+        case TOK_RETURN: {
+            lexer_next(mod->lex); // skip 'return'
+            LLVMValueRef val = compile_expr(mod);
+            LLVMBuildRet(mod->builder, val);
+            break;
+        }
         case TOK_RESULT:
         case TOK_IDENT:   compile_assignment(mod); break;
         case TOK_EOF:     break;

@@ -1,0 +1,75 @@
+!! OOP Tests — classes, methods, inheritance
+
+class Counter
+    set count to 0
+
+    func init(start)
+        this.count = start
+    end
+
+    func inc()
+        this.count = this.count + 1
+    end
+
+    func dec()
+        this.count = this.count - 1
+    end
+
+    func get()
+        return this.count
+    end
+end
+
+c = Counter(5)
+assert(c.get() == 5)
+c.inc()
+c.inc()
+c.inc()
+assert(c.get() == 8)
+c.dec()
+assert(c.get() == 7)
+
+!! Inheritance
+class Shape
+    set sides to 0
+
+    func getSides()
+        return this.sides
+    end
+end
+
+class Triangle from Shape
+    func init()
+        this.sides = 3
+    end
+
+    func area(base, height)
+        return base * height / 2
+    end
+end
+
+t = Triangle()
+assert(t.getSides() == 3)
+assert(t.area(10, 6) == 30)
+
+!! Property access
+class Point
+    set x to 0
+    set y to 0
+
+    func init(px, py)
+        this.x = px
+        this.y = py
+    end
+
+    func sum()
+        return this.x + this.y
+    end
+end
+
+p = Point(3, 4)
+assert(p.x == 3)
+assert(p.y == 4)
+assert(p.sum() == 7)
+
+show "OOP tests passed!"

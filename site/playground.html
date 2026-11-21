@@ -155,6 +155,7 @@
                         <button class="example-btn w-full text-left px-4 py-2.5 rounded-lg text-sm text-gray-400 border border-white/5 hover:border-white/10 transition" data-example="errorhandling">Error Handling</button>
                         <button class="example-btn w-full text-left px-4 py-2.5 rounded-lg text-sm text-gray-400 border border-white/5 hover:border-white/10 transition" data-example="dictionary">Dictionary</button>
                         <button class="example-btn w-full text-left px-4 py-2.5 rounded-lg text-sm text-gray-400 border border-white/5 hover:border-white/10 transition" data-example="natural">Natural Mode</button>
+                        <button class="example-btn w-full text-left px-4 py-2.5 rounded-lg text-sm text-gray-400 border border-white/5 hover:border-white/10 transition" data-example="oop">OOP & Classes</button>
                     </div>
                 </div>
 
@@ -306,6 +307,7 @@
             if (fw === 'repeat') return parseRepeat();
             if (fw === 'while') return parseWhile();
             if (fw === 'each') return parseEach();
+            if (fw === 'class') return parseClass();
             if (fw === 'func') return parseFunc();
             if (fw === 'return') { advance(); return { type: 'return', expr: text.substring(7).trim(), line: t.line }; }
             if (fw === 'try') return parseTryCatch();
@@ -332,6 +334,11 @@
                 const arrMatch = lhs.match(/^(\w+)\[(.+)\]$/);
                 if (arrMatch) {
                     return { type: 'array_assign', name: arrMatch[1], index: arrMatch[2], expr: rhs, line: t.line };
+                }
+                // Property assignment: obj.field = value
+                const dotMatch = lhs.match(/^(\w+)\.(\w+)$/);
+                if (dotMatch) {
+                    return { type: 'prop_assign', name: dotMatch[1], field: dotMatch[2], expr: rhs, line: t.line };
                 }
                 return { type: 'assign', name: lhs, expr: rhs, line: t.line };
             }
@@ -476,6 +483,36 @@
             const body = parseBlock(['end', 'done']);
             if (pos < tokens.length && (firstWord(peek().text) === 'end' || firstWord(peek().text) === 'done')) advance();
             return { type: 'func', name, params, isVariadic, variadicName, body, line: t.line };
+        }
+
+        function parseClass() {
+            const t = advance(); // consume 'class'
+            const rest = t.text.substring(6).trim();
+            // class Name from Parent  OR  class Name
+            const fromMatch = rest.match(/^(\w+)\s+from\s+(\w+)$/);
+            const name = fromMatch ? fromMatch[1] : rest.match(/^(\w+)/)?.[1];
+            const parent = fromMatch ? fromMatch[2] : null;
+            if (!name) return { type: 'noop', line: t.line };
+            const fields = [];
+            const methods = [];
+            while (pos < tokens.length) {
+                const pk = peek();
+                const fw2 = firstWord(pk.text);
+                if (fw2 === 'end' || fw2 === 'done') { advance(); break; }
+                if (fw2 === 'func') {
+                    methods.push(parseFunc());
+                } else if (fw2 === 'set') {
+                    advance();
+                    const sr = pk.text.substring(4).trim();
+                    const ti = sr.indexOf(' to ');
+                    if (ti > 0) {
+                        fields.push({ name: sr.substring(0, ti).trim(), value: sr.substring(ti + 4).trim() });
+                    }
+                } else {
+                    advance();
+                }
+            }
+            return { type: 'class', name, parent, fields, methods, line: t.line };
         }
 
         function parseTryCatch() {
@@ -705,6 +742,10 @@
         if (val === null || val === undefined) return '';
         if (Array.isArray(val)) return '[' + val.map(stringify).join(', ') + ']';
         if (typeof val === 'object') {
+            if (val.__class__) {
+                const entries = Object.entries(val).filter(([k]) => k !== '__class__').map(([k, v]) => k + ': ' + stringify(v));
+                return val.__class__ + '(' + entries.join(', ') + ')';
+            }
             const entries = Object.entries(val).map(([k, v]) => '"' + k + '": ' + stringify(v));
             return '{' + entries.join(', ') + '}';
         }
@@ -794,7 +835,51 @@
     }
 
     // --- Built-in Functions ---
+    function createObject(cls, args, env) {
+        const obj = { __class__: cls.name };
+        // Inherit parent fields
+        if (cls.parent) {
+            const parentCls = env.getClass(cls.parent);
+            if (parentCls) {
+                for (const f of parentCls.fields) obj[f.name] = evalExpr(f.value, env);
+            }
+        }
+        // Own fields
+        for (const f of cls.fields) obj[f.name] = evalExpr(f.value, env);
+        // Call init if exists
+        const initMethod = getMethod(cls, 'init', env);
+        if (initMethod) {
+            const childEnv = env.child();
+            childEnv.set('this', obj);
+            for (let i = 0; i < initMethod.params.length; i++) {
+                childEnv.set(initMethod.params[i].name, i < args.length ? args[i] :
+                    (initMethod.params[i].default !== null ? evalExpr(initMethod.params[i].default, env) : 0));
+            }
+            try { execBlock(initMethod.body, childEnv); } catch (e) {
+                if (e instanceof ReturnValue) { /* ignore return from init */ }
+                else throw e;
+            }
+            // Copy back fields modified by init
+            const thisObj = childEnv.get('this');
+            if (typeof thisObj === 'object') Object.assign(obj, thisObj);
+        }
+        return obj;
+    }
+
+    function getMethod(cls, name, env) {
+        if (cls.methods[name]) return cls.methods[name];
+        if (cls.parent) {
+            const parentCls = env.getClass(cls.parent);
+            if (parentCls) return getMethod(parentCls, name, env);
+        }
+        return null;
+    }
+
     function callFunction(name, args, env) {
+        // Check for class constructor
+        const cls = env.getClass(name);
+        if (cls) return createObject(cls, args, env);
+
         // user-defined
         const fn = env.getFunc(name);
         if (fn) return callUserFunc(fn, args, env);
@@ -989,15 +1074,39 @@
             }
         }
         if (typeof obj === 'object' && !Array.isArray(obj) && obj !== null) {
+            // Class instance method dispatch
+            if (obj.__class__) {
+                const cls = env.getClass(obj.__class__);
+                if (cls) {
+                    const m = getMethod(cls, method, env);
+                    if (m) {
+                        const childEnv = env.child();
+                        childEnv.set('this', obj);
+                        for (let i = 0; i < m.params.length; i++) {
+                            childEnv.set(m.params[i].name, i < args.length ? args[i] :
+                                (m.params[i].default !== null ? evalExpr(m.params[i].default, env) : 0));
+                        }
+                        let result = 0;
+                        try { execBlock(m.body, childEnv); } catch (e) {
+                            if (e instanceof ReturnValue) result = e.value;
+                            else throw e;
+                        }
+                        const thisObj = childEnv.get('this');
+                        if (typeof thisObj === 'object') Object.assign(obj, thisObj);
+                        return result;
+                    }
+                }
+            }
+            // Dict methods
             switch (method) {
-                case 'keys': return Object.keys(obj);
-                case 'values': return Object.values(obj);
+                case 'keys': return Object.keys(obj).filter(k => k !== '__class__');
+                case 'values': return Object.keys(obj).filter(k => k !== '__class__').map(k => obj[k]);
                 case 'has': return (stringify(args[0]) in obj) ? 1 : 0;
-                case 'len': return Object.keys(obj).length;
+                case 'len': return Object.keys(obj).filter(k => k !== '__class__').length;
                 case 'merge': if (typeof args[0] === 'object') return Object.assign({}, obj, args[0]); return obj;
-                case 'items': return Object.entries(obj).map(([k, v]) => [k, v]);
+                case 'items': return Object.entries(obj).filter(([k]) => k !== '__class__').map(([k, v]) => [k, v]);
                 case 'remove': delete obj[stringify(args[0])]; return obj;
-                default: throw new Error("Unknown dict method: " + method);
+                default: throw new Error("Unknown method: " + method);
             }
         }
         throw new Error("Cannot call method on " + typeof obj);
@@ -1041,6 +1150,7 @@
         constructor(parent, outputFn) {
             this.vars = {};
             this.funcs = parent ? null : {};
+            this.classes = parent ? null : {};
             this.parent = parent;
             this.output = outputFn || (parent ? parent.output : console.log);
             this.stepCount = 0;
@@ -1074,6 +1184,16 @@
             let e = this;
             while (e.parent) e = e.parent;
             e.funcs[name] = fn;
+        }
+        getClass(name) {
+            if (this.classes && name in this.classes) return this.classes[name];
+            if (this.parent) return this.parent.getClass(name);
+            return null;
+        }
+        setClass(name, cls) {
+            let e = this;
+            while (e.parent) e = e.parent;
+            e.classes[name] = cls;
         }
         child() { return new Environment(this, this.output); }
         tick() {
@@ -1135,6 +1255,14 @@
                 } else if (Array.isArray(arr)) {
                     const i = idx < 0 ? arr.length + idx : idx;
                     arr[i] = val;
+                }
+                break;
+            }
+            case 'prop_assign': {
+                const obj = env.get(stmt.name);
+                const val = evalExpr(stmt.expr, env);
+                if (typeof obj === 'object' && obj !== null) {
+                    obj[stmt.field] = val;
                 }
                 break;
             }
@@ -1207,6 +1335,24 @@
                         catch (e) { if (e instanceof SkipSignal) continue; if (e instanceof StopSignal) break; throw e; }
                     }
                 }
+                break;
+            }
+            case 'class': {
+                const classDef = {
+                    name: stmt.name,
+                    parent: stmt.parent,
+                    fields: stmt.fields,
+                    methods: {},
+                };
+                for (const m of stmt.methods) {
+                    classDef.methods[m.name] = {
+                        params: m.params,
+                        isVariadic: m.isVariadic,
+                        variadicName: m.variadicName,
+                        body: m.body,
+                    };
+                }
+                env.setClass(stmt.name, classDef);
                 break;
             }
             case 'func': {
@@ -1624,6 +1770,55 @@ end
 
 push(fruits, "date")
 show "Now I have " + len(fruits)`,
+        },
+        oop: {
+            file: "oop.seven",
+            code: `!! Classes and Objects
+class Counter
+    set count to 0
+
+    func init(start)
+        this.count = start
+    end
+
+    func inc()
+        this.count = this.count + 1
+    end
+
+    func get()
+        return this.count
+    end
+end
+
+c = Counter(5)
+show "Start: " + str(c.get())
+c.inc()
+c.inc()
+c.inc()
+show "After 3 increments: " + str(c.get())
+
+!! Inheritance
+class Shape
+    set sides to 0
+
+    func getSides()
+        return this.sides
+    end
+end
+
+class Triangle from Shape
+    func init()
+        this.sides = 3
+    end
+
+    func area(base, height)
+        return base * height / 2
+    end
+end
+
+t = Triangle()
+show "Triangle sides: " + str(t.getSides())
+show "Area(10, 6): " + str(t.area(10, 6))`,
         },
     };
 

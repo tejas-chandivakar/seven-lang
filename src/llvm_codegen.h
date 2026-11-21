@@ -16,11 +16,14 @@
 #define MAX_VARS 1024
 #define MAX_FUNCS 256
 #define MAX_STRINGS 4096
+#define MAX_CLASSES 64
+#define MAX_METHODS 32
+#define MAX_FIELDS 32
 
 typedef struct {
     char *name;
     LLVMValueRef alloca;   // stack slot
-    int is_string;         // 0=int, 1=string, 2=array
+    int is_string;         // 0=int, 1=string, 2=array, 3=dict, 4=object
 } VarInfo;
 
 typedef struct {
@@ -28,6 +31,26 @@ typedef struct {
     LLVMValueRef func;
     int param_count;
 } FuncInfo;
+
+typedef struct {
+    char *name;
+    char *default_val;
+} FieldInfo;
+
+typedef struct {
+    char *name;
+    LLVMValueRef func;
+    int param_count;
+} MethodInfo;
+
+typedef struct {
+    char *name;
+    char *parent;
+    FieldInfo fields[MAX_FIELDS];
+    int field_count;
+    MethodInfo methods[MAX_METHODS];
+    int method_count;
+} ClassInfo;
 
 typedef struct {
     // LLVM core
@@ -77,6 +100,10 @@ typedef struct {
 
     // Mode: 0=hybrid (default), 1=natural
     int mode;
+
+    // Classes
+    ClassInfo classes[MAX_CLASSES];
+    int class_count;
 
     // Lexer ref
     Lexer *lex;

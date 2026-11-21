@@ -1283,7 +1283,11 @@
             case 'nat_remove': {
                 const arr = env.get(stmt.target);
                 const idx = evalExpr(stmt.index, env);
-                if (Array.isArray(arr)) arr.splice(idx, 1);
+                if (typeof arr === 'object' && arr !== null && !Array.isArray(arr)) {
+                    delete arr[stringify(idx)];
+                } else if (Array.isArray(arr)) {
+                    arr.splice(idx, 1);
+                }
                 break;
             }
             case 'expr': {

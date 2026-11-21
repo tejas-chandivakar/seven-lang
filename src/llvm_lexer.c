@@ -32,7 +32,7 @@ static const Keyword keywords[] = {
     {"use", TOK_USE},
     {"try", TOK_TRY}, {"catch", TOK_CATCH},
     {"ask", TOK_ASK}, {"assert", TOK_ASSERT},
-    {"is", TOK_IS}, {"isnt", TOK_ISNT},
+    {"equals", TOK_EQUALS}, {"is", TOK_IS}, {"isnt", TOK_ISNT},
     {"above", TOK_ABOVE}, {"below", TOK_BELOW},
     {"atleast", TOK_ATLEAST}, {"atmost", TOK_ATMOST},
     {"and", TOK_AND}, {"or", TOK_OR}, {"not", TOK_NOT},
@@ -276,6 +276,7 @@ const char *token_type_name(SevenTokenType t) {
         case TOK_AND: return "and";
         case TOK_OR: return "or";
         case TOK_NOT: return "not";
+        case TOK_EQUALS: return "equals";
         case TOK_MODE: return "mode";
         case TOK_HYBRID: return "hybrid";
         case TOK_NATURAL: return "natural";

@@ -669,6 +669,7 @@ static LLVMValueRef compile_comparison(SevenModule *mod) {
 
     switch (t->type) {
         case TOK_IS:      pred = LLVMIntEQ; break;
+        case TOK_EQUALS:  pred = LLVMIntEQ; break;
         case TOK_ISNT:    pred = LLVMIntNE; break;
         case TOK_ABOVE:   pred = LLVMIntSGT; break;
         case TOK_BELOW:   pred = LLVMIntSLT; break;
@@ -815,9 +816,9 @@ static void compile_assignment(SevenModule *mod) {
         return;
     }
 
-    if (op->type == TOK_ASSIGN) {
-        // x = expr
-        lexer_next(mod->lex); // skip =
+    if (op->type == TOK_ASSIGN || op->type == TOK_TO) {
+        // x = expr  OR  set x to expr
+        lexer_next(mod->lex); // skip = or to
 
         // Detect array literal for type tracking
         int rhs_is_array = (lexer_peek(mod->lex)->type == TOK_LBRACKET);
@@ -959,10 +960,23 @@ static void compile_repeat(SevenModule *mod) {
     lexer_next(mod->lex); // skip 'repeat'
 
     LLVMValueRef count = compile_expr(mod);
+    LLVMTypeRef i64 = LLVMInt64TypeInContext(mod->ctx);
+
+    // Check for 'times' keyword
+    if (lexer_peek(mod->lex)->type == TOK_TIMES)
+        lexer_next(mod->lex); // skip 'times'
+
+    // Check for 'as i' — loop variable
+    VarInfo *loop_var = NULL;
+    if (lexer_peek(mod->lex)->type == TOK_AS) {
+        lexer_next(mod->lex); // skip 'as'
+        Token *vt = lexer_expect(mod->lex, TOK_IDENT);
+        loop_var = create_var(mod, vt->value, 0);
+    }
 
     // Create counter
-    LLVMValueRef counter = LLVMBuildAlloca(mod->builder, LLVMInt64TypeInContext(mod->ctx), "rep_i");
-    LLVMBuildStore(mod->builder, LLVMConstInt(LLVMInt64TypeInContext(mod->ctx), 0, 0), counter);
+    LLVMValueRef counter = LLVMBuildAlloca(mod->builder, i64, "rep_i");
+    LLVMBuildStore(mod->builder, LLVMConstInt(i64, 0, 0), counter);
 
     LLVMBasicBlockRef cond_bb = LLVMAppendBasicBlockInContext(mod->ctx, mod->current_func, "rep_cond");
     LLVMBasicBlockRef body_bb = LLVMCreateBasicBlockInContext(mod->ctx, "rep_body");
@@ -971,27 +985,36 @@ static void compile_repeat(SevenModule *mod) {
     LLVMBuildBr(mod->builder, cond_bb);
     LLVMPositionBuilderAtEnd(mod->builder, cond_bb);
 
-    LLVMValueRef i = LLVMBuildLoad2(mod->builder, LLVMInt64TypeInContext(mod->ctx), counter, "i");
+    LLVMValueRef i = LLVMBuildLoad2(mod->builder, i64, counter, "i");
     LLVMValueRef cmp = LLVMBuildICmp(mod->builder, LLVMIntSLT, i, count, "rep_test");
     LLVMBuildCondBr(mod->builder, cmp, body_bb, exit_bb);
 
     LLVMAppendExistingBasicBlock(mod->current_func, body_bb);
     LLVMPositionBuilderAtEnd(mod->builder, body_bb);
+
+    // Set loop variable to current index
+    if (loop_var) {
+        LLVMValueRef cur_i = LLVMBuildLoad2(mod->builder, i64, counter, "cur_i");
+        LLVMBuildStore(mod->builder, cur_i, loop_var->alloca);
+    }
+
     skip_newlines(mod);
 
     while (1) {
         Token *t = lexer_peek(mod->lex);
-        if (t->type == TOK_DONE || t->type == TOK_EOF) break;
+        if (t->type == TOK_END || t->type == TOK_DONE || t->type == TOK_EOF) break;
         compile_statement(mod);
         skip_newlines(mod);
     }
 
-    lexer_expect(mod->lex, TOK_DONE);
+    // Accept both 'end' and 'done'
+    Token *end_tok = lexer_peek(mod->lex);
+    if (end_tok->type == TOK_END || end_tok->type == TOK_DONE)
+        lexer_next(mod->lex);
 
     // Increment counter
-    LLVMValueRef cur = LLVMBuildLoad2(mod->builder, LLVMInt64TypeInContext(mod->ctx), counter, "cur");
-    LLVMValueRef next = LLVMBuildAdd(mod->builder, cur,
-        LLVMConstInt(LLVMInt64TypeInContext(mod->ctx), 1, 0), "inc");
+    LLVMValueRef cur = LLVMBuildLoad2(mod->builder, i64, counter, "cur");
+    LLVMValueRef next = LLVMBuildAdd(mod->builder, cur, LLVMConstInt(i64, 1, 0), "inc");
     LLVMBuildStore(mod->builder, next, counter);
 
     LLVMBuildBr(mod->builder, cond_bb);
@@ -1003,19 +1026,25 @@ static void compile_repeat(SevenModule *mod) {
 static void compile_func_def(SevenModule *mod) {
     lexer_next(mod->lex); // skip 'func'
 
-    Token *name_tok = lexer_expect(mod->lex, TOK_IDENT);
+    // Accept keywords as function names (e.g. func add(...))
+    Token *name_tok = lexer_next(mod->lex);
+    if (!name_tok->value) {
+        fprintf(stderr, "error: expected function name\n"); return;
+    }
     const char *name = name_tok->value;
 
     lexer_expect(mod->lex, TOK_LPAREN);
 
-    // Collect parameter names
+    // Collect parameter names (keywords allowed as param names too)
     char *params[32];
     int param_count = 0;
 
     if (lexer_peek(mod->lex)->type != TOK_RPAREN) {
-        params[param_count++] = strdup(lexer_expect(mod->lex, TOK_IDENT)->value);
+        Token *p = lexer_next(mod->lex);
+        params[param_count++] = strdup(p->value);
         while (lexer_match(mod->lex, TOK_COMMA)) {
-            params[param_count++] = strdup(lexer_expect(mod->lex, TOK_IDENT)->value);
+            p = lexer_next(mod->lex);
+            params[param_count++] = strdup(p->value);
         }
     }
     lexer_expect(mod->lex, TOK_RPAREN);
@@ -1577,7 +1606,7 @@ static void compile_nat_insert(SevenModule *mod) {
         rt_arr_insert, (LLVMValueRef[]){arr, val_to_i64(mod, idx), val_to_i64(mod, val)}, 3, "");
 }
 
-// remove I from arr
+// remove I from arr  OR  remove "key" from dict
 static void compile_nat_remove(SevenModule *mod) {
     LLVMValueRef idx = compile_expr(mod);
     lexer_expect(mod->lex, TOK_FROM);
@@ -1587,8 +1616,16 @@ static void compile_nat_remove(SevenModule *mod) {
     LLVMValueRef arr = load_var(mod, v);
     LLVMTypeRef pt = LLVMPointerTypeInContext(mod->ctx, 0);
     LLVMTypeRef i64 = LLVMInt64TypeInContext(mod->ctx);
-    LLVMBuildCall2(mod->builder, LLVMFunctionType(LLVMVoidTypeInContext(mod->ctx), (LLVMTypeRef[]){pt, i64}, 2, 0),
-        rt_arr_remove, (LLVMValueRef[]){arr, val_to_i64(mod, idx)}, 2, "");
+
+    if (v->is_string == 3) {
+        // Dict: remove key → rt_dict_remove(dict, key_str)
+        LLVMBuildCall2(mod->builder, LLVMFunctionType(LLVMVoidTypeInContext(mod->ctx), (LLVMTypeRef[]){pt, pt}, 2, 0),
+            rt_dict_remove, (LLVMValueRef[]){arr, idx}, 2, "");
+    } else {
+        // Array: remove index → rt_arr_remove(arr, idx)
+        LLVMBuildCall2(mod->builder, LLVMFunctionType(LLVMVoidTypeInContext(mod->ctx), (LLVMTypeRef[]){pt, i64}, 2, 0),
+            rt_arr_remove, (LLVMValueRef[]){arr, val_to_i64(mod, idx)}, 2, "");
+    }
 }
 
 // ---- File I/O statements ----
@@ -1654,7 +1691,15 @@ static void compile_statement(SevenModule *mod) {
             else mod->mode = 0;
             break;
         }
-        case TOK_ADD:     compile_nat_add(mod); break;
+        case TOK_ADD:
+            // If followed by '(', it's a function call: add(a, b)
+            if (mod->lex->pos + 1 < mod->lex->count &&
+                mod->lex->tokens[mod->lex->pos + 1].type == TOK_LPAREN) {
+                compile_assignment(mod);
+            } else {
+                compile_nat_add(mod);
+            }
+            break;
         case TOK_SET:     lexer_next(mod->lex); compile_assignment(mod); break;
         case TOK_RESULT:
         case TOK_IDENT:   compile_assignment(mod); break;

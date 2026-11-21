@@ -8,7 +8,7 @@ repeat 3 times as i
 end
 
 x = 0
-while x < 3
+while x below 3
     show x
     x = x + 1
-end
+done

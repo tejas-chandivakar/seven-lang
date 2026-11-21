@@ -56,6 +56,7 @@ typedef enum {
     TOK_ASSIGN,       // =
 
     // Comparison (word-based)
+    TOK_EQUALS,       // equals
     TOK_IS,           // is
     TOK_ISNT,         // isnt
     TOK_ABOVE,        // above

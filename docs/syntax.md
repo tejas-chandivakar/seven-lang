@@ -13,7 +13,7 @@ mode hybrid       !! default — array ops use function style: push(list, x)
 mode natural      !! array ops use English style: add x to list
 ```
 
-No declaration = `mode hybrid` by default. Mode affects only array operations — everything else is identical.
+No declaration = `mode hybrid` by default. Mode affects array/dict operations and adds English-style syntax (`repeat N times as i`, `equals` comparisons, `remove "key" from dict`).
 
 ---
 
@@ -164,6 +164,20 @@ add 4 to nums
 pop from nums
 insert 99 at 1 in nums
 remove 0 from nums
+
+!! Dict operations in natural mode
+scores = {"math": 90, "science": 85}
+remove "science" from scores
+
+!! repeat with counter variable
+repeat 5 times as i
+    show i
+done
+
+!! equals keyword for comparison
+if x equals 10
+    show "ten"
+end
 ```
 
 ### Common (both modes)

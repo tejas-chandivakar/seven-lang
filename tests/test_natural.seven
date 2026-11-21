@@ -1,0 +1,40 @@
+!! Test: Natural mode features
+mode natural
+
+!! Array operations
+set fruits to [10, 20, 30]
+add 40 to fruits
+assert(len(fruits) is 4, "add to array")
+assert(fruits[3] is 40, "added element")
+
+pop from fruits
+assert(len(fruits) is 3, "pop from array")
+
+insert 99 at 1 in fruits
+assert(fruits[1] is 99, "insert at index")
+
+remove 1 from fruits
+assert(len(fruits) is 3, "remove from array")
+
+!! Dict operations
+set scores to {"math": 90, "science": 85}
+remove "science" from scores
+assert(len(scores) is 1, "remove key from dict")
+assert(has(scores, "math") is 1, "remaining key exists")
+assert(has(scores, "science") is 0, "removed key gone")
+
+!! repeat N times as i
+set total to 0
+repeat 5 times as i
+    set total to total + i
+done
+assert(total is 10, "repeat times as i sum")
+
+!! equals keyword
+set x to 10
+if x equals 10
+    set ok to 1
+end
+assert(ok is 1, "equals keyword")
+
+show "Natural mode tests passed!"

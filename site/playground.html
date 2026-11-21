@@ -153,6 +153,7 @@
                         <button class="example-btn w-full text-left px-4 py-2.5 rounded-lg text-sm text-gray-400 border border-white/5 hover:border-white/10 transition" data-example="sorting">Sorting</button>
                         <button class="example-btn w-full text-left px-4 py-2.5 rounded-lg text-sm text-gray-400 border border-white/5 hover:border-white/10 transition" data-example="testing">Testing</button>
                         <button class="example-btn w-full text-left px-4 py-2.5 rounded-lg text-sm text-gray-400 border border-white/5 hover:border-white/10 transition" data-example="errorhandling">Error Handling</button>
+                        <button class="example-btn w-full text-left px-4 py-2.5 rounded-lg text-sm text-gray-400 border border-white/5 hover:border-white/10 transition" data-example="dictionary">Dictionary</button>
                         <button class="example-btn w-full text-left px-4 py-2.5 rounded-lg text-sm text-gray-400 border border-white/5 hover:border-white/10 transition" data-example="natural">Natural Mode</button>
                     </div>
                 </div>
@@ -526,6 +527,27 @@
             }
         }
 
+        // Dictionary literal: {"key": value, ...}
+        if (expr.startsWith('{')) {
+            const end = findMatchingBracket(expr, 0, '{', '}');
+            if (end === expr.length - 1) {
+                const inner = expr.slice(1, -1).trim();
+                if (inner === '') return {};
+                const dict = {};
+                const entries = splitArgs(inner);
+                for (const rawEntry of entries) {
+                    const entry = rawEntry.trim();
+                    const ci = findColon(entry);
+                    if (ci !== -1) {
+                        const key = evalExpr(entry.substring(0, ci).trim(), env);
+                        const val = evalExpr(entry.substring(ci + 1).trim(), env);
+                        dict[stringify(key)] = val;
+                    }
+                }
+                return dict;
+            }
+        }
+
         // Parenthesized expression
         if (expr.startsWith('(') && findMatchingBracket(expr, 0, '(', ')') === expr.length - 1) {
             return evalExpr(expr.slice(1, -1), env);
@@ -562,6 +584,7 @@
             const col = evalExpr(split.right, env);
             if (Array.isArray(col)) return col.some(x => x === val || String(x) === String(val)) ? 1 : 0;
             if (typeof col === 'string') return col.includes(String(val)) ? 1 : 0;
+            if (typeof col === 'object' && col !== null) return (stringify(val) in col) ? 1 : 0;
             return 0;
         }
 
@@ -633,6 +656,15 @@
             return callMethod(obj, method, args, env);
         }
 
+        // Dict property access: obj.prop (no parens — after method call check)
+        const propMatch = expr.match(/^(\w+)\.(\w+)$/);
+        if (propMatch) {
+            const obj = env.get(propMatch[1]);
+            if (typeof obj === 'object' && !Array.isArray(obj) && obj !== null) {
+                return obj[propMatch[2]] !== undefined ? obj[propMatch[2]] : 0;
+            }
+        }
+
         // Function call: name(args)
         const funcMatch = expr.match(/^(\w+)\((.*)?\)$/);
         if (funcMatch) {
@@ -642,18 +674,21 @@
             return callFunction(name, args, env);
         }
 
-        // Array indexing: name[expr] or expr[expr]
+        // Array/dict indexing: name[expr]
         const idxMatch = expr.match(/^(\w+)\[(.+)\]$/);
         if (idxMatch) {
-            const arr = env.get(idxMatch[1]);
+            const obj = env.get(idxMatch[1]);
             const idx = evalExpr(idxMatch[2], env);
-            if (Array.isArray(arr)) {
-                const i = idx < 0 ? arr.length + idx : idx;
-                return arr[i] !== undefined ? arr[i] : 0;
+            if (typeof obj === 'object' && !Array.isArray(obj) && obj !== null) {
+                return obj[stringify(idx)] !== undefined ? obj[stringify(idx)] : 0;
             }
-            if (typeof arr === 'string') {
-                const i = idx < 0 ? arr.length + idx : idx;
-                return arr[i] || '';
+            if (Array.isArray(obj)) {
+                const i = idx < 0 ? obj.length + idx : idx;
+                return obj[i] !== undefined ? obj[i] : 0;
+            }
+            if (typeof obj === 'string') {
+                const i = idx < 0 ? obj.length + idx : idx;
+                return obj[i] || '';
             }
             return 0;
         }
@@ -669,7 +704,23 @@
     function stringify(val) {
         if (val === null || val === undefined) return '';
         if (Array.isArray(val)) return '[' + val.map(stringify).join(', ') + ']';
+        if (typeof val === 'object') {
+            const entries = Object.entries(val).map(([k, v]) => '"' + k + '": ' + stringify(v));
+            return '{' + entries.join(', ') + '}';
+        }
         return String(val);
+    }
+
+    function findColon(s) {
+        let inStr = false, strChar = '', depth = 0;
+        for (let i = 0; i < s.length; i++) {
+            if (inStr) { if (s[i] === strChar && s[i-1] !== '\\') inStr = false; continue; }
+            if (s[i] === '"' || s[i] === "'") { inStr = true; strChar = s[i]; continue; }
+            if ('([{'.includes(s[i])) { depth++; continue; }
+            if (')]}'.includes(s[i])) { depth--; continue; }
+            if (s[i] === ':' && depth === 0) return i;
+        }
+        return -1;
     }
 
     function findMatchingBracket(s, start, open, close) {
@@ -752,6 +803,7 @@
             case 'len':
                 if (typeof args[0] === 'string') return args[0].length;
                 if (Array.isArray(args[0])) return args[0].length;
+                if (typeof args[0] === 'object' && args[0] !== null) return Object.keys(args[0]).length;
                 return 0;
             case 'abs': return Math.abs(args[0]);
             case 'min': return Math.min(...args);
@@ -859,6 +911,38 @@
                 if (typeof args[0] === 'string') return args[0].indexOf(String(args[1]));
                 return -1;
             }
+            case 'keys': {
+                if (typeof args[0] === 'object' && !Array.isArray(args[0]) && args[0] !== null)
+                    return Object.keys(args[0]);
+                return [];
+            }
+            case 'values': {
+                if (typeof args[0] === 'object' && !Array.isArray(args[0]) && args[0] !== null)
+                    return Object.values(args[0]);
+                return [];
+            }
+            case 'has': {
+                if (typeof args[0] === 'object' && !Array.isArray(args[0]) && args[0] !== null)
+                    return (stringify(args[1]) in args[0]) ? 1 : 0;
+                return 0;
+            }
+            case 'remove_key': {
+                if (typeof args[0] === 'object' && !Array.isArray(args[0]) && args[0] !== null) {
+                    delete args[0][stringify(args[1])];
+                    return args[0];
+                }
+                return args[0];
+            }
+            case 'merge': {
+                if (typeof args[0] === 'object' && typeof args[1] === 'object')
+                    return Object.assign({}, args[0], args[1]);
+                return args[0];
+            }
+            case 'items': {
+                if (typeof args[0] === 'object' && !Array.isArray(args[0]) && args[0] !== null)
+                    return Object.entries(args[0]).map(([k, v]) => [k, v]);
+                return [];
+            }
             case 'char_at': {
                 const s = String(args[0]);
                 const i = args[1] || 0;
@@ -902,6 +986,18 @@
                 case 'slice': return obj.slice(args[0] || 0, args[1]);
                 case 'contains': return obj.includes(args[0]) ? 1 : 0;
                 default: throw new Error("Unknown array method: " + method);
+            }
+        }
+        if (typeof obj === 'object' && !Array.isArray(obj) && obj !== null) {
+            switch (method) {
+                case 'keys': return Object.keys(obj);
+                case 'values': return Object.values(obj);
+                case 'has': return (stringify(args[0]) in obj) ? 1 : 0;
+                case 'len': return Object.keys(obj).length;
+                case 'merge': if (typeof args[0] === 'object') return Object.assign({}, obj, args[0]); return obj;
+                case 'items': return Object.entries(obj).map(([k, v]) => [k, v]);
+                case 'remove': delete obj[stringify(args[0])]; return obj;
+                default: throw new Error("Unknown dict method: " + method);
             }
         }
         throw new Error("Cannot call method on " + typeof obj);
@@ -1034,7 +1130,9 @@
                 const arr = env.get(stmt.name);
                 const idx = evalExpr(stmt.index, env);
                 const val = evalExpr(stmt.expr, env);
-                if (Array.isArray(arr)) {
+                if (typeof arr === 'object' && !Array.isArray(arr) && arr !== null) {
+                    arr[stringify(idx)] = val;
+                } else if (Array.isArray(arr)) {
                     const i = idx < 0 ? arr.length + idx : idx;
                     arr[i] = val;
                 }
@@ -1091,7 +1189,16 @@
             }
             case 'each': {
                 const col = evalExpr(stmt.collection, env);
-                if (Array.isArray(col)) {
+                if (typeof col === 'object' && !Array.isArray(col) && col !== null) {
+                    const entries = Object.entries(col);
+                    for (let i = 0; i < entries.length; i++) {
+                        env.tick();
+                        if (stmt.indexVar) env.set(stmt.indexVar, entries[i][0]);
+                        env.set(stmt.itemVar, entries[i][1]);
+                        try { execBlock(stmt.body, env); }
+                        catch (e) { if (e instanceof SkipSignal) continue; if (e instanceof StopSignal) break; throw e; }
+                    }
+                } else if (Array.isArray(col)) {
                     for (let i = 0; i < col.length; i++) {
                         env.tick();
                         if (stmt.indexVar) env.set(stmt.indexVar, i);
@@ -1459,6 +1566,44 @@ func safe_div(a, b)
 end
 
 show safe_div(10, 2)`,
+        },
+        dictionary: {
+            file: "dictionary.seven",
+            code: `!! Dictionary / Map data structure
+person = {"name": "Tejas", "age": 25, "lang": "SEVEN"}
+
+!! Access by key
+show "Name: " + person["name"]
+show "Age: " + str(person["age"])
+
+!! Dot access
+show "Language: " + person.lang
+
+!! Add / update keys
+person["city"] = "India"
+show "City: " + person["city"]
+
+!! Built-in functions
+show "Keys: " + str(keys(person))
+show "Values: " + str(values(person))
+show "Length: " + str(len(person))
+show "Has name? " + str(has(person, "name"))
+show "Has email? " + str(has(person, "email"))
+
+!! Iterate with each
+show "--- All entries ---"
+each person as key, val
+    show key + " = " + str(val)
+end
+
+!! Merge two dicts
+extra = {"email": "test@test.com", "role": "dev"}
+merged = merge(person, extra)
+show "Merged keys: " + str(keys(merged))
+
+!! Remove a key
+remove_key(person, "age")
+show "After remove: " + str(keys(person))`,
         },
         natural: {
             file: "natural.seven",

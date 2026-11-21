@@ -48,6 +48,8 @@ typedef enum {
     TOK_RPAREN,       // )
     TOK_LBRACKET,     // [
     TOK_RBRACKET,     // ]
+    TOK_LBRACE,       // {
+    TOK_RBRACE,       // }
     TOK_COMMA,        // ,
     TOK_DOT,          // .
     TOK_COLON,        // :

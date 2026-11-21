@@ -37,6 +37,9 @@ static LLVMValueRef rt_file_exists, rt_file_write, rt_file_read;
 static LLVMValueRef rt_file_append, rt_file_delete;
 static LLVMValueRef rt_time, rt_clock_ns, rt_sleep_fn, rt_env, rt_system_fn;
 static LLVMValueRef rt_ask, rt_show_int, rt_show_str;
+static LLVMValueRef rt_dict_new, rt_dict_len, rt_dict_set, rt_dict_get;
+static LLVMValueRef rt_dict_has, rt_dict_remove, rt_dict_keys, rt_dict_values;
+static LLVMValueRef rt_dict_merge, rt_dict_to_str;
 
 // ---- Forward declarations ----
 static void compile_statement(SevenModule *mod);
@@ -58,6 +61,7 @@ static void compile_delete_file(SevenModule *mod);
 static void compile_append_file(SevenModule *mod);
 static LLVMValueRef compile_builtin_call(SevenModule *mod, const char *name);
 static LLVMValueRef compile_array_literal(SevenModule *mod);
+static LLVMValueRef compile_dict_literal(SevenModule *mod);
 
 static void skip_newlines(SevenModule *mod) {
     while (lexer_peek(mod->lex)->type == TOK_NEWLINE)
@@ -228,6 +232,18 @@ static void declare_externals(SevenModule *mod) {
     FN(rt_ask, "seven_ask", i8ptr, 1, i8ptr);
     FN(rt_show_int, "seven_show_int", v, 1, i64);
     FN(rt_show_str, "seven_show_str", v, 1, i8ptr);
+
+    // Dictionary
+    FN0(rt_dict_new, "seven_dict_new", i8ptr);
+    FN(rt_dict_len, "seven_dict_len", i64, 1, i8ptr);
+    FN(rt_dict_set, "seven_dict_set", v, 3, i8ptr, i8ptr, i64);
+    FN(rt_dict_get, "seven_dict_get", i64, 2, i8ptr, i8ptr);
+    FN(rt_dict_has, "seven_dict_has", i64, 2, i8ptr, i8ptr);
+    FN(rt_dict_remove, "seven_dict_remove", v, 2, i8ptr, i8ptr);
+    FN(rt_dict_keys, "seven_dict_keys", i8ptr, 1, i8ptr);
+    FN(rt_dict_values, "seven_dict_values", i8ptr, 1, i8ptr);
+    FN(rt_dict_merge, "seven_dict_merge", i8ptr, 2, i8ptr, i8ptr);
+    FN(rt_dict_to_str, "seven_dict_to_str", i8ptr, 1, i8ptr);
 
     #undef FN
     #undef FN0
@@ -508,20 +524,25 @@ static LLVMValueRef compile_primary(SevenModule *mod) {
                 }
             }
 
-            // Check for array subscript: ident[expr]
+            // Check for array/dict subscript: ident[expr]
             if (lexer_peek(mod->lex)->type == TOK_LBRACKET) {
                 VarInfo *v = find_var(mod, name);
                 if (!v) {
                     fprintf(stderr, "error: undefined variable '%s'\n", name);
                     return LLVMConstInt(LLVMInt64TypeInContext(mod->ctx), 0, 0);
                 }
-                LLVMValueRef arr = load_var(mod, v);
+                LLVMValueRef obj = load_var(mod, v);
                 lexer_next(mod->lex); // skip [
                 LLVMValueRef idx = compile_expr(mod);
                 lexer_expect(mod->lex, TOK_RBRACKET);
                 LLVMTypeRef pt = LLVMPointerTypeInContext(mod->ctx, 0);
                 LLVMTypeRef i64 = LLVMInt64TypeInContext(mod->ctx);
-                LLVMValueRef args[] = { arr, val_to_i64(mod, idx) };
+                if (v->is_string == 3) {
+                    LLVMValueRef key = is_ptr_val(idx) ? idx : val_to_ptr(mod, idx);
+                    LLVMValueRef args[] = { obj, key };
+                    return LLVMBuildCall2(mod->builder, LLVMFunctionType(i64, (LLVMTypeRef[]){pt, pt}, 2, 0), rt_dict_get, args, 2, "dget");
+                }
+                LLVMValueRef args[] = { obj, val_to_i64(mod, idx) };
                 return LLVMBuildCall2(mod->builder, LLVMFunctionType(i64, (LLVMTypeRef[]){pt, i64}, 2, 0), rt_arr_get, args, 2, "aget");
             }
 
@@ -542,6 +563,9 @@ static LLVMValueRef compile_primary(SevenModule *mod) {
 
         case TOK_LBRACKET:
             return compile_array_literal(mod);
+
+        case TOK_LBRACE:
+            return compile_dict_literal(mod);
 
         case TOK_ASK: {
             lexer_next(mod->lex);
@@ -738,24 +762,66 @@ static void compile_assignment(SevenModule *mod) {
 
     Token *op = lexer_peek(mod->lex);
 
+    if (op->type == TOK_LPAREN) {
+        // name(...) — function call as statement
+        LLVMValueRef result = compile_builtin_call(mod, name);
+        if (!result) {
+            compile_func_call(mod, name);
+        }
+        return;
+    }
+
+    if (op->type == TOK_LBRACKET) {
+        // name[key] = val — indexed assignment for array or dict
+        lexer_next(mod->lex); // skip [
+        LLVMValueRef idx = compile_expr(mod);
+        lexer_expect(mod->lex, TOK_RBRACKET);
+        lexer_expect(mod->lex, TOK_ASSIGN);
+        LLVMValueRef val = compile_expr(mod);
+
+        VarInfo *v = find_var(mod, name);
+        if (!v) {
+            fprintf(stderr, "error: undefined variable '%s'\n", name);
+            return;
+        }
+        LLVMValueRef obj = load_var(mod, v);
+        LLVMTypeRef pt = LLVMPointerTypeInContext(mod->ctx, 0);
+        LLVMTypeRef i64t = LLVMInt64TypeInContext(mod->ctx);
+        LLVMTypeRef vt = LLVMVoidTypeInContext(mod->ctx);
+
+        if (v->is_string == 3) {
+            LLVMValueRef key = is_ptr_val(idx) ? idx : val_to_ptr(mod, idx);
+            LLVMValueRef args[] = { obj, key, val_to_i64(mod, val) };
+            LLVMBuildCall2(mod->builder, LLVMFunctionType(vt, (LLVMTypeRef[]){pt, pt, i64t}, 3, 0), rt_dict_set, args, 3, "");
+        } else {
+            LLVMValueRef args[] = { obj, val_to_i64(mod, idx), val_to_i64(mod, val) };
+            LLVMBuildCall2(mod->builder, LLVMFunctionType(vt, (LLVMTypeRef[]){pt, i64t, i64t}, 3, 0), rt_arr_set, args, 3, "");
+        }
+        return;
+    }
+
     if (op->type == TOK_ASSIGN) {
         // x = expr
         lexer_next(mod->lex); // skip =
 
         // Detect array literal for type tracking
         int rhs_is_array = (lexer_peek(mod->lex)->type == TOK_LBRACKET);
-        // Detect array-returning builtins
+        int rhs_is_dict = (lexer_peek(mod->lex)->type == TOK_LBRACE);
+        // Detect array/dict-returning builtins
         if (lexer_peek(mod->lex)->type == TOK_IDENT) {
             const char *fn = lexer_peek(mod->lex)->value;
             if (strcmp(fn, "range") == 0 || strcmp(fn, "fill") == 0 ||
-                strcmp(fn, "unique") == 0 || strcmp(fn, "sort") == 0)
+                strcmp(fn, "unique") == 0 || strcmp(fn, "sort") == 0 ||
+                strcmp(fn, "keys") == 0 || strcmp(fn, "values") == 0)
                 rhs_is_array = 1;
+            if (strcmp(fn, "merge") == 0)
+                rhs_is_dict = 1;
         }
 
         LLVMValueRef val = compile_expr(mod);
 
         int is_ptr = (LLVMGetTypeKind(LLVMTypeOf(val)) == LLVMPointerTypeKind);
-        int vtype = is_ptr ? (rhs_is_array ? 2 : 1) : 0;
+        int vtype = is_ptr ? (rhs_is_dict ? 3 : (rhs_is_array ? 2 : 1)) : 0;
         VarInfo *v = create_var(mod, name, vtype);
 
         if (is_ptr) {
@@ -1109,16 +1175,21 @@ static LLVMValueRef compile_builtin_call(SevenModule *mod, const char *name) {
     // --- String functions ---
     if (strcmp(name, "len") == 0) {
         PARSE_ARGS_START;
-        // Check if arg is a variable to determine type
         Token *peek = lexer_peek(mod->lex);
         int arg_is_array = 0;
+        int arg_is_dict = 0;
         if (peek->type == TOK_IDENT) {
             VarInfo *vv = find_var(mod, peek->value);
             if (vv && vv->is_string == 2) arg_is_array = 1;
+            if (vv && vv->is_string == 3) arg_is_dict = 1;
         } else if (peek->type == TOK_LBRACKET) {
             arg_is_array = 1;
+        } else if (peek->type == TOK_LBRACE) {
+            arg_is_dict = 1;
         }
         LLVMValueRef a = PARSE_ARG; PARSE_ARGS_END;
+        if (arg_is_dict)
+            return CALL1(rt_dict_len, i64, pt, is_ptr_val(a) ? a : val_to_ptr(mod, a));
         if (arg_is_array)
             return CALL1(rt_arr_len, i64, pt, is_ptr_val(a) ? a : val_to_ptr(mod, a));
         return CALL1(rt_str_len, i64, pt, a);
@@ -1281,6 +1352,30 @@ static LLVMValueRef compile_builtin_call(SevenModule *mod, const char *name) {
         PARSE_ARGS_START; LLVMValueRef a = PARSE_ARG; PARSE_ARGS_END;
         return CALL1(rt_ask, pt, pt, a);
     }
+    // Dictionary functions
+    if (strcmp(name, "keys") == 0) {
+        PARSE_ARGS_START; LLVMValueRef a = PARSE_ARG; PARSE_ARGS_END;
+        return CALL1(rt_dict_keys, pt, pt, is_ptr_val(a) ? a : val_to_ptr(mod, a));
+    }
+    if (strcmp(name, "values") == 0) {
+        PARSE_ARGS_START; LLVMValueRef a = PARSE_ARG; PARSE_ARGS_END;
+        return CALL1(rt_dict_values, pt, pt, is_ptr_val(a) ? a : val_to_ptr(mod, a));
+    }
+    if (strcmp(name, "has") == 0) {
+        PARSE_ARGS_START; LLVMValueRef a = PARSE_ARG; PARSE_COMMA; LLVMValueRef b = PARSE_ARG; PARSE_ARGS_END;
+        return CALL2(rt_dict_has, i64, pt, pt, is_ptr_val(a) ? a : val_to_ptr(mod, a), is_ptr_val(b) ? b : val_to_ptr(mod, b));
+    }
+    if (strcmp(name, "remove_key") == 0) {
+        PARSE_ARGS_START; LLVMValueRef a = PARSE_ARG; PARSE_COMMA; LLVMValueRef b = PARSE_ARG; PARSE_ARGS_END;
+        LLVMValueRef ap = is_ptr_val(a) ? a : val_to_ptr(mod, a);
+        LLVMValueRef bp = is_ptr_val(b) ? b : val_to_ptr(mod, b);
+        LLVMBuildCall2(mod->builder, LLVMFunctionType(vt, (LLVMTypeRef[]){pt, pt}, 2, 0), rt_dict_remove, (LLVMValueRef[]){ap, bp}, 2, "");
+        return ap;
+    }
+    if (strcmp(name, "merge") == 0) {
+        PARSE_ARGS_START; LLVMValueRef a = PARSE_ARG; PARSE_COMMA; LLVMValueRef b = PARSE_ARG; PARSE_ARGS_END;
+        return CALL2(rt_dict_merge, pt, pt, pt, is_ptr_val(a) ? a : val_to_ptr(mod, a), is_ptr_val(b) ? b : val_to_ptr(mod, b));
+    }
 
     #undef PARSE_ARGS_START
     #undef PARSE_ARG
@@ -1315,6 +1410,36 @@ static LLVMValueRef compile_array_literal(SevenModule *mod) {
     }
     lexer_expect(mod->lex, TOK_RBRACKET);
     return arr;
+}
+
+static LLVMValueRef compile_dict_literal(SevenModule *mod) {
+    lexer_next(mod->lex); // skip {
+    LLVMTypeRef pt = LLVMPointerTypeInContext(mod->ctx, 0);
+    LLVMTypeRef i64 = LLVMInt64TypeInContext(mod->ctx);
+    LLVMTypeRef vt = LLVMVoidTypeInContext(mod->ctx);
+
+    LLVMValueRef dict = LLVMBuildCall2(mod->builder, LLVMFunctionType(pt, NULL, 0, 0), rt_dict_new, NULL, 0, "dict");
+
+    if (lexer_peek(mod->lex)->type != TOK_RBRACE) {
+        // key : value
+        LLVMValueRef key = compile_expr(mod);
+        lexer_expect(mod->lex, TOK_COLON);
+        LLVMValueRef val = compile_expr(mod);
+        LLVMValueRef kp = is_ptr_val(key) ? key : val_to_ptr(mod, key);
+        LLVMValueRef args[] = { dict, kp, val_to_i64(mod, val) };
+        LLVMBuildCall2(mod->builder, LLVMFunctionType(vt, (LLVMTypeRef[]){pt, pt, i64}, 3, 0), rt_dict_set, args, 3, "");
+
+        while (lexer_match(mod->lex, TOK_COMMA)) {
+            key = compile_expr(mod);
+            lexer_expect(mod->lex, TOK_COLON);
+            val = compile_expr(mod);
+            kp = is_ptr_val(key) ? key : val_to_ptr(mod, key);
+            LLVMValueRef args2[] = { dict, kp, val_to_i64(mod, val) };
+            LLVMBuildCall2(mod->builder, LLVMFunctionType(vt, (LLVMTypeRef[]){pt, pt, i64}, 3, 0), rt_dict_set, args2, 3, "");
+        }
+    }
+    lexer_expect(mod->lex, TOK_RBRACE);
+    return dict;
 }
 
 // ---- Each/as loop ----

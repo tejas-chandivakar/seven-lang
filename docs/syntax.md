@@ -178,6 +178,34 @@ reverse(nums)           !! reversed copy
 len(nums)               !! length
 ```
 
+## Dictionaries (Maps)
+```
+person = {"name": "Tejas", "age": 25}
+empty = {}
+
+!! Access by key
+show person["name"]
+person["city"] = "India"
+
+!! Built-in functions
+keys(person)              !! array of keys
+values(person)            !! array of values
+len(person)               !! number of entries
+has(person, "name")       !! 1 if key exists, 0 otherwise
+remove_key(person, "age") !! remove a key
+merged = merge(a, b)      !! combine two dicts
+
+!! Iterate
+each person as key, val
+    show key, val
+end
+
+!! Membership check
+if "name" in person
+    show "found"
+end
+```
+
 ## Files (no parentheses — language commands)
 ```
 write "file.txt", "data"

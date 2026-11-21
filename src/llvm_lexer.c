@@ -167,6 +167,8 @@ void lexer_tokenize(Lexer *lex) {
             case ')': lexer_add(lex, TOK_RPAREN, ")", line, col); break;
             case '[': lexer_add(lex, TOK_LBRACKET, "[", line, col); break;
             case ']': lexer_add(lex, TOK_RBRACKET, "]", line, col); break;
+            case '{': lexer_add(lex, TOK_LBRACE, "{", line, col); break;
+            case '}': lexer_add(lex, TOK_RBRACE, "}", line, col); break;
             case ',': lexer_add(lex, TOK_COMMA, ",", line, col); break;
             case '.': lexer_add(lex, TOK_DOT, ".", line, col); break;
             case ':': lexer_add(lex, TOK_COLON, ":", line, col); break;
@@ -257,6 +259,8 @@ const char *token_type_name(SevenTokenType t) {
         case TOK_RPAREN: return ")";
         case TOK_LBRACKET: return "[";
         case TOK_RBRACKET: return "]";
+        case TOK_LBRACE: return "{";
+        case TOK_RBRACE: return "}";
         case TOK_COMMA: return ",";
         case TOK_DOT: return ".";
         case TOK_COLON: return ":";

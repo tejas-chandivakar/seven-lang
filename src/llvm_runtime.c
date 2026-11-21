@@ -339,6 +339,120 @@ void seven_arr_remove(int64_t *arr, int64_t idx) {
     arr[0]--;
 }
 
+// ---- Dictionary functions ----
+// Layout: [count, capacity, key0, val0, key1, val1, ...]
+// Keys are char* cast to int64_t
+
+int64_t *seven_dict_new(void) {
+    int64_t cap = 16;
+    int64_t *dict = malloc(sizeof(int64_t) * (2 + cap * 2));
+    dict[0] = 0;    // count
+    dict[1] = cap;  // capacity
+    for (int64_t i = 0; i < cap * 2; i++) dict[2 + i] = 0;
+    return dict;
+}
+
+static int64_t dict_find_slot(int64_t *dict, const char *key) {
+    int64_t count = dict[0];
+    for (int64_t i = 0; i < count; i++) {
+        char *k = (char *)(uintptr_t)dict[2 + i * 2];
+        if (k && strcmp(k, key) == 0) return i;
+    }
+    return -1;
+}
+
+int64_t seven_dict_len(int64_t *dict) {
+    return dict ? dict[0] : 0;
+}
+
+void seven_dict_set(int64_t *dict, const char *key, int64_t val) {
+    if (!dict || !key) return;
+    int64_t slot = dict_find_slot(dict, key);
+    if (slot >= 0) {
+        dict[2 + slot * 2 + 1] = val;
+        return;
+    }
+    int64_t count = dict[0];
+    if (count >= dict[1]) return;
+    dict[2 + count * 2] = (int64_t)(uintptr_t)strdup(key);
+    dict[2 + count * 2 + 1] = val;
+    dict[0] = count + 1;
+}
+
+int64_t seven_dict_get(int64_t *dict, const char *key) {
+    if (!dict || !key) return 0;
+    int64_t slot = dict_find_slot(dict, key);
+    if (slot < 0) return 0;
+    return dict[2 + slot * 2 + 1];
+}
+
+int64_t seven_dict_has(int64_t *dict, const char *key) {
+    if (!dict || !key) return 0;
+    return dict_find_slot(dict, key) >= 0 ? 1 : 0;
+}
+
+void seven_dict_remove(int64_t *dict, const char *key) {
+    if (!dict || !key) return;
+    int64_t slot = dict_find_slot(dict, key);
+    if (slot < 0) return;
+    int64_t count = dict[0];
+    free((char *)(uintptr_t)dict[2 + slot * 2]);
+    for (int64_t i = slot; i < count - 1; i++) {
+        dict[2 + i * 2] = dict[2 + (i + 1) * 2];
+        dict[2 + i * 2 + 1] = dict[2 + (i + 1) * 2 + 1];
+    }
+    dict[0] = count - 1;
+}
+
+int64_t *seven_dict_keys(int64_t *dict) {
+    int64_t *arr = seven_arr_new();
+    if (!dict) return arr;
+    int64_t count = dict[0];
+    for (int64_t i = 0; i < count; i++) {
+        seven_arr_push(arr, dict[2 + i * 2]);
+    }
+    return arr;
+}
+
+int64_t *seven_dict_values(int64_t *dict) {
+    int64_t *arr = seven_arr_new();
+    if (!dict) return arr;
+    int64_t count = dict[0];
+    for (int64_t i = 0; i < count; i++) {
+        seven_arr_push(arr, dict[2 + i * 2 + 1]);
+    }
+    return arr;
+}
+
+int64_t *seven_dict_merge(int64_t *a, int64_t *b) {
+    int64_t *r = seven_dict_new();
+    if (a) {
+        for (int64_t i = 0; i < a[0]; i++)
+            seven_dict_set(r, (char *)(uintptr_t)a[2 + i * 2], a[2 + i * 2 + 1]);
+    }
+    if (b) {
+        for (int64_t i = 0; i < b[0]; i++)
+            seven_dict_set(r, (char *)(uintptr_t)b[2 + i * 2], b[2 + i * 2 + 1]);
+    }
+    return r;
+}
+
+char *seven_dict_to_str(int64_t *dict) {
+    if (!dict || dict[0] == 0) return strdup("{}");
+    char buf[65536];
+    int pos = 0;
+    buf[pos++] = '{';
+    int64_t count = dict[0];
+    for (int64_t i = 0; i < count; i++) {
+        if (i > 0) { buf[pos++] = ','; buf[pos++] = ' '; }
+        char *k = (char *)(uintptr_t)dict[2 + i * 2];
+        pos += snprintf(buf + pos, sizeof(buf) - pos, "\"%s\": %" PRId64, k ? k : "", dict[2 + i * 2 + 1]);
+    }
+    buf[pos++] = '}';
+    buf[pos] = '\0';
+    return strdup(buf);
+}
+
 // ---- Math functions ----
 
 int64_t seven_pow(int64_t base, int64_t exp) {

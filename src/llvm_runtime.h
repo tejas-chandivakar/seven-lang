@@ -53,6 +53,20 @@ int64_t *seven_arr_fill(int64_t count, int64_t val);
 void seven_arr_insert(int64_t *arr, int64_t idx, int64_t val);
 void seven_arr_remove(int64_t *arr, int64_t idx);
 
+// ---- Dictionary functions ----
+// Dicts: [count, capacity, key0, val0, key1, val1, ...]
+// Keys are char* cast to int64_t, values are int64_t
+int64_t *seven_dict_new(void);
+int64_t seven_dict_len(int64_t *dict);
+void seven_dict_set(int64_t *dict, const char *key, int64_t val);
+int64_t seven_dict_get(int64_t *dict, const char *key);
+int64_t seven_dict_has(int64_t *dict, const char *key);
+void seven_dict_remove(int64_t *dict, const char *key);
+int64_t *seven_dict_keys(int64_t *dict);
+int64_t *seven_dict_values(int64_t *dict);
+int64_t *seven_dict_merge(int64_t *a, int64_t *b);
+char *seven_dict_to_str(int64_t *dict);
+
 // ---- Math functions ----
 int64_t seven_pow(int64_t base, int64_t exp);
 int64_t seven_clamp(int64_t val, int64_t lo, int64_t hi);
